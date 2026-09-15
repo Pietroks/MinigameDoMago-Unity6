@@ -27,7 +27,7 @@ namespace WizardGame.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("Minigame do Mago reconstruido com sucesso com Menus, HUD, Mira e Arma POV!");
+            Debug.Log("Minigame do Mago reconstruido com AudioListener, BGM, SFX e Health Bars!");
         }
 
         private static void ConfigureSprites()
@@ -147,7 +147,7 @@ namespace WizardGame.EditorTools
             var controller = go.AddComponent<WizardController>();
             SetPrivateField(controller, "spriteRenderer", sr);
             SetPrivateField(controller, "hitCollider", col);
-            SetPrivateField(controller, "targetHeight", 1.5f);
+            SetPrivateField(controller, "targetHeight", 1.4f);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             GameObject.DestroyImmediate(go);
@@ -159,7 +159,7 @@ namespace WizardGame.EditorTools
             string scenePath = "Assets/Scenes/Gameplay.unity";
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // 1. Camera
+            // 1. Camera com AudioListener OBRIGATÓRIO
             GameObject camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
             var cam = camGo.AddComponent<Camera>();
@@ -169,14 +169,19 @@ namespace WizardGame.EditorTools
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.transform.position = new Vector3(0f, 0f, -10f);
 
+            // OUVINTE DE ÁUDIO (Sem ele o jogo fica 100% mudo!)
+            camGo.AddComponent<AudioListener>();
+
             // 2. SoundManager
             GameObject soundGo = new GameObject("SoundManager");
             var soundMgr = soundGo.AddComponent<SoundManager>();
+            soundMgr.bgmMusicClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/harp-piano-dreamy-flashback-jam-fx-1-00-07.mp3");
             soundMgr.normalShotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/tiro.mp3");
             soundMgr.strongShotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/raio.mp3");
             soundMgr.teleportSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/dbz-teleport.mp3");
             soundMgr.victorySound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/award-winners.mp3");
             soundMgr.defeatSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/heavy-thunder-sound-effect-no-copyright-338980.mp3");
+            soundMgr.hitDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/tiro.mp3");
 
             var commonDeathsList = new List<AudioClip>();
             for (int i = 1; i <= 16; i++)
@@ -226,7 +231,7 @@ namespace WizardGame.EditorTools
             GameObject inputGo = new GameObject("PlayerInputHandler");
             var inputHandler = inputGo.AddComponent<PlayerInputHandler>();
             SetPrivateField(inputHandler, "weaponSystem", weaponSystem);
-            SetPrivateField(inputHandler, "clickToleranceRadius", 0.6f);
+            SetPrivateField(inputHandler, "clickToleranceRadius", 0.65f);
 
             // 8. Canvas UI
             GameObject canvasGo = new GameObject("Canvas");
@@ -249,7 +254,7 @@ namespace WizardGame.EditorTools
             GameObject hudGo = CreatePanel(canvasGo.transform, "InGameHUD", new Vector2(0f, 0f), new Vector2(1f, 1f), new Color(0, 0, 0, 0));
 
             // Top Bar Background
-            GameObject topBar = CreatePanel(hudGo.transform, "TopBar", new Vector2(0f, 1f), new Vector2(1f, 1f), new Color(0.08f, 0.08f, 0.14f, 0.85f));
+            GameObject topBar = CreatePanel(hudGo.transform, "TopBar", new Vector2(0f, 1f), new Vector2(1f, 1f), new Color(0.08f, 0.08f, 0.14f, 0.88f));
             var topBarRect = topBar.GetComponent<RectTransform>();
             topBarRect.pivot = new Vector2(0.5f, 1f);
             topBarRect.sizeDelta = new Vector2(0f, 85f);
@@ -304,11 +309,11 @@ namespace WizardGame.EditorTools
                                "  • Clique Direito (RMB): Tiro Forte Arcano (Dano 3 - Cooldown 3s)\n" +
                                "  • Tecla [R]: Recarregar Mana (Capacidade: 8 feitiços)\n" +
                                "  • Tecla [ESC] ou [P]: Pausar o Jogo\n\n" +
-                               "TIPOS DE MAGOS:\n" +
-                               "  • Comum (1 HP): Mago padrao.\n" +
-                               "  • Rapido (2 HP): Toma o 1º tiro e foge em disparada!\n" +
-                               "  • Dourado (3 HP - 5 Pts): Super rapido e brilhante!\n" +
-                               "  • Fantasma (4 HP): Teleporta pelo cenario ao ser atingido!";
+                               "TIPOS DE MAGOS & VIDA:\n" +
+                               "  • Comum (1 HP): Morre com 1 tiro.\n" +
+                               "  • Rapido (2 HP): Barra de vida visivel! Foge apos o 1º hit!\n" +
+                               "  • Dourado (3 HP - 5 Pts): Barra de vida! Corre suave pelo mapa!\n" +
+                               "  • Fantasma (4 HP): Barra de vida! Teleporta pelo cenario!";
             CreateUIText(instrPanel.transform, "InstrBody", instrBody, 20, Color.white, new Vector2(0f, 15f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
             var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -200f), new Vector2(0.5f, 0.5f), new Vector2(260f, 50f), defaultFont, new Color(0.2f, 0.5f, 0.2f));

@@ -6,19 +6,23 @@ using WizardGame.Data;
 namespace WizardGame.Entities
 {
     /// <summary>
-    /// Controlador do ciclo de vida, movimentação e dano de cada mago.
-    /// Garante tamanho normalizado proporcional à câmera e hitbox precisa.
+    /// Controlador robusto de mago. Possui barra de vida flutuante para inimigos com mais de 1 HP,
+    /// collider sempre ativo enquanto vivo (nunca trava a tela) e fallback de segurança contra travamentos.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer), typeof(Collider2D))]
     public class WizardController : MonoBehaviour
     {
-        [Header("Componentes")]
+        [Header("Componentes Visuais")]
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private Collider2D hitCollider;
 
-        [Header("Tamanho Normalizado")]
-        [Tooltip("Altura alvo do mago em unidades de mundo da câmera (ortográfica = 5, altura tela = 10).")]
-        [SerializeField] private float targetHeight = 1.5f;
+        [Header("Barra de Vida (Health Bar)")]
+        [SerializeField] private GameObject healthBarRoot;
+        [SerializeField] private SpriteRenderer healthBarBg;
+        [SerializeField] private SpriteRenderer healthBarFill;
+
+        [Header("Configuração de Escala")]
+        [SerializeField] private float targetHeight = 1.4f;
 
         private WizardDataSO currentData;
         private int currentHealth;
@@ -38,6 +42,41 @@ namespace WizardGame.Entities
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
             if (hitCollider == null) hitCollider = GetComponent<Collider2D>();
+
+            CreateHealthBarIfMissing();
+        }
+
+        private void CreateHealthBarIfMissing()
+        {
+            if (healthBarRoot != null) return;
+
+            healthBarRoot = new GameObject("HealthBar");
+            healthBarRoot.transform.SetParent(transform, false);
+            healthBarRoot.transform.localPosition = new Vector3(0f, 0.85f, 0f);
+
+            // Fundo da barra (Preto/Cinza)
+            GameObject bgGo = new GameObject("Bg");
+            bgGo.transform.SetParent(healthBarRoot.transform, false);
+            healthBarBg = bgGo.AddComponent<SpriteRenderer>();
+            healthBarBg.sortingOrder = 10;
+            healthBarBg.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+            healthBarBg.sprite = CreateSolidWhiteSprite();
+            bgGo.transform.localScale = new Vector3(0.9f, 0.15f, 1f);
+
+            // Preenchimento da barra (Verde)
+            GameObject fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(healthBarRoot.transform, false);
+            healthBarFill = fillGo.AddComponent<SpriteRenderer>();
+            healthBarFill.sortingOrder = 11;
+            healthBarFill.color = Color.green;
+            healthBarFill.sprite = CreateSolidWhiteSprite();
+            fillGo.transform.localScale = new Vector3(0.86f, 0.11f, 1f);
+        }
+
+        private Sprite CreateSolidWhiteSprite()
+        {
+            Texture2D tex = Texture2D.whiteTexture;
+            return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
         }
 
         public void Initialize(WizardDataSO data, Vector3 spawnPosition, Bounds bounds)
@@ -54,7 +93,7 @@ namespace WizardGame.Entities
             spriteRenderer.color = data.baseTint;
             hitCollider.enabled = true;
 
-            // Normalizar escala proporcionalmente ao tamanho original do sprite
+            // Normalizar escala proporcionalmente ao sprite
             float spriteHeight = 1f;
             if (data.sprite != null && data.sprite.bounds.size.y > 0.05f)
             {
@@ -64,11 +103,13 @@ namespace WizardGame.Entities
             normalizedScale = new Vector3(scaleFactor, scaleFactor, 1f);
             transform.localScale = Vector3.zero;
 
-            // Ajustar collider dinamicamente aos limites do sprite
             if (hitCollider is CircleCollider2D circleCol)
             {
                 circleCol.radius = spriteHeight * 0.45f;
             }
+
+            // Configurar barra de vida
+            UpdateHealthBar();
 
             StopAllActiveCoroutines();
 
@@ -76,6 +117,22 @@ namespace WizardGame.Entities
             StartBehavior();
 
             escapeCoroutine = StartCoroutine(EscapeTimerRoutine(data.escapeTimeSeconds));
+        }
+
+        private void UpdateHealthBar()
+        {
+            if (healthBarRoot == null) return;
+
+            // Só mostra barra se tiver mais de 1 de vida inicial
+            bool showBar = currentData != null && currentData.maxHealth > 1 && !isDeadOrEscaping;
+            healthBarRoot.SetActive(showBar);
+
+            if (showBar && healthBarFill != null)
+            {
+                float pct = Mathf.Clamp01((float)currentHealth / currentData.maxHealth);
+                healthBarFill.transform.localScale = new Vector3(0.86f * pct, 0.11f, 1f);
+                healthBarFill.color = Color.Lerp(Color.red, Color.green, pct);
+            }
         }
 
         private void StopAllActiveCoroutines()
@@ -89,7 +146,7 @@ namespace WizardGame.Entities
         private IEnumerator SpawnScaleInRoutine()
         {
             float elapsed = 0f;
-            float duration = 0.22f;
+            float duration = 0.2f;
 
             while (elapsed < duration)
             {
@@ -131,6 +188,7 @@ namespace WizardGame.Entities
             if (isDeadOrEscaping) return;
 
             currentHealth -= damage;
+            UpdateHealthBar();
             StartCoroutine(FlashDamageRoutine());
 
             if (currentHealth <= 0)
@@ -147,7 +205,7 @@ namespace WizardGame.Entities
         {
             Color original = currentData.baseTint;
             spriteRenderer.color = Color.red;
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.08f);
             if (!isDeadOrEscaping)
             {
                 spriteRenderer.color = original;
@@ -179,10 +237,11 @@ namespace WizardGame.Entities
 
             isDeadOrEscaping = true;
             hitCollider.enabled = false;
+            if (healthBarRoot != null) healthBarRoot.SetActive(false);
             StopAllActiveCoroutines();
 
             float elapsed = 0f;
-            float duration = 0.4f;
+            float duration = 0.35f;
             Vector3 startPos = transform.position;
             Vector3 endPos = startPos + new Vector3(0f, 1.2f, 0f);
             Color startCol = spriteRenderer.color;
@@ -202,7 +261,8 @@ namespace WizardGame.Entities
         private void Die()
         {
             isDeadOrEscaping = true;
-            hitCollider.enabled = false;
+            hitCollider.enabled = false; // Desativa para não processar múltiplos cliques após morte
+            if (healthBarRoot != null) healthBarRoot.SetActive(false);
             StopAllActiveCoroutines();
 
             StartCoroutine(DeathAnimationRoutine());
@@ -211,13 +271,13 @@ namespace WizardGame.Entities
         private IEnumerator DeathAnimationRoutine()
         {
             float elapsed = 0f;
-            float duration = 0.35f;
+            float duration = 0.25f;
             Vector3 startScale = transform.localScale;
 
             if (currentData.wizardType == WizardType.Fantasma)
             {
                 Vector3 startPos = transform.position;
-                Vector3 endPos = startPos + new Vector3(0f, 1.5f, 0f);
+                Vector3 endPos = startPos + new Vector3(0f, 1.2f, 0f);
                 Color startCol = spriteRenderer.color;
 
                 while (elapsed < duration)
@@ -276,17 +336,16 @@ namespace WizardGame.Entities
 
         private IEnumerator FastHitReactionRoutine()
         {
-            hitCollider.enabled = false;
+            // NUNCA desabilita o collider: jogador continua podendo atirar e abater!
             Vector3 origScale = normalizedScale;
-
-            transform.localScale = new Vector3(origScale.x * 1.3f, origScale.y * 0.7f, origScale.z);
-            yield return new WaitForSeconds(0.08f);
+            transform.localScale = new Vector3(origScale.x * 1.25f, origScale.y * 0.75f, origScale.z);
+            yield return new WaitForSeconds(0.06f);
             transform.localScale = origScale;
 
             Vector3 target = GetRandomPointInBounds();
             Vector3 start = transform.position;
             float elapsed = 0f;
-            float dashDuration = 0.16f;
+            float dashDuration = 0.15f;
 
             while (elapsed < dashDuration)
             {
@@ -295,7 +354,6 @@ namespace WizardGame.Entities
                 yield return null;
             }
             transform.position = target;
-            hitCollider.enabled = true;
             movementCoroutine = StartCoroutine(FastPendulumRoutine());
         }
 
@@ -355,11 +413,11 @@ namespace WizardGame.Entities
 
         private IEnumerator GhostTeleportRoutine()
         {
-            hitCollider.enabled = false;
+            // NUNCA desativa o collider: se o jogador mirar onde ele reaparece, o tiro acerta na hora!
             StopBehaviorCoroutines();
 
             float elapsed = 0f;
-            float dur = 0.12f;
+            float dur = 0.1f;
             Vector3 startScale = transform.localScale;
 
             while (elapsed < dur)
@@ -381,7 +439,6 @@ namespace WizardGame.Entities
                 yield return null;
             }
             transform.localScale = normalizedScale;
-            hitCollider.enabled = true;
 
             StartBehavior();
         }
@@ -397,7 +454,7 @@ namespace WizardGame.Entities
             Vector3 start = transform.position;
             for (int i = 0; i < 4; i++)
             {
-                transform.position = start + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.1f);
+                transform.position = start + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.08f);
                 yield return new WaitForSeconds(0.02f);
             }
             transform.position = start;

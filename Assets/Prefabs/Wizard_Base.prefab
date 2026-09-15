@@ -144,4 +144,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Entities.WizardController
   spriteRenderer: {fileID: 3196369651490083623}
   hitCollider: {fileID: 6516751600981813907}
-  targetHeight: 1.5
+  healthBarRoot: {fileID: 0}
+  healthBarBg: {fileID: 0}
+  healthBarFill: {fileID: 0}
+  targetHeight: 1.4
