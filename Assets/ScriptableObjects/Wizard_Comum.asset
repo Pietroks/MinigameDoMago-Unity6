@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3902d0460b1dba429a7756001e3ad13, type: 3}
+  m_Name: Wizard_Comum
+  m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
+  wizardType: 0
+  displayName: Mago Comum
+  sprite: {fileID: 0}
+  baseTint: {r: 1, g: 1, b: 1, a: 1}
+  maxHealth: 1
+  pointsOnDefeat: 1
+  escapeTimeSeconds: 5
+  spawnWeight: 65
+  escapePenalty: 1
+  escapeSound: {fileID: 8300000, guid: aaf1dd34fb2244f48b8e2800310b3f5d, type: 3}
+  customDamageSound: {fileID: 0}
+  customDeathSound: {fileID: 0}
