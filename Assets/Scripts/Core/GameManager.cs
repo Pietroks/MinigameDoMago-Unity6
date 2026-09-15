@@ -15,7 +15,8 @@ namespace WizardGame.Core
     }
 
     /// <summary>
-    /// Orquestrador do fluxo do jogo, pontuação, cooldowns e estados de menu/pause/gameover.
+    /// Orquestrador principal com Sistema de Combos, Multiplicadores Dinâmicos
+    /// e Bônus de Precisão por Headshot / Acerto Perfeito.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
@@ -36,6 +37,12 @@ namespace WizardGame.Core
         private float strongCooldownTimer;
         private bool isStrongReady;
 
+        // --- SISTEMA DE COMBOS E ESTATÍSTICAS ---
+        private int currentStreak;
+        private int currentMultiplier;
+        private int maxStreak;
+        private int headshotsCount;
+
         private void Start()
         {
             Time.timeScale = 1f;
@@ -44,6 +51,7 @@ namespace WizardGame.Core
             {
                 inputHandler.OnNormalShot += HandleNormalShot;
                 inputHandler.OnStrongShot += HandleStrongShot;
+                inputHandler.OnShotMissed += HandleShotMissed;
                 inputHandler.OnTogglePauseRequested += TogglePause;
             }
 
@@ -67,7 +75,6 @@ namespace WizardGame.Core
                 uiManager.OnMainMenuClicked += ReturnToMainMenu;
             }
 
-            // Iniciar no Menu Principal
             SetState(GameState.Menu);
         }
 
@@ -129,12 +136,18 @@ namespace WizardGame.Core
         {
             currentScore = 0;
             currentEscaped = 0;
+            currentStreak = 0;
+            currentMultiplier = 1;
+            maxStreak = 0;
+            headshotsCount = 0;
+
             isStrongReady = true;
             strongCooldownTimer = 0f;
 
             uiManager?.UpdateScore(currentScore, winScoreTarget);
             uiManager?.UpdateEscapes(currentEscaped, maxEscapesAllowed);
             uiManager?.UpdateStrongCooldown(true);
+            uiManager?.UpdateCombo(currentStreak, currentMultiplier);
 
             if (weaponSystem != null)
             {
@@ -178,19 +191,29 @@ namespace WizardGame.Core
             );
         }
 
-        private void HandleNormalShot(WizardController target)
+        private void HandleNormalShot(ShotHitInfo hitInfo)
         {
             if (currentState != GameState.Playing) return;
 
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.normalShotSound);
 
-            if (target != null)
+            if (hitInfo.isHit && hitInfo.target != null)
             {
-                target.TakeDamage(1);
+                // Bônus de Precisão: Headshot / Acerto Perfeito
+                if (hitInfo.isHeadshot)
+                {
+                    currentScore += 1;
+                    headshotsCount++;
+                    SoundManager.Instance?.PlayHeadshotSound();
+                    uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
+                    uiManager?.UpdateScore(currentScore, winScoreTarget);
+                }
+
+                hitInfo.target.TakeDamage(1);
             }
         }
 
-        private void HandleStrongShot(WizardController target)
+        private void HandleStrongShot(ShotHitInfo hitInfo)
         {
             if (currentState != GameState.Playing || !isStrongReady) return;
 
@@ -201,19 +224,51 @@ namespace WizardGame.Core
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
             weaponSystem?.TriggerRecoil();
 
-            if (target != null)
+            if (hitInfo.isHit && hitInfo.target != null)
             {
-                target.TakeDamage(3);
+                // Bônus de Headshot com tiro forte
+                if (hitInfo.isHeadshot)
+                {
+                    currentScore += 1;
+                    headshotsCount++;
+                    SoundManager.Instance?.PlayHeadshotSound();
+                    uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
+                    uiManager?.UpdateScore(currentScore, winScoreTarget);
+                }
+
+                hitInfo.target.TakeDamage(3);
             }
         }
 
-        private void HandleWizardDefeated(WizardController wizard, int points)
+        private void HandleShotMissed()
         {
             if (currentState != GameState.Playing) return;
 
-            currentScore += points;
-            uiManager?.UpdateScore(currentScore, winScoreTarget);
+            // Errar o disparo quebra a sequência de combo!
+            if (currentStreak > 0)
+            {
+                BreakCombo("ERROU O TIRO");
+            }
+        }
 
+        private void HandleWizardDefeated(WizardController wizard, int basePoints)
+        {
+            if (currentState != GameState.Playing) return;
+
+            // Incrementa sequência de combo
+            currentStreak++;
+            if (currentStreak > maxStreak) maxStreak = currentStreak;
+
+            currentMultiplier = CalculateMultiplier(currentStreak);
+
+            // Aplica multiplicador na pontuação
+            int pointsEarned = basePoints * currentMultiplier;
+            currentScore += pointsEarned;
+
+            uiManager?.UpdateScore(currentScore, winScoreTarget);
+            uiManager?.UpdateCombo(currentStreak, currentMultiplier);
+
+            // Som de Morte
             if (wizard.GetData() != null && wizard.GetData().customDeathSound != null)
             {
                 SoundManager.Instance?.PlaySFX(wizard.GetData().customDeathSound);
@@ -233,6 +288,12 @@ namespace WizardGame.Core
         {
             if (currentState != GameState.Playing) return;
 
+            // Deixar mago escapar quebra a sequência de combo!
+            if (currentStreak > 0)
+            {
+                BreakCombo("MAGO ESCAPOU");
+            }
+
             currentEscaped += penalty;
             uiManager?.UpdateEscapes(currentEscaped, maxEscapesAllowed);
 
@@ -245,6 +306,36 @@ namespace WizardGame.Core
             {
                 EndGame(won: false);
             }
+        }
+
+        private void BreakCombo(string reason)
+        {
+            bool hadActiveCombo = currentStreak >= 2;
+            currentStreak = 0;
+            currentMultiplier = 1;
+
+            if (hadActiveCombo)
+            {
+                SoundManager.Instance?.PlayComboBreakSound();
+                uiManager?.NotifyComboBroken(reason);
+            }
+            else
+            {
+                uiManager?.UpdateCombo(0, 1);
+            }
+        }
+
+        private int CalculateMultiplier(int streak)
+        {
+            // Escala conforme solicitado pelo usuário:
+            // 1–4 kills → x1
+            // 5–9 kills → x2
+            // 10–19 kills → x3
+            // 20+ kills → x4
+            if (streak >= 20) return 4;
+            if (streak >= 10) return 3;
+            if (streak >= 5) return 2;
+            return 1;
         }
 
         private void EndGame(bool won)
@@ -260,7 +351,7 @@ namespace WizardGame.Core
                 SoundManager.Instance?.PlaySFX(SoundManager.Instance.defeatSound);
             }
 
-            uiManager?.ShowGameOver(won, currentScore, currentEscaped);
+            uiManager?.ShowGameOver(won, currentScore, currentEscaped, maxStreak, headshotsCount);
         }
     }
 }

@@ -4,9 +4,18 @@ using WizardGame.Entities;
 
 namespace WizardGame.Input
 {
+    public struct ShotHitInfo
+    {
+        public WizardController target;
+        public bool isHit;
+        public bool isHeadshot;
+        public Vector3 hitPoint;
+    }
+
     /// <summary>
     /// Captura entradas do jogador para mira, tiro normal, tiro forte, recarga e pausa.
-    /// Utiliza OverlapCircle com tolerância de acerto arcade para garantir que o clique sempre funcione.
+    /// Detecta com precisão acertos normais, erros de tiro (para quebra de combo)
+    /// e Headshots / Acertos Perfeitos (terço superior do mago).
     /// </summary>
     public class PlayerInputHandler : MonoBehaviour
     {
@@ -15,7 +24,7 @@ namespace WizardGame.Input
         [SerializeField] private float longPressThreshold = 0.35f;
 
         [Tooltip("Raio de tolerância do clique em unidades de mundo.")]
-        [SerializeField] private float clickToleranceRadius = 0.5f;
+        [SerializeField] private float clickToleranceRadius = 0.55f;
 
         [Header("Referências")]
         [SerializeField] private WeaponSystem weaponSystem;
@@ -25,8 +34,9 @@ namespace WizardGame.Input
         private bool isPointerDown;
         private bool isInputBlocked;
 
-        public event Action<WizardController> OnNormalShot;
-        public event Action<WizardController> OnStrongShot;
+        public event Action<ShotHitInfo> OnNormalShot;
+        public event Action<ShotHitInfo> OnStrongShot;
+        public event Action OnShotMissed;
         public event Action OnReloadRequested;
         public event Action OnTogglePauseRequested;
 
@@ -53,7 +63,7 @@ namespace WizardGame.Input
                 OnReloadRequested?.Invoke();
             }
 
-            // Tiro Forte Imediato no Botão Direito
+            // Tiro Forte no Botão Direito
             if (UnityEngine.Input.GetMouseButtonDown(1))
             {
                 TriggerShot(UnityEngine.Input.mousePosition, isStrong: true);
@@ -88,27 +98,49 @@ namespace WizardGame.Input
                 }
             }
 
-            WizardController hitWizard = FindWizardAtPosition(screenPosition);
-
-            if (isStrong)
-            {
-                OnStrongShot?.Invoke(hitWizard);
-            }
-            else
-            {
-                OnNormalShot?.Invoke(hitWizard);
-            }
-        }
-
-        private WizardController FindWizardAtPosition(Vector2 screenPosition)
-        {
             if (mainCamera == null) mainCamera = Camera.main;
-            if (mainCamera == null) return null;
+            if (mainCamera == null) return;
 
             Vector3 worldPos = mainCamera.ScreenToWorldPoint(screenPosition);
             worldPos.z = 0f;
 
-            // Busca por sobreposição circular com raio de tolerância arcade
+            WizardController hitWizard = FindWizardAtPosition(worldPos);
+
+            ShotHitInfo hitInfo = new ShotHitInfo
+            {
+                target = hitWizard,
+                isHit = hitWizard != null,
+                isHeadshot = false,
+                hitPoint = worldPos
+            };
+
+            if (hitWizard != null)
+            {
+                // Headshot / Acerto Perfeito: Se o clique atingir o terço superior do mago (cabeça/chapéu)
+                float relativeY = worldPos.y - hitWizard.transform.position.y;
+                if (relativeY > 0.22f)
+                {
+                    hitInfo.isHeadshot = true;
+                }
+            }
+            else
+            {
+                // Disparo errou todos os magos: quebra de combo
+                OnShotMissed?.Invoke();
+            }
+
+            if (isStrong)
+            {
+                OnStrongShot?.Invoke(hitInfo);
+            }
+            else
+            {
+                OnNormalShot?.Invoke(hitInfo);
+            }
+        }
+
+        private WizardController FindWizardAtPosition(Vector3 worldPos)
+        {
             Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, clickToleranceRadius);
             WizardController bestTarget = null;
             float closestDist = float.MaxValue;

@@ -5,7 +5,7 @@ namespace WizardGame.Core
 {
     /// <summary>
     /// Gerenciador de áudio 2D com múltiplos canais de SFX simultâneos,
-    /// trilha sonora em loop e suporte a Mute.
+    /// trilha sonora em loop, suporte a Mute, sons de Headshot e Quebra de Combo.
     /// </summary>
     public class SoundManager : MonoBehaviour
     {
@@ -24,6 +24,10 @@ namespace WizardGame.Core
         public AudioClip strongShotSound;
         public AudioClip teleportSound;
         public AudioClip hitDamageSound;
+
+        [Header("Clipes de Combo e Precisão")]
+        public AudioClip headshotSound;
+        public AudioClip comboBreakSound;
 
         [Header("Clipes de Fim de Jogo")]
         public AudioClip victorySound;
@@ -60,19 +64,17 @@ namespace WizardGame.Core
 
         private void SetupAudioSources()
         {
-            // BGM Source
             if (bgmSource == null) bgmSource = gameObject.AddComponent<AudioSource>();
             bgmSource.loop = true;
-            bgmSource.spatialBlend = 0f; // 2D puro
+            bgmSource.spatialBlend = 0f;
             bgmSource.playOnAwake = false;
             bgmSource.volume = 0.45f;
 
-            // SFX Channels Pool
             if (sfxSources == null) sfxSources = new List<AudioSource>();
             while (sfxSources.Count < sfxChannelCount)
             {
                 AudioSource src = gameObject.AddComponent<AudioSource>();
-                src.spatialBlend = 0f; // 2D puro (garante volume máximo em qualquer posição)
+                src.spatialBlend = 0f;
                 src.playOnAwake = false;
                 src.volume = 1.0f;
                 sfxSources.Add(src);
@@ -102,12 +104,27 @@ namespace WizardGame.Core
         {
             if (clip == null || isMuted || sfxSources.Count == 0) return;
 
-            // Usa canal rotativo para sons simultâneos não cortarem uns aos outros
             AudioSource src = sfxSources[currentSfxIndex];
             currentSfxIndex = (currentSfxIndex + 1) % sfxSources.Count;
 
             src.volume = Mathf.Clamp01(volume);
             src.PlayOneShot(clip);
+        }
+
+        public void PlayHeadshotSound()
+        {
+            if (headshotSound != null)
+            {
+                PlaySFX(headshotSound, 1.0f);
+            }
+        }
+
+        public void PlayComboBreakSound()
+        {
+            if (comboBreakSound != null)
+            {
+                PlaySFX(comboBreakSound, 0.8f);
+            }
         }
 
         public void PlayRandomDeathSound()

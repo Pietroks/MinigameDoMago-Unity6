@@ -17,7 +17,7 @@ namespace WizardGame.EditorTools
         [MenuItem("Tools/Setup Wizard Minigame Complete")]
         public static void SetupProject()
         {
-            Debug.Log("Iniciando reconstrucao completa do Minigame do Mago...");
+            Debug.Log("Iniciando reconstrucao completa com Sistema de Combos e Headshots...");
 
             ConfigureSprites();
             var wizardDatas = CreateWizardScriptableObjects();
@@ -27,7 +27,7 @@ namespace WizardGame.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("Minigame do Mago reconstruido com AudioListener, BGM, SFX e Health Bars!");
+            Debug.Log("Minigame do Mago reconstruido com sucesso!");
         }
 
         private static void ConfigureSprites()
@@ -168,8 +168,6 @@ namespace WizardGame.EditorTools
             cam.backgroundColor = new Color(0.06f, 0.06f, 0.1f);
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.transform.position = new Vector3(0f, 0f, -10f);
-
-            // OUVINTE DE ÁUDIO (Sem ele o jogo fica 100% mudo!)
             camGo.AddComponent<AudioListener>();
 
             // 2. SoundManager
@@ -182,6 +180,8 @@ namespace WizardGame.EditorTools
             soundMgr.victorySound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/award-winners.mp3");
             soundMgr.defeatSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/heavy-thunder-sound-effect-no-copyright-338980.mp3");
             soundMgr.hitDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/tiro.mp3");
+            soundMgr.headshotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/surprise-sound-effect-99300.mp3");
+            soundMgr.comboBreakSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
 
             var commonDeathsList = new List<AudioClip>();
             for (int i = 1; i <= 16; i++)
@@ -260,7 +260,7 @@ namespace WizardGame.EditorTools
             topBarRect.sizeDelta = new Vector2(0f, 85f);
             topBarRect.anchoredPosition = Vector2.zero;
 
-            var scoreText = CreateUIText(topBar.transform, "ScoreText", "Magos: 0 / 50", 26, Color.white, new Vector2(25f, -22f), new Vector2(0f, 1f), defaultFont);
+            var scoreText = CreateUIText(topBar.transform, "ScoreText", "Pontos: 0 / 50", 26, Color.white, new Vector2(25f, -22f), new Vector2(0f, 1f), defaultFont);
             var escapeText = CreateUIText(topBar.transform, "EscapeText", "Escaparam: 0 / 15", 22, new Color(1f, 0.6f, 0.6f), new Vector2(25f, -54f), new Vector2(0f, 1f), defaultFont);
 
             var ammoText = CreateUIText(topBar.transform, "AmmoText", "MANA: 8 / 8  [R]", 24, Color.cyan, new Vector2(0f, -42f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
@@ -270,6 +270,25 @@ namespace WizardGame.EditorTools
             var muteBtnObj = CreateButton(topBar.transform, "MuteButton", "SOM: ATIVO", new Vector2(-25f, -42f), new Vector2(1f, 1f), new Vector2(150f, 44f), defaultFont, new Color(0.2f, 0.2f, 0.35f));
             var muteBtn = muteBtnObj.GetComponent<Button>();
             var muteBtnText = muteBtnObj.GetComponentInChildren<Text>();
+
+            // --- SISTEMA DE COMBO CONTAINER NO HUD ---
+            GameObject comboContainer = CreatePanel(hudGo.transform, "ComboContainer", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Color(0.12f, 0.05f, 0.2f, 0.85f));
+            var comboRect = comboContainer.GetComponent<RectTransform>();
+            comboRect.pivot = new Vector2(0.5f, 1f);
+            comboRect.sizeDelta = new Vector2(480f, 48f);
+            comboRect.anchoredPosition = new Vector2(0f, -95f);
+
+            var comboText = CreateUIText(comboContainer.transform, "ComboText", "COMBO x2 — 5 ABATES", 28, Color.yellow, new Vector2(0f, -24f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
+
+            // Aviso de quebra de combo
+            var comboBreakText = CreateUIText(hudGo.transform, "ComboBreakText", "COMBO QUEBRADO!", 24, Color.red, new Vector2(0f, -155f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
+
+            // --- POPUP DE HEADSHOT ---
+            GameObject headshotContainer = CreatePanel(hudGo.transform, "HeadshotPopup", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0, 0, 0, 0));
+            var hsRect = headshotContainer.GetComponent<RectTransform>();
+            hsRect.sizeDelta = new Vector2(500f, 60f);
+            hsRect.anchoredPosition = new Vector2(0f, 140f);
+            var headshotText = CreateUIText(headshotContainer.transform, "HeadshotText", "🎯 HEADSHOT! +1 PONTO", 32, new Color(0.2f, 1f, 0.3f), Vector2.zero, new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             // Bottom Bar Controls Hint
             GameObject bottomBar = CreatePanel(hudGo.transform, "BottomBar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Color(0.05f, 0.05f, 0.08f, 0.75f));
@@ -297,26 +316,25 @@ namespace WizardGame.EditorTools
             // --- PAINEL DE INSTRUÇÕES ---
             GameObject instrPanel = CreatePanel(startMenu.transform, "InstructionsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.08f, 0.08f, 0.16f, 0.98f));
             var instrRect = instrPanel.GetComponent<RectTransform>();
-            instrRect.sizeDelta = new Vector2(750f, 520f);
+            instrRect.sizeDelta = new Vector2(800f, 580f);
             instrRect.anchoredPosition = Vector2.zero;
 
-            CreateUIText(instrPanel.transform, "InstrTitle", "COMO JOGAR & CONTROLES", 34, Color.yellow, new Vector2(0f, 215f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(instrPanel.transform, "InstrTitle", "COMO JOGAR & SISTEMA DE COMBOS", 32, Color.yellow, new Vector2(0f, 250f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             string instrBody = "OBJETIVO:\n" +
-                               "Abata 50 magos para vencer! Se 15 escaparem, voce perde!\n\n" +
+                               "Abata magos para atingir 50 pontos! Se 15 escaparem, voce perde!\n\n" +
+                               "SISTEMA DE COMBOS & MULTIPLICADOR:\n" +
+                               "  • Matar magos seguidos aumenta seu multiplicador:\n" +
+                               "    1-4 abates: x1  |  5-9 abates: x2  |  10-19 abates: x3  |  20+ abates: x4!\n" +
+                               "  • ATENCAO: Errar um tiro no vazio ou deixar um mago escapar QUEBRA O COMBO!\n\n" +
+                               "BONUS DE PRECISAO:\n" +
+                               "  • 🎯 HEADSHOT / ACERTO PERFEITO: Atire na cabeca do mago para ganhar +1 Ponto!\n\n" +
                                "CONTROLES:\n" +
-                               "  • Clique Esquerdo (LMB): Tiro de Mana Normal (Dano 1)\n" +
-                               "  • Clique Direito (RMB): Tiro Forte Arcano (Dano 3 - Cooldown 3s)\n" +
-                               "  • Tecla [R]: Recarregar Mana (Capacidade: 8 feitiços)\n" +
-                               "  • Tecla [ESC] ou [P]: Pausar o Jogo\n\n" +
-                               "TIPOS DE MAGOS & VIDA:\n" +
-                               "  • Comum (1 HP): Morre com 1 tiro.\n" +
-                               "  • Rapido (2 HP): Barra de vida visivel! Foge apos o 1º hit!\n" +
-                               "  • Dourado (3 HP - 5 Pts): Barra de vida! Corre suave pelo mapa!\n" +
-                               "  • Fantasma (4 HP): Barra de vida! Teleporta pelo cenario!";
-            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 20, Color.white, new Vector2(0f, 15f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
+                               "  • [LMB]: Tiro de Mana Normal  |  [RMB]: Tiro Forte (Dano 3 - Recarga 3s)\n" +
+                               "  • Tecla [R]: Recarregar Mana (Capacidade 8)  |  Tecla [ESC/P]: Pausar";
+            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 18, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
-            var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -200f), new Vector2(0.5f, 0.5f), new Vector2(260f, 50f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
+            var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -240f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
             var closeInstrBtn = closeInstrBtnObj.GetComponent<Button>();
             instrPanel.SetActive(false);
 
@@ -341,16 +359,17 @@ namespace WizardGame.EditorTools
             // --- MENU DE FIM DE JOGO ---
             GameObject endPanel = CreatePanel(canvasGo.transform, "GameOverPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.04f, 0.04f, 0.08f, 0.96f));
             var endRect = endPanel.GetComponent<RectTransform>();
-            endRect.sizeDelta = new Vector2(600f, 420f);
+            endRect.sizeDelta = new Vector2(650f, 460f);
             endRect.anchoredPosition = Vector2.zero;
 
-            var endTitleText = CreateUIText(endPanel.transform, "EndTitle", "VITORIA!", 46, Color.yellow, new Vector2(0f, 140f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
-            var endScoreText = CreateUIText(endPanel.transform, "EndScore", "Magos Abatidos: 50", 26, Color.white, new Vector2(0f, 45f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            var endTitleText = CreateUIText(endPanel.transform, "EndTitle", "VITORIA!", 46, Color.yellow, new Vector2(0f, 160f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            var endScoreText = CreateUIText(endPanel.transform, "EndScore", "Pontos Totais: 50", 24, Color.white, new Vector2(0f, 95f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            var endStatsText = CreateUIText(endPanel.transform, "EndStats", "Maior Combo: 12  |  Headshots: 5", 20, Color.cyan, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
-            var endRestartBtnObj = CreateButton(endPanel.transform, "EndRestartBtn", "JOGAR NOVAMENTE", new Vector2(0f, -60f), new Vector2(0.5f, 0.5f), new Vector2(300f, 55f), defaultFont, new Color(0.5f, 0.1f, 0.8f));
+            var endRestartBtnObj = CreateButton(endPanel.transform, "EndRestartBtn", "JOGAR NOVAMENTE", new Vector2(0f, -65f), new Vector2(0.5f, 0.5f), new Vector2(300f, 55f), defaultFont, new Color(0.5f, 0.1f, 0.8f));
             var endRestartBtn = endRestartBtnObj.GetComponent<Button>();
 
-            var endMenuBtnObj = CreateButton(endPanel.transform, "EndMenuBtn", "MENU PRINCIPAL", new Vector2(0f, -130f), new Vector2(0.5f, 0.5f), new Vector2(300f, 50f), defaultFont, new Color(0.25f, 0.25f, 0.35f));
+            var endMenuBtnObj = CreateButton(endPanel.transform, "EndMenuBtn", "MENU PRINCIPAL", new Vector2(0f, -135f), new Vector2(0.5f, 0.5f), new Vector2(300f, 50f), defaultFont, new Color(0.25f, 0.25f, 0.35f));
             var endMenuBtn = endMenuBtnObj.GetComponent<Button>();
             endPanel.SetActive(false);
 
@@ -370,8 +389,16 @@ namespace WizardGame.EditorTools
             SetPrivateField(uiMgr, "muteButton", muteBtn);
             SetPrivateField(uiMgr, "muteButtonText", muteBtnText);
 
+            SetPrivateField(uiMgr, "comboContainer", comboContainer);
+            SetPrivateField(uiMgr, "comboText", comboText);
+            SetPrivateField(uiMgr, "comboBreakText", comboBreakText);
+
+            SetPrivateField(uiMgr, "headshotPopupContainer", headshotContainer);
+            SetPrivateField(uiMgr, "headshotPopupText", headshotText);
+
             SetPrivateField(uiMgr, "endTitleText", endTitleText);
             SetPrivateField(uiMgr, "endScoreText", endScoreText);
+            SetPrivateField(uiMgr, "endStatsText", endStatsText);
             SetPrivateField(uiMgr, "restartButton", endRestartBtn);
             SetPrivateField(uiMgr, "endMainMenuButton", endMenuBtn);
 
@@ -419,7 +446,7 @@ namespace WizardGame.EditorTools
             rect.anchorMax = anchor;
             rect.pivot = anchor;
             rect.anchoredPosition = anchoredPos;
-            rect.sizeDelta = new Vector2(650f, 60f);
+            rect.sizeDelta = new Vector2(750f, 60f);
 
             var t = go.AddComponent<Text>();
             t.text = text;
