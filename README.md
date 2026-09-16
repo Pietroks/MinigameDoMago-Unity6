@@ -30,10 +30,14 @@ Recriação e refatoração completa do clássico jogo Point-and-Click / Shootin
   - **Vitória**: Abater **50 magos**.
   - **Derrota**: Deixar **15 magos escaparem**.
 - **Interface Completa (HUD e Menus)**:
-  - Menu Inicial (Jogar, Instruções/Controles, Sair).
-  - Menu de Pausa (`[ESC]` ou `[P]`).
+  - Menu Inicial (Jogar, Instruções/Controles, Sliders de Volume, Sair).
+  - Menu de Pausa (`[ESC]` ou `[P]`) com sliders de Música e Efeitos.
   - Botão de Som / Mute com alternância instantânea.
-  - Painel de Vitória e Derrota com reinício rápido.
+  - Painel de Vitória e Derrota com reinício rápido e estatísticas.
+- **Trilha Sonora Profissional & Sistema de Volume**:
+  - Tema dedicado de Menu (`Goblin Dungeon Menu`).
+  - Playlist dinâmica de gameplay com rotação contínua e crossfade suave entre faixas (`Arcane Confrontation`, `Mago na Mira`, `Sky Funeral`, `Spooky Castle Comedy v2`, etc.).
+  - Controle de volume calibrado para evitar distorções (*audio estourando*), com sliders interativos e persistência de preferências do jogador via `PlayerPrefs`.
 
 ---
 

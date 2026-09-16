@@ -20,6 +20,7 @@ namespace WizardGame.EditorTools
             Debug.Log("Iniciando reconstrucao completa com Goblins e Spritesheets...");
 
             ConfigureSprites();
+            ConfigureAudio();
             var wizardDatas = CreateGoblinScriptableObjects();
             var wizardPrefab = CreateGoblinPrefab();
             SetupGameplayScene(wizardDatas, wizardPrefab);
@@ -100,6 +101,36 @@ namespace WizardGame.EditorTools
                     }
                     if (dirty)
                     {
+                        importer.SaveAndReimport();
+                    }
+                }
+            }
+        }
+
+        private static void ConfigureAudio()
+        {
+            string[] guids = AssetDatabase.FindAssets("t:AudioClip", new[] { "Assets/Audio/Music" });
+            foreach (string guid in guids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                AudioImporter importer = AssetImporter.GetAtPath(path) as AudioImporter;
+                if (importer != null)
+                {
+                    var settings = importer.defaultSampleSettings;
+                    bool dirty = false;
+                    if (settings.loadType != AudioClipLoadType.Streaming)
+                    {
+                        settings.loadType = AudioClipLoadType.Streaming;
+                        dirty = true;
+                    }
+                    if (settings.compressionFormat != AudioCompressionFormat.Vorbis)
+                    {
+                        settings.compressionFormat = AudioCompressionFormat.Vorbis;
+                        dirty = true;
+                    }
+                    if (dirty)
+                    {
+                        importer.defaultSampleSettings = settings;
                         importer.SaveAndReimport();
                     }
                 }
@@ -294,7 +325,17 @@ namespace WizardGame.EditorTools
             // 2. SoundManager
             GameObject soundGo = new GameObject("SoundManager");
             var soundMgr = soundGo.AddComponent<SoundManager>();
-            soundMgr.bgmMusicClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/harp-piano-dreamy-flashback-jam-fx-1-00-07.mp3");
+            soundMgr.menuMusicClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Goblin Dungeon Menu.mp3");
+            soundMgr.gameplayPlaylist = new List<AudioClip>
+            {
+                AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Mago na Mira.mp3"),
+                AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Arcane Confrontation.mp3"),
+                AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Sky Funeral.mp3"),
+                AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Spooky Castle Comedy v2.mp3"),
+                AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Wizard_s Mishap.mp3"),
+                AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/Music/Tavern Menu of Doom.mp3")
+            };
+            soundMgr.bgmMusicClip = soundMgr.menuMusicClip;
             soundMgr.normalShotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/tiro.mp3");
             soundMgr.strongShotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/raio.mp3");
             soundMgr.teleportSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/dbz-teleport.mp3");
@@ -434,6 +475,10 @@ namespace WizardGame.EditorTools
             var quitBtnObj = CreateButton(startMenu.transform, "QuitButton", "SAIR DO JOGO", new Vector2(0f, -95f), new Vector2(0.5f, 0.5f), new Vector2(320f, 50f), defaultFont, new Color(0.35f, 0.1f, 0.1f));
             var quitBtn = quitBtnObj.GetComponent<Button>();
 
+            // Sliders de volume no Menu Inicial
+            var (startBgmSlider, startBgmText) = CreateVolumeSlider(startMenu.transform, "StartBgmSlider", "MÚSICA: 28%", new Vector2(0f, -165f), new Vector2(340f, 36f), defaultFont);
+            var (startSfxSlider, startSfxText) = CreateVolumeSlider(startMenu.transform, "StartSfxSlider", "EFEITOS: 75%", new Vector2(0f, -215f), new Vector2(340f, 36f), defaultFont);
+
             // --- PAINEL DE INSTRUÇÕES (COM OS 4 GOBLINS) ---
             GameObject instrPanel = CreatePanel(startMenu.transform, "InstructionsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.06f, 0.08f, 0.15f, 0.98f));
             var instrRect = instrPanel.GetComponent<RectTransform>();
@@ -464,19 +509,23 @@ namespace WizardGame.EditorTools
             // --- MENU DE PAUSA ---
             GameObject pausePanel = CreatePanel(canvasGo.transform, "PauseMenuPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.05f, 0.05f, 0.1f, 0.95f));
             var pauseRect = pausePanel.GetComponent<RectTransform>();
-            pauseRect.sizeDelta = new Vector2(450f, 380f);
+            pauseRect.sizeDelta = new Vector2(460f, 480f);
             pauseRect.anchoredPosition = Vector2.zero;
 
-            CreateUIText(pausePanel.transform, "PauseTitle", "JOGO PAUSADO", 40, Color.white, new Vector2(0f, 130f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(pausePanel.transform, "PauseTitle", "JOGO PAUSADO", 40, Color.white, new Vector2(0f, 180f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
-            var resumeBtnObj = CreateButton(pausePanel.transform, "ResumeBtn", "CONTINUAR", new Vector2(0f, 40f), new Vector2(0.5f, 0.5f), new Vector2(280f, 55f), defaultFont, new Color(0.2f, 0.6f, 0.2f));
+            var resumeBtnObj = CreateButton(pausePanel.transform, "ResumeBtn", "CONTINUAR", new Vector2(0f, 105f), new Vector2(0.5f, 0.5f), new Vector2(280f, 52f), defaultFont, new Color(0.2f, 0.6f, 0.2f));
             var resumeBtn = resumeBtnObj.GetComponent<Button>();
 
-            var restartBtnObj = CreateButton(pausePanel.transform, "RestartBtn", "REINICIAR", new Vector2(0f, -30f), new Vector2(0.5f, 0.5f), new Vector2(280f, 50f), defaultFont, new Color(0.2f, 0.35f, 0.6f));
+            var restartBtnObj = CreateButton(pausePanel.transform, "RestartBtn", "REINICIAR", new Vector2(0f, 45f), new Vector2(0.5f, 0.5f), new Vector2(280f, 48f), defaultFont, new Color(0.2f, 0.35f, 0.6f));
             var restartBtn = restartBtnObj.GetComponent<Button>();
 
-            var pauseMenuBtnObj = CreateButton(pausePanel.transform, "PauseMenuBtn", "MENU PRINCIPAL", new Vector2(0f, -95f), new Vector2(0.5f, 0.5f), new Vector2(280f, 50f), defaultFont, new Color(0.4f, 0.15f, 0.15f));
+            var pauseMenuBtnObj = CreateButton(pausePanel.transform, "PauseMenuBtn", "MENU PRINCIPAL", new Vector2(0f, -15f), new Vector2(0.5f, 0.5f), new Vector2(280f, 48f), defaultFont, new Color(0.4f, 0.15f, 0.15f));
             var pauseMenuBtn = pauseMenuBtnObj.GetComponent<Button>();
+
+            // Sliders de volume no Menu de Pausa
+            var (pauseBgmSlider, pauseBgmText) = CreateVolumeSlider(pausePanel.transform, "PauseBgmSlider", "MÚSICA: 28%", new Vector2(0f, -95f), new Vector2(340f, 36f), defaultFont);
+            var (pauseSfxSlider, pauseSfxText) = CreateVolumeSlider(pausePanel.transform, "PauseSfxSlider", "EFEITOS: 75%", new Vector2(0f, -150f), new Vector2(340f, 36f), defaultFont);
             pausePanel.SetActive(false);
 
             // --- MENU DE FIM DE JOGO ---
@@ -533,6 +582,16 @@ namespace WizardGame.EditorTools
             SetPrivateField(uiMgr, "resumeButton", resumeBtn);
             SetPrivateField(uiMgr, "pauseRestartButton", restartBtn);
             SetPrivateField(uiMgr, "pauseMainMenuButton", pauseMenuBtn);
+
+            SetPrivateField(uiMgr, "startBgmSlider", startBgmSlider);
+            SetPrivateField(uiMgr, "startBgmText", startBgmText);
+            SetPrivateField(uiMgr, "startSfxSlider", startSfxSlider);
+            SetPrivateField(uiMgr, "startSfxText", startSfxText);
+
+            SetPrivateField(uiMgr, "pauseBgmSlider", pauseBgmSlider);
+            SetPrivateField(uiMgr, "pauseBgmText", pauseBgmText);
+            SetPrivateField(uiMgr, "pauseSfxSlider", pauseSfxSlider);
+            SetPrivateField(uiMgr, "pauseSfxText", pauseSfxText);
 
             // 10. GameManager Wiring
             GameObject gmGo = new GameObject("GameManager");
@@ -627,6 +686,100 @@ namespace WizardGame.EditorTools
             outline.effectDistance = new Vector2(1.2f, -1.2f);
 
             return go;
+        }
+
+        private static (Slider, Text) CreateVolumeSlider(Transform parent, string name, string label, Vector2 anchoredPos, Vector2 size, Font font)
+        {
+            GameObject root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            var rootRect = root.AddComponent<RectTransform>();
+            rootRect.sizeDelta = size;
+            rootRect.anchoredPosition = anchoredPos;
+
+            // Label Text
+            var textGo = new GameObject("Label");
+            textGo.transform.SetParent(root.transform, false);
+            var tRect = textGo.AddComponent<RectTransform>();
+            tRect.anchorMin = new Vector2(0f, 0.5f);
+            tRect.anchorMax = new Vector2(0f, 0.5f);
+            tRect.pivot = new Vector2(0f, 0.5f);
+            tRect.anchoredPosition = new Vector2(0f, 0f);
+            tRect.sizeDelta = new Vector2(130f, 30f);
+
+            var textComp = textGo.AddComponent<Text>();
+            textComp.text = label;
+            textComp.font = font;
+            textComp.fontSize = 16;
+            textComp.color = Color.white;
+            textComp.alignment = TextAnchor.MiddleLeft;
+
+            // Slider GameObject
+            var sliderGo = new GameObject("Slider");
+            sliderGo.transform.SetParent(root.transform, false);
+            var sRect = sliderGo.AddComponent<RectTransform>();
+            sRect.anchorMin = new Vector2(0f, 0.5f);
+            sRect.anchorMax = new Vector2(1f, 0.5f);
+            sRect.pivot = new Vector2(0.5f, 0.5f);
+            sRect.anchoredPosition = new Vector2(70f, 0f);
+            sRect.sizeDelta = new Vector2(-140f, 22f);
+
+            var slider = sliderGo.AddComponent<Slider>();
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = 0.5f;
+
+            // Background track
+            var bgGo = new GameObject("Background");
+            bgGo.transform.SetParent(sliderGo.transform, false);
+            var bgRect = bgGo.AddComponent<RectTransform>();
+            bgRect.anchorMin = new Vector2(0f, 0.25f);
+            bgRect.anchorMax = new Vector2(1f, 0.75f);
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+            var bgImg = bgGo.AddComponent<Image>();
+            bgImg.color = new Color(0.15f, 0.15f, 0.25f, 0.9f);
+
+            // Fill Area
+            var fillAreaGo = new GameObject("Fill Area");
+            fillAreaGo.transform.SetParent(sliderGo.transform, false);
+            var faRect = fillAreaGo.AddComponent<RectTransform>();
+            faRect.anchorMin = new Vector2(0f, 0.25f);
+            faRect.anchorMax = new Vector2(1f, 0.75f);
+            faRect.offsetMin = Vector2.zero;
+            faRect.offsetMax = Vector2.zero;
+
+            var fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(fillAreaGo.transform, false);
+            var fRect = fillGo.AddComponent<RectTransform>();
+            fRect.anchorMin = Vector2.zero;
+            fRect.anchorMax = Vector2.one;
+            fRect.offsetMin = Vector2.zero;
+            fRect.offsetMax = Vector2.zero;
+            var fillImg = fillGo.AddComponent<Image>();
+            fillImg.color = new Color(0.3f, 0.75f, 0.35f, 1f);
+
+            // Handle Slide Area
+            var handleAreaGo = new GameObject("Handle Slide Area");
+            handleAreaGo.transform.SetParent(sliderGo.transform, false);
+            var haRect = handleAreaGo.AddComponent<RectTransform>();
+            haRect.anchorMin = Vector2.zero;
+            haRect.anchorMax = Vector2.one;
+            haRect.offsetMin = Vector2.zero;
+            haRect.offsetMax = Vector2.zero;
+
+            var handleGo = new GameObject("Handle");
+            handleGo.transform.SetParent(handleAreaGo.transform, false);
+            var hRect = handleGo.AddComponent<RectTransform>();
+            hRect.sizeDelta = new Vector2(20f, 20f);
+            var hImg = handleGo.AddComponent<Image>();
+            hImg.color = Color.white;
+
+            slider.fillRect = fRect;
+            slider.handleRect = hRect;
+            slider.targetGraphic = hImg;
+            slider.direction = Slider.Direction.LeftToRight;
+
+            return (slider, textComp);
         }
 
         private static void SetPrivateField(object target, string fieldName, object value)

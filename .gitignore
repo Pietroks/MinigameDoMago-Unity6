@@ -35,3 +35,6 @@
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Raw Source Folders
+soundtrack_/

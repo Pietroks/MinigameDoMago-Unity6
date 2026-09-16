@@ -57,6 +57,18 @@ namespace WizardGame.UI
         [SerializeField] private Button pauseRestartButton;
         [SerializeField] private Button pauseMainMenuButton;
 
+        [Header("Controle de Volume (Menu Inicial)")]
+        [SerializeField] private Slider startBgmSlider;
+        [SerializeField] private Text startBgmText;
+        [SerializeField] private Slider startSfxSlider;
+        [SerializeField] private Text startSfxText;
+
+        [Header("Controle de Volume (Menu de Pausa)")]
+        [SerializeField] private Slider pauseBgmSlider;
+        [SerializeField] private Text pauseBgmText;
+        [SerializeField] private Slider pauseSfxSlider;
+        [SerializeField] private Text pauseSfxText;
+
         public event Action OnPlayClicked;
         public event Action OnResumeClicked;
         public event Action OnRestartClicked;
@@ -296,6 +308,77 @@ namespace WizardGame.UI
         }
 
         #endregion
+
+        private void Start()
+        {
+            InitializeVolumeSliders();
+            UpdateMuteUI();
+        }
+
+        private void InitializeVolumeSliders()
+        {
+            if (SoundManager.Instance == null) return;
+
+            float bgm = SoundManager.Instance.BGMVolume;
+            float sfx = SoundManager.Instance.SFXVolume;
+
+            if (startBgmSlider != null)
+            {
+                startBgmSlider.value = bgm;
+                startBgmSlider.onValueChanged.AddListener(OnBgmSliderChanged);
+            }
+            if (pauseBgmSlider != null)
+            {
+                pauseBgmSlider.value = bgm;
+                pauseBgmSlider.onValueChanged.AddListener(OnBgmSliderChanged);
+            }
+
+            if (startSfxSlider != null)
+            {
+                startSfxSlider.value = sfx;
+                startSfxSlider.onValueChanged.AddListener(OnSfxSliderChanged);
+            }
+            if (pauseSfxSlider != null)
+            {
+                pauseSfxSlider.value = sfx;
+                pauseSfxSlider.onValueChanged.AddListener(OnSfxSliderChanged);
+            }
+
+            UpdateBgmLabels(bgm);
+            UpdateSfxLabels(sfx);
+        }
+
+        private void OnBgmSliderChanged(float val)
+        {
+            SoundManager.Instance?.SetBGMVolume(val);
+            if (startBgmSlider != null && Mathf.Abs(startBgmSlider.value - val) > 0.001f) startBgmSlider.value = val;
+            if (pauseBgmSlider != null && Mathf.Abs(pauseBgmSlider.value - val) > 0.001f) pauseBgmSlider.value = val;
+            UpdateBgmLabels(val);
+        }
+
+        private void OnSfxSliderChanged(float val)
+        {
+            SoundManager.Instance?.SetSFXVolume(val);
+            if (startSfxSlider != null && Mathf.Abs(startSfxSlider.value - val) > 0.001f) startSfxSlider.value = val;
+            if (pauseSfxSlider != null && Mathf.Abs(pauseSfxSlider.value - val) > 0.001f) pauseSfxSlider.value = val;
+            UpdateSfxLabels(val);
+        }
+
+        private void UpdateBgmLabels(float val)
+        {
+            int pct = Mathf.RoundToInt(val * 100f);
+            string txt = $"MÚSICA: {pct}%";
+            if (startBgmText != null) startBgmText.text = txt;
+            if (pauseBgmText != null) pauseBgmText.text = txt;
+        }
+
+        private void UpdateSfxLabels(float val)
+        {
+            int pct = Mathf.RoundToInt(val * 100f);
+            string txt = $"EFEITOS: {pct}%";
+            if (startSfxText != null) startSfxText.text = txt;
+            if (pauseSfxText != null) pauseSfxText.text = txt;
+        }
 
         private void ToggleMute()
         {

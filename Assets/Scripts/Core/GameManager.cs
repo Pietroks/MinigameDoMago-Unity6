@@ -109,6 +109,7 @@ namespace WizardGame.Core
                     spawner?.StopSpawning();
                     inputHandler?.SetInputBlocked(true);
                     uiManager?.ShowStartMenu();
+                    SoundManager.Instance?.PlayMenuMusic();
                     break;
 
                 case GameState.Playing:
@@ -116,6 +117,7 @@ namespace WizardGame.Core
                     inputHandler?.SetInputBlocked(false);
                     uiManager?.ShowGameplayHUD();
                     spawner?.StartSpawning();
+                    SoundManager.Instance?.PlayGameplayMusic();
                     break;
 
                 case GameState.Paused:
