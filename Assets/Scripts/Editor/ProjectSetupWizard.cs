@@ -30,6 +30,44 @@ namespace WizardGame.EditorTools
             Debug.Log("Minigame dos Goblins configurado com sucesso!");
         }
 
+        [MenuItem("Tools/Build Game Standalone")]
+        public static void BuildGame()
+        {
+            Debug.Log("Iniciando reconstrucao e build de MinigameDoMago...");
+            SetupProject();
+
+            EditorBuildSettings.scenes = new[] {
+                new EditorBuildSettingsScene("Assets/Scenes/Gameplay.unity", true)
+            };
+
+            string buildFolder = "Builds";
+            if (!System.IO.Directory.Exists(buildFolder))
+            {
+                System.IO.Directory.CreateDirectory(buildFolder);
+            }
+
+            string buildPath = buildFolder + "/MinigameDoMago.exe";
+
+            BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
+            buildPlayerOptions.scenes = new[] { "Assets/Scenes/Gameplay.unity" };
+            buildPlayerOptions.locationPathName = buildPath;
+            buildPlayerOptions.target = BuildTarget.StandaloneWindows64;
+            buildPlayerOptions.options = BuildOptions.None;
+
+            UnityEditor.Build.Reporting.BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
+            UnityEditor.Build.Reporting.BuildSummary summary = report.summary;
+
+            if (summary.result == UnityEditor.Build.Reporting.BuildResult.Succeeded)
+            {
+                Debug.Log($"BUILD CONCLUIDA COM SUCESSO! Total: {summary.totalSize} bytes em {buildPath}");
+            }
+            else
+            {
+                Debug.LogError($"BUILD FALHOU! Status: {summary.result} - Erros: {summary.totalErrors}");
+                EditorApplication.Exit(1);
+            }
+        }
+
         private static void ConfigureSprites()
         {
             string[] guids = AssetDatabase.FindAssets("t:Texture2D", new[] { "Assets/Sprites" });
