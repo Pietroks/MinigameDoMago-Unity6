@@ -9,11 +9,12 @@ namespace WizardGame.UI
 {
     /// <summary>
     /// Gerencia a interface completa: HUD em tempo real, Sistema de Combos,
-    /// Popups de Headshot, Menu Inicial, Pause e Telas de Fim de Jogo com Estatísticas.
+    /// Popups de Headshot, Menu Inicial, Pause e Telas de Fim de Jogo com Estatisticas.
+    /// Adaptado para o tema de cacada aos Goblins.
     /// </summary>
     public class UIManager : MonoBehaviour
     {
-        [Header("Painéis Principais")]
+        [Header("Paineis Principais")]
         [SerializeField] private GameObject startMenuPanel;
         [SerializeField] private GameObject pauseMenuPanel;
         [SerializeField] private GameObject instructionsPanel;
@@ -123,22 +124,22 @@ namespace WizardGame.UI
 
             if (endTitleText != null)
             {
-                endTitleText.text = won ? "VITORIA! O REINO ESTA SALVO!" : "DERROTA! OS MAGOS ESCAPARAM!";
+                endTitleText.text = won ? "VITORIA! TODOS OS GOBLINS FORAM DERROTADOS!" : "DERROTA! OS GOBLINS ESCAPARAM!";
                 endTitleText.color = won ? Color.yellow : Color.red;
             }
 
             if (endScoreText != null)
             {
                 endScoreText.text = won
-                    ? $"Pontos Totais: {score}  |  Magos Abatidos com Sucesso!"
-                    : $"Pontos Totais: {score}  |  Magos que Fugiram: {escaped} / 15";
+                    ? $"Pontos Totais: {score}  |  Goblins Abatidos com Maestria!"
+                    : $"Pontos Totais: {score}  |  Goblins Fugitivos: {escaped} / 15";
             }
 
             if (endStatsText != null)
             {
-                endStatsText.text = $"Estatisticas de Precisao:\n" +
-                                    $"  • Maior Combo Sequencial: {maxStreak} abates\n" +
-                                    $"  • Tiros Perfeitos (Headshots): {headshots}";
+                endStatsText.text = $"Estatisticas de Desempenho:\n" +
+                                    $"  - Maior Combo Sequencial: {maxStreak} abates\n" +
+                                    $"  - Tiros Perfeitos (Headshots): {headshots}";
             }
         }
 
@@ -151,7 +152,7 @@ namespace WizardGame.UI
         {
             if (escapeText != null)
             {
-                escapeText.text = $"Escaparam: {current} / {max}";
+                escapeText.text = $"Fugiram: {current} / {max}";
                 escapeText.color = current >= (max - 3) ? Color.red : new Color(1f, 0.6f, 0.6f);
             }
         }
@@ -197,13 +198,12 @@ namespace WizardGame.UI
             if (streak >= 2)
             {
                 comboContainer.SetActive(true);
-                comboText.text = $"COMBO x{multiplier} — {streak} ABATES";
+                comboText.text = $"COMBO x{multiplier} - {streak} ABATES";
 
-                // Cores dinâmicas
-                if (multiplier >= 4) comboText.color = new Color(1f, 0.2f, 1f); // Magenta/Roxo
-                else if (multiplier == 3) comboText.color = new Color(1f, 0.3f, 0.1f); // Vermelho fogo
+                if (multiplier >= 4) comboText.color = new Color(1f, 0.2f, 1f); // Magenta
+                else if (multiplier == 3) comboText.color = new Color(1f, 0.3f, 0.1f); // Vermelho
                 else if (multiplier == 2) comboText.color = new Color(1f, 0.7f, 0f); // Laranja
-                else comboText.color = new Color(1f, 0.95f, 0.4f); // Amarelo suave
+                else comboText.color = new Color(1f, 0.95f, 0.4f); // Amarelo
 
                 if (comboPulseCoroutine != null) StopCoroutine(comboPulseCoroutine);
                 comboPulseCoroutine = StartCoroutine(PunchScaleRoutine(comboContainer.transform));
@@ -274,7 +274,7 @@ namespace WizardGame.UI
             headshotPopupContainer.SetActive(true);
             if (headshotPopupText != null)
             {
-                headshotPopupText.text = "🎯 HEADSHOT! +1 PONTO";
+                headshotPopupText.text = "HEADSHOT! +1 PONTO";
                 headshotPopupText.color = new Color(0.2f, 1f, 0.3f);
             }
 

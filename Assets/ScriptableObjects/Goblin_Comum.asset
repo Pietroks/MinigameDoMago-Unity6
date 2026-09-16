@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3902d0460b1dba429a7756001e3ad13, type: 3}
+  m_Name: Goblin_Comum
+  m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
+  wizardType: 0
+  displayName: Goblin Comum
+  sprite: {fileID: 21300000, guid: 571550b00a86e2e4db739eecb215a8c8, type: 3}
+  portraitSprite: {fileID: 21300000, guid: 5d8c66762d7002549ba1fbc1ed9a02fd, type: 3}
+  baseTint: {r: 1, g: 1, b: 1, a: 1}
+  idleFrames:
+  - {fileID: 21300000, guid: b1792daf7cab00a4aaf9e0532ad1bd53, type: 3}
+  walkFrames:
+  - {fileID: 21300000, guid: 571550b00a86e2e4db739eecb215a8c8, type: 3}
+  - {fileID: 21300000, guid: 2361b5c05bb22e9428f716f66c6d6c4e, type: 3}
+  - {fileID: 21300000, guid: 44aec9c4843583349a21ca5ee7430ca0, type: 3}
+  runFrames: []
+  attackFrames:
+  - {fileID: 21300000, guid: aade57f090b03134cbb2d59477c8496a, type: 3}
+  - {fileID: 21300000, guid: 6db5e37f3933c69479bedbee5740ad90, type: 3}
+  deathFrames:
+  - {fileID: 21300000, guid: 26eceecdd5f16f9408a2fadf8866c210, type: 3}
+  - {fileID: 21300000, guid: 25dcb94771224fb4bb995a2d43833ad1, type: 3}
+  specialActionSprite: {fileID: 0}
+  maxHealth: 1
+  pointsOnDefeat: 1
+  moveSpeed: 2
+  escapeTimeSeconds: 5.5
+  spawnWeight: 50
+  escapePenalty: 1
+  escapeSound: {fileID: 8300000, guid: aaf1dd34fb2244f48b8e2800310b3f5d, type: 3}
+  customDamageSound: {fileID: 0}
+  customDeathSound: {fileID: 0}

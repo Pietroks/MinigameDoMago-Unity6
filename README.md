@@ -17,11 +17,15 @@ Recriação e refatoração completa do clássico jogo Point-and-Click / Shootin
 - **Tiro Forte Arcano**:
   - Acionado com **Botão Direito do Mouse (RMB)**. Causa **3 de dano**.
   - Cooldown de 3.0 segundos com indicador de recarga em tempo real no HUD.
-- **4 Tipos de Magos**:
-  - 🧙 **Mago Comum**: 1 HP, 1 Ponto. Flutua suavemente pelo cenário.
-  - 🏃 **Mago Rápido**: 2 HP, 2 Pontos. Ao tomar o 1º tiro, reage com *squash & stretch* e foge em disparada!
-  - ⭐ **Mago Dourado**: 3 HP, 5 Pontos. Brilho pulsante e movimentação rápida em linha reta.
-  - 👻 **Mago Fantasma**: 4 HP, 3 Pontos. Transparência mágica e **teleporte instantâneo** pelo mapa ao sofrer dano!
+- **4 Tipos de Goblins (Spritesheets & Animações Dedicadas)**:
+  - 👺 **Goblin Comum**: 1 HP, 1 Ponto. Patrulha o cenário e ataca com facas de perto. Animações: Idle, Walk, Attack, Death.
+  - 🏃 **Goblin Fugitivo**: 2 HP, 2 Pontos. Ao tomar dano, salta em pânico e foge em disparada acelerada. Animações: Idle, Walk, Run, Jump, Death.
+  - 🛡️ **Goblin Dourado**: 3 HP, 5 Pontos. Rápido e agressivo com investidas (*Dash*) e postura defensiva com escudo (*Shield*). Vale muitos pontos! Animações: Idle, Walk, Dash, Shield, Death.
+  - 🌀 **Goblin Fantasma**: 4 HP, 3 Pontos. Levitação mágica e teleporte instantâneo através de portais dimensionais ao sofrer impacto. Animações: Idle, Float, Portal, Attack, Death.
+- **Sistema de Combos & Headshot**:
+  - Multiplicador de pontuação progressivo (x1 a x4) por abates em sequência.
+  - Bônus de precisão (*Headshot / Acerto Perfeito*): +1 ponto extra ao atingir o ponto fraco superior do goblin.
+  - Errar tiros ou deixar goblins escaparem quebra a sequência de combo!
 - **Condições de Partida**:
   - **Vitória**: Abater **50 magos**.
   - **Derrota**: Deixar **15 magos escaparem**.

@@ -14,20 +14,20 @@ namespace WizardGame.EditorTools
 {
     public static class ProjectSetupWizard
     {
-        [MenuItem("Tools/Setup Wizard Minigame Complete")]
+        [MenuItem("Tools/Setup Goblin Minigame Complete")]
         public static void SetupProject()
         {
-            Debug.Log("Iniciando reconstrucao completa com Sistema de Combos e Headshots...");
+            Debug.Log("Iniciando reconstrucao completa com Goblins e Spritesheets...");
 
             ConfigureSprites();
-            var wizardDatas = CreateWizardScriptableObjects();
-            var wizardPrefab = CreateWizardPrefab();
+            var wizardDatas = CreateGoblinScriptableObjects();
+            var wizardPrefab = CreateGoblinPrefab();
             SetupGameplayScene(wizardDatas, wizardPrefab);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("Minigame do Mago reconstruido com sucesso!");
+            Debug.Log("Minigame dos Goblins configurado com sucesso!");
         }
 
         private static void ConfigureSprites()
@@ -39,79 +39,160 @@ namespace WizardGame.EditorTools
                 TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
                 if (importer != null)
                 {
-                    importer.textureType = TextureImporterType.Sprite;
-                    importer.spriteImportMode = SpriteImportMode.Single;
-                    importer.alphaIsTransparency = true;
-                    importer.SaveAndReimport();
+                    bool dirty = false;
+                    if (importer.textureType != TextureImporterType.Sprite)
+                    {
+                        importer.textureType = TextureImporterType.Sprite;
+                        dirty = true;
+                    }
+                    if (importer.spriteImportMode != SpriteImportMode.Single)
+                    {
+                        importer.spriteImportMode = SpriteImportMode.Single;
+                        dirty = true;
+                    }
+                    if (!importer.alphaIsTransparency)
+                    {
+                        importer.alphaIsTransparency = true;
+                        dirty = true;
+                    }
+                    if (importer.filterMode != FilterMode.Point)
+                    {
+                        importer.filterMode = FilterMode.Point;
+                        dirty = true;
+                    }
+                    if (dirty)
+                    {
+                        importer.SaveAndReimport();
+                    }
                 }
             }
         }
 
-        private static List<WizardDataSO> CreateWizardScriptableObjects()
+        private static List<WizardDataSO> CreateGoblinScriptableObjects()
         {
             string folder = "Assets/ScriptableObjects";
             if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets", "ScriptableObjects");
 
             var list = new List<WizardDataSO>();
 
-            // Comum
-            var comum = GetOrCreateSO<WizardDataSO>(folder + "/Wizard_Comum.asset");
+            // 1. Goblin Comum: 1 HP, 1 Ponto
+            var comum = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Comum.asset");
             comum.wizardType = WizardType.Comum;
-            comum.displayName = "Mago Comum";
+            comum.displayName = "Goblin Comum";
             comum.maxHealth = 1;
             comum.pointsOnDefeat = 1;
-            comum.escapeTimeSeconds = 5.0f;
-            comum.spawnWeight = 65;
+            comum.moveSpeed = 2.0f;
+            comum.escapeTimeSeconds = 5.5f;
+            comum.spawnWeight = 50;
             comum.escapePenalty = 1;
             comum.baseTint = Color.white;
-            comum.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Wizards/maguinho.webp");
+            comum.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/portrait.png");
+            comum.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_0.png");
+            comum.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/idle.png") };
+            comum.walkFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_0.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_1.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_2.png")
+            };
+            comum.attackFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/attack.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/attack_1.png")
+            };
+            comum.deathFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/death.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/death_1.png")
+            };
             comum.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/hihi.mp3");
             EditorUtility.SetDirty(comum);
             list.Add(comum);
 
-            // Rapido
-            var rapido = GetOrCreateSO<WizardDataSO>(folder + "/Wizard_Rapido.asset");
-            rapido.wizardType = WizardType.Rapido;
-            rapido.displayName = "Mago Rapido";
-            rapido.maxHealth = 2;
-            rapido.pointsOnDefeat = 2;
-            rapido.escapeTimeSeconds = 6.0f;
-            rapido.spawnWeight = 20;
-            rapido.escapePenalty = 2;
-            rapido.baseTint = new Color(1f, 0.75f, 0.75f);
-            rapido.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Wizards/maguinho2.png");
-            rapido.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
-            rapido.customDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/Zé-Wilker-Filho-da-puta (mp3cut.net).mp3");
-            EditorUtility.SetDirty(rapido);
-            list.Add(rapido);
+            // 2. Goblin Fugitivo: 2 HP, 2 Pontos, salta e corre acelerado ao tomar dano
+            var fugitivo = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Fugitivo.asset");
+            fugitivo.wizardType = WizardType.Fugitivo;
+            fugitivo.displayName = "Goblin Fugitivo";
+            fugitivo.maxHealth = 2;
+            fugitivo.pointsOnDefeat = 2;
+            fugitivo.moveSpeed = 3.2f;
+            fugitivo.escapeTimeSeconds = 5.5f;
+            fugitivo.spawnWeight = 25;
+            fugitivo.escapePenalty = 2;
+            fugitivo.baseTint = Color.white;
+            fugitivo.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/portrait.png");
+            fugitivo.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/walk_0.png");
+            fugitivo.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/idle.png") };
+            fugitivo.walkFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/walk_0.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/walk_1.png")
+            };
+            fugitivo.runFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/run_0.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/run_1.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/run_2.png")
+            };
+            fugitivo.specialActionSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/jump.png");
+            fugitivo.deathFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/death.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/death_1.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/death_2.png")
+            };
+            fugitivo.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
+            fugitivo.customDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/Zé-Wilker-Filho-da-puta (mp3cut.net).mp3");
+            EditorUtility.SetDirty(fugitivo);
+            list.Add(fugitivo);
 
-            // Dourado
-            var dourado = GetOrCreateSO<WizardDataSO>(folder + "/Wizard_Dourado.asset");
+            // 3. Goblin Dourado: 3 HP, 5 Pontos, rapido e agressivo com escudo
+            var dourado = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Dourado.asset");
             dourado.wizardType = WizardType.Dourado;
-            dourado.displayName = "Mago Dourado";
+            dourado.displayName = "Goblin Dourado";
             dourado.maxHealth = 3;
             dourado.pointsOnDefeat = 5;
-            dourado.escapeTimeSeconds = 7.0f;
+            dourado.moveSpeed = 3.6f;
+            dourado.escapeTimeSeconds = 6.5f;
             dourado.spawnWeight = 10;
             dourado.escapePenalty = 1;
             dourado.baseTint = new Color(1f, 0.95f, 0.4f);
-            dourado.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Wizards/mago-nivel-3.png");
+            dourado.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/portrait.png");
+            dourado.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/walk_0.png");
+            dourado.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/idle.png") };
+            dourado.walkFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/walk_0.png") };
+            dourado.runFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/dash_0.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/dash_1.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/dash_2.png")
+            };
+            dourado.attackFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/attack.png") };
+            dourado.specialActionSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/shield.png");
+            dourado.deathFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/death.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/death_1.png")
+            };
             dourado.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/hihi.mp3");
             dourado.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
             EditorUtility.SetDirty(dourado);
             list.Add(dourado);
 
-            // Fantasma
-            var fantasma = GetOrCreateSO<WizardDataSO>(folder + "/Wizard_Fantasma.asset");
+            // 4. Goblin Fantasma: 4 HP, 3 Pontos, teleporte dimensional instantaneo
+            var fantasma = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Fantasma.asset");
             fantasma.wizardType = WizardType.Fantasma;
-            fantasma.displayName = "Mago Fantasma";
+            fantasma.displayName = "Goblin Fantasma";
             fantasma.maxHealth = 4;
             fantasma.pointsOnDefeat = 3;
-            fantasma.escapeTimeSeconds = 9.0f;
+            fantasma.moveSpeed = 2.4f;
+            fantasma.escapeTimeSeconds = 8.5f;
             fantasma.spawnWeight = 15;
             fantasma.escapePenalty = 1;
-            fantasma.baseTint = new Color(0.7f, 0.85f, 1f, 0.85f);
-            fantasma.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Wizards/mago-1-2.png");
+            fantasma.baseTint = new Color(0.85f, 0.95f, 1f, 0.9f);
+            fantasma.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/portrait.png");
+            fantasma.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/walk_0.png");
+            fantasma.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/idle.png") };
+            fantasma.walkFrames = new[] {
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/float_0.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/float_1.png"),
+                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/float_2.png")
+            };
+            fantasma.attackFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/cast.png") };
+            fantasma.specialActionSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/portal.png");
+            fantasma.deathFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/death.png") };
             fantasma.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/hihi.mp3");
             fantasma.customDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/dbz-teleport.mp3");
             EditorUtility.SetDirty(fantasma);
@@ -131,22 +212,24 @@ namespace WizardGame.EditorTools
             return asset;
         }
 
-        private static WizardController CreateWizardPrefab()
+        private static WizardController CreateGoblinPrefab()
         {
             string folder = "Assets/Prefabs";
             if (!AssetDatabase.IsValidFolder(folder)) AssetDatabase.CreateFolder("Assets", "Prefabs");
-            string prefabPath = folder + "/Wizard_Base.prefab";
+            string prefabPath = folder + "/Goblin_Base.prefab";
 
-            GameObject go = new GameObject("Wizard_Base");
+            GameObject go = new GameObject("Goblin_Base");
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sortingOrder = 5;
 
             var col = go.AddComponent<CircleCollider2D>();
             col.radius = 0.5f;
 
+            var anim = go.AddComponent<FrameAnimator>();
             var controller = go.AddComponent<WizardController>();
             SetPrivateField(controller, "spriteRenderer", sr);
             SetPrivateField(controller, "hitCollider", col);
+            SetPrivateField(controller, "frameAnimator", anim);
             SetPrivateField(controller, "targetHeight", 1.4f);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
@@ -296,45 +379,47 @@ namespace WizardGame.EditorTools
             botBarRect.pivot = new Vector2(0.5f, 0f);
             botBarRect.sizeDelta = new Vector2(0f, 40f);
             botBarRect.anchoredPosition = Vector2.zero;
-            var hintText = CreateUIText(bottomBar.transform, "ControlsHint", "[LMB] Atirar  |  [RMB] Tiro Forte  |  [R] Recarregar Mana  |  [ESC / P] Pausar", 18, new Color(0.85f, 0.85f, 0.85f), new Vector2(0f, 20f), new Vector2(0.5f, 0f), defaultFont, TextAnchor.MiddleCenter);
+            var hintText = CreateUIText(bottomBar.transform, "ControlsHint", "[LMB] Disparo  |  [RMB] Tiro Forte  |  [R] Recarregar Mana  |  [ESC / P] Pausar", 18, new Color(0.85f, 0.85f, 0.85f), new Vector2(0f, 20f), new Vector2(0.5f, 0f), defaultFont, TextAnchor.MiddleCenter);
 
             // --- MENU INICIAL ---
             GameObject startMenu = CreatePanel(canvasGo.transform, "StartMenuPanel", new Vector2(0f, 0f), new Vector2(1f, 1f), new Color(0.04f, 0.04f, 0.08f, 0.95f));
 
-            CreateUIText(startMenu.transform, "Title", "MINIGAME DO MAGO", 58, Color.yellow, new Vector2(0f, 260f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
-            CreateUIText(startMenu.transform, "Subtitle", "Defenda a torre e nao deixe os magos escaparem!", 24, Color.white, new Vector2(0f, 195f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(startMenu.transform, "Title", "CACADA AOS GOBLINS", 56, Color.yellow, new Vector2(0f, 260f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(startMenu.transform, "Subtitle", "Elimine os goblins invasores antes que eles fujam!", 24, Color.white, new Vector2(0f, 195f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             var playBtnObj = CreateButton(startMenu.transform, "PlayButton", "JOGAR AGORA", new Vector2(0f, 60f), new Vector2(0.5f, 0.5f), new Vector2(320f, 65f), defaultFont, new Color(0.5f, 0.1f, 0.8f));
             var playBtn = playBtnObj.GetComponent<Button>();
 
-            var instrBtnObj = CreateButton(startMenu.transform, "InstructionsButton", "COMO JOGAR / CONTROLES", new Vector2(0f, -20f), new Vector2(0.5f, 0.5f), new Vector2(320f, 55f), defaultFont, new Color(0.15f, 0.3f, 0.6f));
+            var instrBtnObj = CreateButton(startMenu.transform, "InstructionsButton", "GUIA DOS GOBLINS & REGRAS", new Vector2(0f, -20f), new Vector2(0.5f, 0.5f), new Vector2(320f, 55f), defaultFont, new Color(0.15f, 0.3f, 0.6f));
             var instrBtn = instrBtnObj.GetComponent<Button>();
 
             var quitBtnObj = CreateButton(startMenu.transform, "QuitButton", "SAIR DO JOGO", new Vector2(0f, -95f), new Vector2(0.5f, 0.5f), new Vector2(320f, 50f), defaultFont, new Color(0.35f, 0.1f, 0.1f));
             var quitBtn = quitBtnObj.GetComponent<Button>();
 
-            // --- PAINEL DE INSTRUÇÕES ---
-            GameObject instrPanel = CreatePanel(startMenu.transform, "InstructionsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.08f, 0.08f, 0.16f, 0.98f));
+            // --- PAINEL DE INSTRUÇÕES (COM OS 4 GOBLINS) ---
+            GameObject instrPanel = CreatePanel(startMenu.transform, "InstructionsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.06f, 0.08f, 0.15f, 0.98f));
             var instrRect = instrPanel.GetComponent<RectTransform>();
-            instrRect.sizeDelta = new Vector2(800f, 580f);
+            instrRect.sizeDelta = new Vector2(920f, 640f);
             instrRect.anchoredPosition = Vector2.zero;
 
-            CreateUIText(instrPanel.transform, "InstrTitle", "COMO JOGAR & SISTEMA DE COMBOS", 32, Color.yellow, new Vector2(0f, 250f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(instrPanel.transform, "InstrTitle", "MANUAL DOS GOBLINS & MECANICAS", 30, Color.yellow, new Vector2(0f, 280f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
-            string instrBody = "OBJETIVO:\n" +
-                               "Abata magos para atingir 50 pontos! Se 15 escaparem, voce perde!\n\n" +
-                               "SISTEMA DE COMBOS & MULTIPLICADOR:\n" +
-                               "  • Matar magos seguidos aumenta seu multiplicador:\n" +
-                               "    1-4 abates: x1  |  5-9 abates: x2  |  10-19 abates: x3  |  20+ abates: x4!\n" +
-                               "  • ATENCAO: Errar um tiro no vazio ou deixar um mago escapar QUEBRA O COMBO!\n\n" +
+            string instrBody = "INIMIGOS (GUIA OFICIAL):\n" +
+                               "  • GOBLIN COMUM: 1 HP | 1 Ponto | Move-se aleatoriamente atacando com facas.\n" +
+                               "  • GOBLIN FUGITIVO: 2 HP | 2 Pontos | Ao ser atingido, salta e foge em disparada acelerada!\n" +
+                               "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido e agressivo com escudo. Vale mais pontos!\n" +
+                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporte dimensional instantaneo atraves de portais ao tomar dano.\n\n" +
+                               "SISTEMA DE COMBOS & MULTIPLICADORES:\n" +
+                               "  • 1-4 abates: x1  |  5-9 abates: x2  |  10-19 abates: x3  |  20+ abates: x4!\n" +
+                               "  • Errar um tiro no vazio ou deixar um goblin fugir QUEBRA O COMBO imediatamente!\n\n" +
                                "BONUS DE PRECISAO:\n" +
-                               "  • 🎯 HEADSHOT / ACERTO PERFEITO: Atire na cabeca do mago para ganhar +1 Ponto!\n\n" +
-                               "CONTROLES:\n" +
-                               "  • [LMB]: Tiro de Mana Normal  |  [RMB]: Tiro Forte (Dano 3 - Recarga 3s)\n" +
-                               "  • Tecla [R]: Recarregar Mana (Capacidade 8)  |  Tecla [ESC/P]: Pausar";
-            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 18, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
+                               "  • HEADSHOT: Acertos no topo da cabeca concedem +1 Ponto Imediato!\n\n" +
+                               "COMANDOS:\n" +
+                               "  • [LMB]: Disparo  |  [RMB]: Tiro Forte (Dano 3 - Recarga 3s)\n" +
+                               "  • [R]: Recarregar Mana (Pente de 8)  |  [ESC / P]: Pausar";
+            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 17, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
-            var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -240f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
+            var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -270f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
             var closeInstrBtn = closeInstrBtnObj.GetComponent<Button>();
             instrPanel.SetActive(false);
 

@@ -6,8 +6,9 @@ using WizardGame.Data;
 namespace WizardGame.Entities
 {
     /// <summary>
-    /// Controlador robusto de mago. Possui barra de vida flutuante para inimigos com mais de 1 HP,
-    /// collider sempre ativo enquanto vivo (nunca trava a tela) e fallback de segurança contra travamentos.
+    /// Controlador completo de Goblin. Gerencia ciclo de vida, maquina de estados de animacao
+    /// por spritesheet (FrameAnimator), comportamentos especializados por tipo (Comum, Fugitivo, Dourado, Fantasma),
+    /// barra de vida e eventos de combate sem travamentos.
     /// </summary>
     [RequireComponent(typeof(SpriteRenderer), typeof(Collider2D))]
     public class WizardController : MonoBehaviour
@@ -15,18 +16,20 @@ namespace WizardGame.Entities
         [Header("Componentes Visuais")]
         [SerializeField] private SpriteRenderer spriteRenderer;
         [SerializeField] private Collider2D hitCollider;
+        [SerializeField] private FrameAnimator frameAnimator;
 
         [Header("Barra de Vida (Health Bar)")]
         [SerializeField] private GameObject healthBarRoot;
         [SerializeField] private SpriteRenderer healthBarBg;
         [SerializeField] private SpriteRenderer healthBarFill;
 
-        [Header("Configuração de Escala")]
+        [Header("Configuracao de Escala")]
         [SerializeField] private float targetHeight = 1.4f;
 
         private WizardDataSO currentData;
         private int currentHealth;
         private bool isDeadOrEscaping;
+        private bool isEnraged; // Para o Goblin Fugitivo ao tomar dano
         private Bounds screenWorldBounds;
         private Vector3 normalizedScale = Vector3.one;
 
@@ -34,6 +37,7 @@ namespace WizardGame.Entities
         private Coroutine pulseCoroutine;
         private Coroutine escapeCoroutine;
         private Coroutine hitReactionCoroutine;
+        private Coroutine attackRoutine;
 
         public event Action<WizardController, int> OnDefeated;
         public event Action<WizardController, int> OnEscaped;
@@ -42,6 +46,8 @@ namespace WizardGame.Entities
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
             if (hitCollider == null) hitCollider = GetComponent<Collider2D>();
+            if (frameAnimator == null) frameAnimator = GetComponent<FrameAnimator>();
+            if (frameAnimator == null) frameAnimator = gameObject.AddComponent<FrameAnimator>();
 
             CreateHealthBarIfMissing();
         }
@@ -54,20 +60,18 @@ namespace WizardGame.Entities
             healthBarRoot.transform.SetParent(transform, false);
             healthBarRoot.transform.localPosition = new Vector3(0f, 0.85f, 0f);
 
-            // Fundo da barra (Preto/Cinza)
             GameObject bgGo = new GameObject("Bg");
             bgGo.transform.SetParent(healthBarRoot.transform, false);
             healthBarBg = bgGo.AddComponent<SpriteRenderer>();
-            healthBarBg.sortingOrder = 10;
-            healthBarBg.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+            healthBarBg.sortingOrder = 15;
+            healthBarBg.color = new Color(0.1f, 0.1f, 0.1f, 0.85f);
             healthBarBg.sprite = CreateSolidWhiteSprite();
             bgGo.transform.localScale = new Vector3(0.9f, 0.15f, 1f);
 
-            // Preenchimento da barra (Verde)
             GameObject fillGo = new GameObject("Fill");
             fillGo.transform.SetParent(healthBarRoot.transform, false);
             healthBarFill = fillGo.AddComponent<SpriteRenderer>();
-            healthBarFill.sortingOrder = 11;
+            healthBarFill.sortingOrder = 16;
             healthBarFill.color = Color.green;
             healthBarFill.sprite = CreateSolidWhiteSprite();
             fillGo.transform.localScale = new Vector3(0.86f, 0.11f, 1f);
@@ -85,21 +89,28 @@ namespace WizardGame.Entities
             currentHealth = data.maxHealth;
             screenWorldBounds = bounds;
             isDeadOrEscaping = false;
+            isEnraged = false;
 
             transform.position = spawnPosition;
             transform.rotation = Quaternion.identity;
 
-            spriteRenderer.sprite = data.sprite;
+            // Inicializar sprite inicial
+            Sprite defaultSprite = (data.walkFrames != null && data.walkFrames.Length > 0) ? data.walkFrames[0] : data.sprite;
+            spriteRenderer.sprite = defaultSprite;
             spriteRenderer.color = data.baseTint;
+            spriteRenderer.flipX = false;
             hitCollider.enabled = true;
+
+            // Registrar animacoes no FrameAnimator
+            SetupAnimations(data);
 
             // Normalizar escala proporcionalmente ao sprite
             float spriteHeight = 1f;
-            if (data.sprite != null && data.sprite.bounds.size.y > 0.05f)
+            if (defaultSprite != null && defaultSprite.bounds.size.y > 0.05f)
             {
-                spriteHeight = data.sprite.bounds.size.y;
+                spriteHeight = defaultSprite.bounds.size.y;
             }
-            float scaleFactor = targetHeight / spriteHeight;
+            float scaleFactor = targetHeight / Mathf.Max(0.1f, spriteHeight);
             normalizedScale = new Vector3(scaleFactor, scaleFactor, 1f);
             transform.localScale = Vector3.zero;
 
@@ -108,9 +119,7 @@ namespace WizardGame.Entities
                 circleCol.radius = spriteHeight * 0.45f;
             }
 
-            // Configurar barra de vida
             UpdateHealthBar();
-
             StopAllActiveCoroutines();
 
             StartCoroutine(SpawnScaleInRoutine());
@@ -119,11 +128,49 @@ namespace WizardGame.Entities
             escapeCoroutine = StartCoroutine(EscapeTimerRoutine(data.escapeTimeSeconds));
         }
 
+        private void SetupAnimations(WizardDataSO data)
+        {
+            frameAnimator.UnlockAnimation();
+
+            // Idle
+            if (data.idleFrames != null && data.idleFrames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Idle, data.idleFrames, 6f, true);
+            }
+
+            // Walk / Levitation
+            if (data.walkFrames != null && data.walkFrames.Length > 0)
+            {
+                float fps = (data.wizardType == WizardType.Dourado) ? 10f : 7f;
+                frameAnimator.RegisterState(AnimationState.Walk, data.walkFrames, fps, true);
+            }
+
+            // Run / Dash
+            if (data.runFrames != null && data.runFrames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Run, data.runFrames, 12f, true);
+            }
+
+            // Attack
+            if (data.attackFrames != null && data.attackFrames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Attack, data.attackFrames, 8f, false);
+            }
+
+            // Death
+            if (data.deathFrames != null && data.deathFrames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Death, data.deathFrames, 8f, false);
+            }
+
+            // Comeca andando
+            frameAnimator.Play(AnimationState.Walk);
+        }
+
         private void UpdateHealthBar()
         {
             if (healthBarRoot == null) return;
 
-            // Só mostra barra se tiver mais de 1 de vida inicial
             bool showBar = currentData != null && currentData.maxHealth > 1 && !isDeadOrEscaping;
             healthBarRoot.SetActive(showBar);
 
@@ -141,6 +188,7 @@ namespace WizardGame.Entities
             if (pulseCoroutine != null) StopCoroutine(pulseCoroutine);
             if (escapeCoroutine != null) StopCoroutine(escapeCoroutine);
             if (hitReactionCoroutine != null) StopCoroutine(hitReactionCoroutine);
+            if (attackRoutine != null) StopCoroutine(attackRoutine);
         }
 
         private IEnumerator SpawnScaleInRoutine()
@@ -163,22 +211,24 @@ namespace WizardGame.Entities
         {
             if (movementCoroutine != null) StopCoroutine(movementCoroutine);
             if (pulseCoroutine != null) StopCoroutine(pulseCoroutine);
+            if (attackRoutine != null) StopCoroutine(attackRoutine);
 
             switch (currentData.wizardType)
             {
                 case WizardType.Comum:
-                    movementCoroutine = StartCoroutine(GentleFloatRoutine());
+                    movementCoroutine = StartCoroutine(CommonPatrolRoutine());
+                    attackRoutine = StartCoroutine(PeriodicAttackRoutine(3f, 5f));
                     break;
-                case WizardType.Rapido:
-                    movementCoroutine = StartCoroutine(FastPendulumRoutine());
+                case WizardType.Fugitivo:
+                    movementCoroutine = StartCoroutine(FugitiveRunRoutine());
                     break;
                 case WizardType.Dourado:
-                    pulseCoroutine = StartCoroutine(GoldenPulseRoutine());
-                    movementCoroutine = StartCoroutine(GoldenDashRoutine());
+                    pulseCoroutine = StartCoroutine(GoldenGlowRoutine());
+                    movementCoroutine = StartCoroutine(GoldenAggressiveRoutine());
                     break;
                 case WizardType.Fantasma:
-                    pulseCoroutine = StartCoroutine(GhostAlphaRoutine());
-                    movementCoroutine = StartCoroutine(GhostVerticalRoutine());
+                    pulseCoroutine = StartCoroutine(GhostSpectralAlphaRoutine());
+                    movementCoroutine = StartCoroutine(GhostLevitateRoutine());
                     break;
             }
         }
@@ -218,14 +268,17 @@ namespace WizardGame.Entities
 
             switch (currentData.wizardType)
             {
-                case WizardType.Rapido:
-                    hitReactionCoroutine = StartCoroutine(FastHitReactionRoutine());
+                case WizardType.Fugitivo:
+                    hitReactionCoroutine = StartCoroutine(FugitiveJumpReactionRoutine());
                     break;
                 case WizardType.Fantasma:
-                    hitReactionCoroutine = StartCoroutine(GhostTeleportRoutine());
+                    hitReactionCoroutine = StartCoroutine(GhostTeleportReactionRoutine());
+                    break;
+                case WizardType.Dourado:
+                    hitReactionCoroutine = StartCoroutine(GoldenShieldReactionRoutine());
                     break;
                 default:
-                    hitReactionCoroutine = StartCoroutine(JiggleRoutine());
+                    hitReactionCoroutine = StartCoroutine(CommonJiggleReactionRoutine());
                     break;
             }
         }
@@ -240,6 +293,7 @@ namespace WizardGame.Entities
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
             StopAllActiveCoroutines();
 
+            // Anima subida e fade out
             float elapsed = 0f;
             float duration = 0.35f;
             Vector3 startPos = transform.position;
@@ -261,7 +315,7 @@ namespace WizardGame.Entities
         private void Die()
         {
             isDeadOrEscaping = true;
-            hitCollider.enabled = false; // Desativa para não processar múltiplos cliques após morte
+            hitCollider.enabled = false;
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
             StopAllActiveCoroutines();
 
@@ -270,172 +324,262 @@ namespace WizardGame.Entities
 
         private IEnumerator DeathAnimationRoutine()
         {
-            float elapsed = 0f;
-            float duration = 0.25f;
-            Vector3 startScale = transform.localScale;
-
-            if (currentData.wizardType == WizardType.Fantasma)
+            // Toca animacao de morte no FrameAnimator
+            if (frameAnimator != null && currentData.deathFrames != null && currentData.deathFrames.Length > 0)
             {
-                Vector3 startPos = transform.position;
-                Vector3 endPos = startPos + new Vector3(0f, 1.2f, 0f);
-                Color startCol = spriteRenderer.color;
-
-                while (elapsed < duration)
-                {
-                    elapsed += Time.deltaTime;
-                    float t = elapsed / duration;
-                    transform.position = Vector3.Lerp(startPos, endPos, t);
-                    spriteRenderer.color = new Color(startCol.r, startCol.g, startCol.b, Mathf.Lerp(startCol.a, 0f, t));
-                    yield return null;
-                }
+                frameAnimator.LockAnimation(AnimationState.Death);
             }
-            else
+
+            float duration = 0.45f;
+            float elapsed = 0f;
+            Color startCol = spriteRenderer.color;
+
+            while (elapsed < duration)
             {
-                while (elapsed < duration)
+                elapsed += Time.deltaTime;
+                float t = elapsed / duration;
+                // Fade out suave nos ultimos 40% da animacao
+                if (t > 0.6f)
                 {
-                    elapsed += Time.deltaTime;
-                    float t = elapsed / duration;
-                    transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
-                    transform.Rotate(0f, 0f, 360f * (Time.deltaTime / duration));
-                    yield return null;
+                    float fadeT = (t - 0.6f) / 0.4f;
+                    spriteRenderer.color = new Color(startCol.r, startCol.g, startCol.b, Mathf.Lerp(startCol.a, 0f, fadeT));
                 }
+                yield return null;
             }
 
             OnDefeated?.Invoke(this, currentData.pointsOnDefeat);
         }
 
-        #region Comportamentos de Movimentação
+        #region Comportamentos Especificos dos Goblins
 
-        private IEnumerator GentleFloatRoutine()
-        {
-            Vector3 origin = transform.position;
-            float seed = UnityEngine.Random.Range(0f, 100f);
-            while (true)
-            {
-                float t = (Time.time + seed) * 1.5f;
-                float ox = Mathf.Sin(t) * 0.4f;
-                float oy = Mathf.Cos(t * 0.8f) * 0.3f;
-                transform.position = origin + new Vector3(ox, oy, 0f);
-                yield return null;
-            }
-        }
-
-        private IEnumerator FastPendulumRoutine()
-        {
-            Vector3 origin = transform.position;
-            float seed = UnityEngine.Random.Range(0f, 100f);
-            while (true)
-            {
-                float t = (Time.time + seed) * 4f;
-                float ox = Mathf.Sin(t) * 0.7f;
-                float oy = Mathf.Sin(t * 2f) * 0.2f;
-                transform.position = origin + new Vector3(ox, oy, 0f);
-                yield return null;
-            }
-        }
-
-        private IEnumerator FastHitReactionRoutine()
-        {
-            // NUNCA desabilita o collider: jogador continua podendo atirar e abater!
-            Vector3 origScale = normalizedScale;
-            transform.localScale = new Vector3(origScale.x * 1.25f, origScale.y * 0.75f, origScale.z);
-            yield return new WaitForSeconds(0.06f);
-            transform.localScale = origScale;
-
-            Vector3 target = GetRandomPointInBounds();
-            Vector3 start = transform.position;
-            float elapsed = 0f;
-            float dashDuration = 0.15f;
-
-            while (elapsed < dashDuration)
-            {
-                elapsed += Time.deltaTime;
-                transform.position = Vector3.Lerp(start, target, elapsed / dashDuration);
-                yield return null;
-            }
-            transform.position = target;
-            movementCoroutine = StartCoroutine(FastPendulumRoutine());
-        }
-
-        private IEnumerator GoldenPulseRoutine()
+        // 1. GOBLIN COMUM: Movimento aleatorio e ataques periodicos
+        private IEnumerator CommonPatrolRoutine()
         {
             while (true)
             {
-                float factor = (Mathf.Sin(Time.time * 5f) + 1f) * 0.5f;
-                spriteRenderer.color = Color.Lerp(new Color(1f, 0.95f, 0.4f), new Color(1f, 0.75f, 0f), factor);
-                yield return null;
-            }
-        }
-
-        private IEnumerator GoldenDashRoutine()
-        {
-            while (true)
-            {
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.5f, 1.2f));
                 Vector3 target = GetRandomPointInBounds();
                 Vector3 start = transform.position;
-                float duration = UnityEngine.Random.Range(0.3f, 0.5f);
+                float dist = Vector3.Distance(start, target);
+                float duration = dist / Mathf.Max(0.5f, currentData.moveSpeed);
                 float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(target.x - start.x);
+                frameAnimator.Play(AnimationState.Walk);
 
                 while (elapsed < duration)
                 {
                     elapsed += Time.deltaTime;
                     float t = elapsed / duration;
-                    float smooth = Mathf.SmoothStep(0f, 1f, t);
-                    transform.position = Vector3.Lerp(start, target, smooth);
+                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
                     yield return null;
                 }
+
                 transform.position = target;
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 1.0f));
             }
         }
 
-        private IEnumerator GhostAlphaRoutine()
+        private IEnumerator PeriodicAttackRoutine(float minInterval, float maxInterval)
         {
             while (true)
             {
-                float alpha = Mathf.PingPong(Time.time * 0.8f, 0.5f) + 0.5f;
+                yield return new WaitForSeconds(UnityEngine.Random.Range(minInterval, maxInterval));
+                if (isDeadOrEscaping) yield break;
+
+                // Executa um ataque rapido com faca
+                frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Walk);
+            }
+        }
+
+        private IEnumerator CommonJiggleReactionRoutine()
+        {
+            Vector3 start = transform.position;
+            for (int i = 0; i < 4; i++)
+            {
+                transform.position = start + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.1f);
+                yield return new WaitForSeconds(0.025f);
+            }
+            transform.position = start;
+        }
+
+        // 2. GOBLIN FUGITIVO: Corrida rapida e pulo ao sofrer dano com disparada acelerada
+        private IEnumerator FugitiveRunRoutine()
+        {
+            float speed = isEnraged ? (currentData.moveSpeed * 1.8f) : currentData.moveSpeed;
+
+            while (true)
+            {
+                Vector3 target = GetRandomPointInBounds();
+                Vector3 start = transform.position;
+                float dist = Vector3.Distance(start, target);
+                float duration = dist / speed;
+                float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(target.x - start.x);
+                frameAnimator.Play(isEnraged ? AnimationState.Run : AnimationState.Walk);
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.deltaTime;
+                    transform.position = Vector3.Lerp(start, target, elapsed / duration);
+                    yield return null;
+                }
+
+                transform.position = target;
+                yield return new WaitForSeconds(isEnraged ? 0.1f : 0.3f);
+            }
+        }
+
+        private IEnumerator FugitiveJumpReactionRoutine()
+        {
+            isEnraged = true;
+            if (movementCoroutine != null) StopCoroutine(movementCoroutine);
+
+            // Se tiver sprite de jump, aplica
+            if (currentData.specialActionSprite != null)
+            {
+                spriteRenderer.sprite = currentData.specialActionSprite;
+            }
+
+            // Pulo de reacao no ar
+            Vector3 startPos = transform.position;
+            float jumpDuration = 0.28f;
+            float elapsed = 0f;
+            float jumpHeight = 0.8f;
+
+            while (elapsed < jumpDuration)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / jumpDuration;
+                float yOffset = Mathf.Sin(t * Mathf.PI) * jumpHeight;
+                transform.position = new Vector3(startPos.x, startPos.y + yOffset, startPos.z);
+                yield return null;
+            }
+            transform.position = startPos;
+
+            // Retoma corrida em disparada total
+            movementCoroutine = StartCoroutine(FugitiveRunRoutine());
+        }
+
+        // 3. GOBLIN DOURADO: Brilho pulsante, investidas com escudo e dash agressivo
+        private IEnumerator GoldenGlowRoutine()
+        {
+            while (true)
+            {
+                float factor = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;
+                spriteRenderer.color = Color.Lerp(new Color(1f, 0.95f, 0.5f), new Color(1f, 0.75f, 0.1f), factor);
+                yield return null;
+            }
+        }
+
+        private IEnumerator GoldenAggressiveRoutine()
+        {
+            while (true)
+            {
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f));
+                Vector3 target = GetRandomPointInBounds();
+                Vector3 start = transform.position;
+                float dist = Vector3.Distance(start, target);
+                float duration = dist / (currentData.moveSpeed * 1.5f);
+                float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(target.x - start.x);
+                frameAnimator.Play(AnimationState.Run);
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / duration;
+                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    yield return null;
+                }
+
+                transform.position = target;
+                frameAnimator.Play(AnimationState.Idle);
+            }
+        }
+
+        private IEnumerator GoldenShieldReactionRoutine()
+        {
+            if (currentData.specialActionSprite != null)
+            {
+                spriteRenderer.sprite = currentData.specialActionSprite; // Postura com escudo
+            }
+
+            // Recuo defensivo
+            Vector3 start = transform.position;
+            Vector3 recoilDir = (UnityEngine.Random.insideUnitCircle.normalized);
+            Vector3 recoilTarget = start + (recoilDir * 0.5f);
+
+            float elapsed = 0f;
+            float dur = 0.15f;
+            while (elapsed < dur)
+            {
+                elapsed += Time.deltaTime;
+                transform.position = Vector3.Lerp(start, recoilTarget, elapsed / dur);
+                yield return null;
+            }
+
+            yield return new WaitForSeconds(0.1f);
+            movementCoroutine = StartCoroutine(GoldenAggressiveRoutine());
+        }
+
+        // 4. GOBLIN FANTASMA: Levitacao espectral e teleporte dimensional atraves de portais
+        private IEnumerator GhostSpectralAlphaRoutine()
+        {
+            while (true)
+            {
+                float alpha = Mathf.PingPong(Time.time * 1.2f, 0.45f) + 0.55f;
                 Color c = spriteRenderer.color;
                 spriteRenderer.color = new Color(c.r, c.g, c.b, alpha);
                 yield return null;
             }
         }
 
-        private IEnumerator GhostVerticalRoutine()
+        private IEnumerator GhostLevitateRoutine()
         {
             Vector3 origin = transform.position;
             while (true)
             {
-                float oy = Mathf.Sin(Time.time * 2f) * 0.35f;
-                transform.position = new Vector3(origin.x, origin.y + oy, origin.z);
+                float oy = Mathf.Sin(Time.time * 2.5f) * 0.35f;
+                float ox = Mathf.Cos(Time.time * 1.5f) * 0.25f;
+                transform.position = new Vector3(origin.x + ox, origin.y + oy, origin.z);
                 yield return null;
             }
         }
 
-        private IEnumerator GhostTeleportRoutine()
+        private IEnumerator GhostTeleportReactionRoutine()
         {
-            // NUNCA desativa o collider: se o jogador mirar onde ele reaparece, o tiro acerta na hora!
-            StopBehaviorCoroutines();
+            if (movementCoroutine != null) StopCoroutine(movementCoroutine);
 
+            Vector3 oldPos = transform.position;
+            Vector3 newPos = GetRandomPointInBounds();
+
+            // Spawn portal no ponto de saida
+            SpawnPortalEffect(oldPos);
+
+            // Desaparece
             float elapsed = 0f;
-            float dur = 0.1f;
+            float dur = 0.12f;
             Vector3 startScale = transform.localScale;
-
             while (elapsed < dur)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / dur;
-                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, t);
+                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
                 yield return null;
             }
 
-            transform.position = GetRandomPointInBounds();
+            // Spawn portal no ponto de entrada e move
+            SpawnPortalEffect(newPos);
+            transform.position = newPos;
 
+            // Reaparece no destino
             elapsed = 0f;
             while (elapsed < dur)
             {
                 elapsed += Time.deltaTime;
-                float t = elapsed / dur;
-                transform.localScale = Vector3.Lerp(Vector3.zero, normalizedScale, t);
+                transform.localScale = Vector3.Lerp(Vector3.zero, normalizedScale, elapsed / dur);
                 yield return null;
             }
             transform.localScale = normalizedScale;
@@ -443,21 +587,38 @@ namespace WizardGame.Entities
             StartBehavior();
         }
 
-        private void StopBehaviorCoroutines()
+        private void SpawnPortalEffect(Vector3 pos)
         {
-            if (movementCoroutine != null) StopCoroutine(movementCoroutine);
-            if (pulseCoroutine != null) StopCoroutine(pulseCoroutine);
+            if (currentData.specialActionSprite == null) return;
+
+            GameObject portalGo = new GameObject("PortalFX");
+            portalGo.transform.position = pos;
+            portalGo.transform.localScale = normalizedScale * 1.1f;
+
+            SpriteRenderer sr = portalGo.AddComponent<SpriteRenderer>();
+            sr.sprite = currentData.specialActionSprite;
+            sr.sortingOrder = 8;
+            sr.color = new Color(0.3f, 0.8f, 1f, 0.9f);
+
+            StartCoroutine(PortalFadeRoutine(portalGo));
         }
 
-        private IEnumerator JiggleRoutine()
+        private IEnumerator PortalFadeRoutine(GameObject portalGo)
         {
-            Vector3 start = transform.position;
-            for (int i = 0; i < 4; i++)
+            float dur = 0.35f;
+            float elapsed = 0f;
+            SpriteRenderer sr = portalGo.GetComponent<SpriteRenderer>();
+
+            while (elapsed < dur)
             {
-                transform.position = start + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.08f);
-                yield return new WaitForSeconds(0.02f);
+                elapsed += Time.deltaTime;
+                float t = elapsed / dur;
+                portalGo.transform.Rotate(0f, 0f, 180f * Time.deltaTime);
+                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, Mathf.Lerp(0.9f, 0f, t));
+                yield return null;
             }
-            transform.position = start;
+
+            Destroy(portalGo);
         }
 
         private Vector3 GetRandomPointInBounds()

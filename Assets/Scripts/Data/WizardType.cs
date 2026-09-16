@@ -1,12 +1,12 @@
-﻿namespace WizardGame.Data
+namespace WizardGame.Data
 {
     /// <summary>
-    /// Tipos de magos disponíveis no jogo, correspondentes às variantes do projeto original.
+    /// Tipos de goblins disponiveis no jogo, correspondentes as variantes oficiais.
     /// </summary>
     public enum WizardType
     {
         Comum,
-        Rapido,
+        Fugitivo,
         Dourado,
         Fantasma
     }

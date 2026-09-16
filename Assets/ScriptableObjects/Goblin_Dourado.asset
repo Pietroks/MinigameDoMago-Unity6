@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3902d0460b1dba429a7756001e3ad13, type: 3}
+  m_Name: Goblin_Dourado
+  m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
+  wizardType: 2
+  displayName: Goblin Dourado
+  sprite: {fileID: 21300000, guid: a9a2104b5809ef54a9f4bda46b9f5de7, type: 3}
+  portraitSprite: {fileID: 21300000, guid: ccbe9508ba2ffa344a55de7ea221fbdc, type: 3}
+  baseTint: {r: 1, g: 0.95, b: 0.4, a: 1}
+  idleFrames:
+  - {fileID: 21300000, guid: 1fb43e6283db517498398f0628d7a05c, type: 3}
+  walkFrames:
+  - {fileID: 21300000, guid: a9a2104b5809ef54a9f4bda46b9f5de7, type: 3}
+  runFrames:
+  - {fileID: 21300000, guid: f9007b855f895af4cb145a4949716863, type: 3}
+  - {fileID: 21300000, guid: 68df0380333b8844b85406b3e721b669, type: 3}
+  - {fileID: 21300000, guid: 462a164330db550439642ac0e036f378, type: 3}
+  attackFrames:
+  - {fileID: 21300000, guid: fa1d307529c6c584385e2838bb8c9a7b, type: 3}
+  deathFrames:
+  - {fileID: 21300000, guid: 3b315275857e62f41bf17221ca75555b, type: 3}
+  - {fileID: 21300000, guid: 5d1036f13dc78e445855cbce38a45b38, type: 3}
+  specialActionSprite: {fileID: 21300000, guid: 2b718702dbff98e4f8a8f00b9c61ccec, type: 3}
+  maxHealth: 3
+  pointsOnDefeat: 5
+  moveSpeed: 3.6
+  escapeTimeSeconds: 6.5
+  spawnWeight: 10
+  escapePenalty: 1
+  escapeSound: {fileID: 8300000, guid: aaf1dd34fb2244f48b8e2800310b3f5d, type: 3}
+  customDamageSound: {fileID: 0}
+  customDeathSound: {fileID: 8300000, guid: a8ea7ba7bed7a6941b20d78cde1a9fb2, type: 3}
