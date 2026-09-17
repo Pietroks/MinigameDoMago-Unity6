@@ -388,6 +388,11 @@ namespace WizardGame.Core
             Destroy(ringGo);
         }
 
+        public void TriggerCameraShake(float duration = 0.15f, float magnitude = 0.15f)
+        {
+            StartCoroutine(CameraShakeRoutine(duration, magnitude));
+        }
+
         private IEnumerator CameraShakeRoutine(float duration, float magnitude)
         {
             Camera cam = Camera.main;

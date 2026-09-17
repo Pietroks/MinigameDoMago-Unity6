@@ -121,7 +121,8 @@ namespace WizardGame.Entities
             {
                 spriteHeight = defaultSprite.bounds.size.y;
             }
-            float scaleFactor = targetHeight / Mathf.Max(0.1f, spriteHeight);
+            float effectiveTargetHeight = (data.wizardType == WizardType.Chefe) ? (targetHeight * 1.35f) : targetHeight;
+            float scaleFactor = effectiveTargetHeight / Mathf.Max(0.1f, spriteHeight);
             normalizedScale = new Vector3(scaleFactor, scaleFactor, 1f);
             transform.localScale = Vector3.zero;
 
@@ -132,7 +133,8 @@ namespace WizardGame.Entities
 
             if (healthBarRoot != null)
             {
-                healthBarRoot.transform.localPosition = new Vector3(0f, spriteHeight * 0.62f, 0f);
+                float barYOffset = (data.wizardType == WizardType.Chefe) ? (spriteHeight * 0.70f) : (spriteHeight * 0.62f);
+                healthBarRoot.transform.localPosition = new Vector3(0f, barYOffset, 0f);
             }
 
             SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
@@ -178,10 +180,17 @@ namespace WizardGame.Entities
                 frameAnimator.RegisterState(AnimationState.Run, data.runFrames, 12f, true);
             }
 
-            // Attack
+            // Attack / Golpe Forte
             if (data.attackFrames != null && data.attackFrames.Length > 0)
             {
-                frameAnimator.RegisterState(AnimationState.Attack, data.attackFrames, 8f, false);
+                float fps = (data.wizardType == WizardType.Chefe) ? 10f : 8f;
+                frameAnimator.RegisterState(AnimationState.Attack, data.attackFrames, fps, false);
+            }
+
+            // Attack2 / Investida Brutal (Chefe)
+            if (data.attack2Frames != null && data.attack2Frames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Attack2, data.attack2Frames, 12f, false);
             }
 
             // Hit / Dano Sofrido
@@ -199,7 +208,8 @@ namespace WizardGame.Entities
             // Death
             if (data.deathFrames != null && data.deathFrames.Length > 0)
             {
-                frameAnimator.RegisterState(AnimationState.Death, data.deathFrames, 8.5f, false);
+                float fps = (data.wizardType == WizardType.Chefe) ? 7.5f : 8.5f;
+                frameAnimator.RegisterState(AnimationState.Death, data.deathFrames, fps, false);
             }
 
             // Comeca andando
@@ -215,9 +225,21 @@ namespace WizardGame.Entities
 
             if (showBar && healthBarFill != null)
             {
+                bool isBoss = currentData.wizardType == WizardType.Chefe;
+                float barWidth = isBoss ? 1.35f : 0.86f;
+                float barHeight = isBoss ? 0.16f : 0.11f;
+
+                if (healthBarBg != null)
+                {
+                    healthBarBg.transform.localScale = new Vector3(barWidth + 0.08f, barHeight + 0.04f, 1f);
+                    healthBarBg.color = isBoss ? new Color(0.18f, 0.02f, 0.02f, 0.92f) : new Color(0.1f, 0.1f, 0.1f, 0.85f);
+                }
+
                 float pct = Mathf.Clamp01((float)currentHealth / currentData.maxHealth);
-                healthBarFill.transform.localScale = new Vector3(0.86f * pct, 0.11f, 1f);
-                healthBarFill.color = Color.Lerp(Color.red, Color.green, pct);
+                healthBarFill.transform.localScale = new Vector3(barWidth * pct, barHeight, 1f);
+                healthBarFill.color = isBoss
+                    ? Color.Lerp(new Color(0.85f, 0.15f, 0.1f), new Color(1f, 0.85f, 0.2f), pct)
+                    : Color.Lerp(Color.red, Color.green, pct);
             }
         }
 
@@ -286,6 +308,9 @@ namespace WizardGame.Entities
                     pulseCoroutine = StartCoroutine(GhostSpectralAlphaRoutine());
                     movementCoroutine = StartCoroutine(GhostLevitateRoutine());
                     break;
+                case WizardType.Chefe:
+                    movementCoroutine = StartCoroutine(BossBehaviorRoutine());
+                    break;
             }
         }
 
@@ -332,6 +357,9 @@ namespace WizardGame.Entities
                     break;
                 case WizardType.Dourado:
                     hitReactionCoroutine = StartCoroutine(GoldenShieldReactionRoutine());
+                    break;
+                case WizardType.Chefe:
+                    hitReactionCoroutine = StartCoroutine(BossHitReactionRoutine());
                     break;
                 default:
                     hitReactionCoroutine = StartCoroutine(CommonJiggleReactionRoutine());
@@ -441,9 +469,15 @@ namespace WizardGame.Entities
                 frameAnimator.LockAnimation(AnimationState.Death);
             }
 
-            float duration = 0.70f;
+            bool isBoss = currentData != null && currentData.wizardType == WizardType.Chefe;
+            float duration = isBoss ? 1.15f : 0.70f;
             float elapsed = 0f;
             Color startCol = spriteRenderer.color;
+
+            if (isBoss)
+            {
+                SpellEffectsManager.Instance?.TriggerCameraShake(0.25f, 0.22f);
+            }
 
             while (elapsed < duration)
             {
@@ -773,6 +807,97 @@ namespace WizardGame.Entities
             }
 
             Destroy(portalGo);
+        }
+
+        // 5. GOBLIN CHEFE (BOSS): Passos pesados, Golpe Forte sísmico (Ataque 1) e Investidas Brutais (Ataque 2)
+        private IEnumerator BossBehaviorRoutine()
+        {
+            float speed = currentData.moveSpeed * currentSpeedMultiplier;
+
+            while (true)
+            {
+                // Fase 1: Marcha Pesada até uma posição do cenário
+                Vector3 target = GetRandomPointInBounds();
+                Vector3 start = transform.position;
+                float dist = Vector3.Distance(start, target);
+                float walkDuration = dist / Mathf.Max(0.5f, speed);
+                float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(target.x - start.x);
+                frameAnimator.Play(AnimationState.Walk);
+
+                while (elapsed < walkDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / walkDuration;
+                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    yield return null;
+                }
+
+                transform.position = target;
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.65f) / currentSpeedMultiplier);
+
+                if (isDeadOrEscaping) yield break;
+
+                // Alterna entre Golpe Forte (Attack 1) e Investida Brutal (Attack 2)
+                bool doInvestida = (currentData.attack2Frames != null && currentData.attack2Frames.Length > 0) && (UnityEngine.Random.value > 0.45f);
+
+                if (doInvestida)
+                {
+                    // Ataque 2: Investida Brutal com Dash Acelerado
+                    Vector3 chargeTarget = GetRandomPointInBounds();
+                    frameAnimator.SetFacingDirection(chargeTarget.x - transform.position.x);
+                    frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
+
+                    Vector3 chargeStart = transform.position;
+                    float chargeDist = Vector3.Distance(chargeStart, chargeTarget);
+                    float chargeDuration = chargeDist / Mathf.Max(1.0f, speed * 2.2f);
+                    float chargeElapsed = 0f;
+
+                    while (chargeElapsed < chargeDuration)
+                    {
+                        chargeElapsed += Time.deltaTime;
+                        float t = chargeElapsed / chargeDuration;
+                        transform.position = Vector3.Lerp(chargeStart, chargeTarget, t);
+                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                        yield return null;
+                    }
+
+                    transform.position = chargeTarget;
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.12f, 0.12f);
+                }
+                else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
+                {
+                    // Ataque 1: Golpe Forte com Clava
+                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
+                    // No meio do golpe (~0.35s do ataque a 10fps), gera tremor de terra
+                    yield return new WaitForSeconds(0.35f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.16f, 0.18f);
+                    yield return new WaitForSeconds(0.35f);
+                }
+
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f) / currentSpeedMultiplier);
+            }
+        }
+
+        private IEnumerator BossHitReactionRoutine()
+        {
+            if (currentData.hitFrames != null && currentData.hitFrames.Length > 0)
+            {
+                frameAnimator.PlayOneShot(AnimationState.Hit, AnimationState.Walk);
+            }
+
+            Vector3 start = transform.position;
+            // Estremece de dor momentaneamente
+            for (int i = 0; i < 3; i++)
+            {
+                transform.position = start + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.08f);
+                yield return new WaitForSeconds(0.025f);
+            }
+            transform.position = start;
         }
 
         private Vector3 GetRandomPointInBounds()

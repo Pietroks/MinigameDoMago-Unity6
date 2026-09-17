@@ -635,12 +635,13 @@ namespace WizardGame.Core
                     (WizardType.Dourado, 1),
                     (WizardType.Comum, 2)),
 
-                // Onda 5: Horda Total Noturna
-                new WaveConfig("A Grande Horda Noturna", "Horda Total! Todas as forças combinadas!", 0.75f, 1.5f,
+                // Onda 5: O Duelo Final com o Goblin Chefe!
+                new WaveConfig("O Goblin Chefe", "O Goblin Chefe e sua guarda de elite atacam!", 0.85f, 1.35f,
                     (WizardType.Comum, 4),
-                    (WizardType.Fugitivo, 3),
-                    (WizardType.Dourado, 2),
-                    (WizardType.Fantasma, 2))
+                    (WizardType.Fugitivo, 2),
+                    (WizardType.Dourado, 1),
+                    (WizardType.Fantasma, 1),
+                    (WizardType.Chefe, 1))
             };
         }
 

@@ -21,6 +21,7 @@ namespace WizardGame.Data
         public Sprite[] walkFrames;
         public Sprite[] runFrames;
         public Sprite[] attackFrames;
+        public Sprite[] attack2Frames;
         public Sprite[] hitFrames;
         public Sprite[] teleportFrames;
         public Sprite[] deathFrames;

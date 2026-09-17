@@ -46,6 +46,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 734a3fe82b06baa46bfecaef9436566c, type: 3}
   attackFrames:
   - {fileID: 21300000, guid: fa1d307529c6c584385e2838bb8c9a7b, type: 3}
+  attack2Frames: []
   hitFrames:
   - {fileID: 21300000, guid: 2aba8d4a34791a84d8242806d41f865a, type: 3}
   - {fileID: 21300000, guid: 83906005d7f0f424fab2fe8c8ea000e5, type: 3}

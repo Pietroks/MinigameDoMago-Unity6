@@ -8,6 +8,7 @@ namespace WizardGame.Data
         Comum,
         Fugitivo,
         Dourado,
-        Fantasma
+        Fantasma,
+        Chefe
     }
 }

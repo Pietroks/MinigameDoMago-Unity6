@@ -243,6 +243,30 @@ namespace WizardGame.EditorTools
             EditorUtility.SetDirty(fantasma);
             list.Add(fantasma);
 
+            // 5. Goblin Chefe: HP 20, Pontos 50, Velocidade 2 (Fiel à spritesheet oficial)
+            var chefe = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe.asset");
+            chefe.wizardType = WizardType.Chefe;
+            chefe.displayName = "Goblin Chefe";
+            chefe.maxHealth = 20;
+            chefe.pointsOnDefeat = 50;
+            chefe.moveSpeed = 2.0f;
+            chefe.escapeTimeSeconds = 14.0f;
+            chefe.spawnWeight = 5;
+            chefe.escapePenalty = 5;
+            chefe.baseTint = Color.white;
+            chefe.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe/portrait.png");
+            chefe.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe/idle_0.png");
+            chefe.idleFrames = LoadFrames("Assets/Sprites/Goblins/Chefe", "idle", 8);
+            chefe.walkFrames = LoadFrames("Assets/Sprites/Goblins/Chefe", "walk", 8);
+            chefe.attackFrames = LoadFrames("Assets/Sprites/Goblins/Chefe", "attack1", 7);
+            chefe.attack2Frames = LoadFrames("Assets/Sprites/Goblins/Chefe", "attack2", 8);
+            chefe.hitFrames = LoadFrames("Assets/Sprites/Goblins/Chefe", "hit", 4);
+            chefe.deathFrames = LoadFrames("Assets/Sprites/Goblins/Chefe", "death", 8);
+            chefe.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
+            chefe.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
+            EditorUtility.SetDirty(chefe);
+            list.Add(chefe);
+
             return list;
         }
 
@@ -522,16 +546,17 @@ namespace WizardGame.EditorTools
             // --- PAINEL DE INSTRUÇÕES (COM OS 4 GOBLINS E ARSENAL MÁGICO) ---
             GameObject instrPanel = CreatePanel(startMenu.transform, "InstructionsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.06f, 0.08f, 0.15f, 0.98f));
             var instrRect = instrPanel.GetComponent<RectTransform>();
-            instrRect.sizeDelta = new Vector2(980f, 690f);
+            instrRect.sizeDelta = new Vector2(980f, 720f);
             instrRect.anchoredPosition = Vector2.zero;
 
-            CreateUIText(instrPanel.transform, "InstrTitle", "MANUAL DOS GOBLINS & ARSENAL MÁGICO", 28, Color.yellow, new Vector2(0f, 305f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(instrPanel.transform, "InstrTitle", "MANUAL DOS GOBLINS & ARSENAL MÁGICO", 28, Color.yellow, new Vector2(0f, 320f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             string instrBody = "INIMIGOS (GUIA OFICIAL):\n" +
                                "  • GOBLIN COMUM: 1 HP | 1 Ponto | Move-se atacando com facas.\n" +
                                "  • GOBLIN FUGITIVO: 2 HP | 2 Pontos | Ao sofrer dano, salta em disparada veloz!\n" +
                                "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido e agressivo com escudo dourado.\n" +
-                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta atraves de portais misticos ao tomar dano.\n\n" +
+                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta atraves de portais misticos ao tomar dano.\n" +
+                               "  • 👑 GOBLIN CHEFE (BOSS): 20 HP | 50 Pontos | Golpe Forte sismico e investidas brutais!\n\n" +
                                "ARSENAL MAGICO (CAIXA DE FERRAMENTAS DO MAGO):\n" +
                                "  • 🔥 [LMB] TIRO NORMAL: 1 Dano basico (consome mana da varinha).\n" +
                                "  • 💥 [1 / Q] TIRO ARCANO: 3 Dano concentrado | Cooldown 3.0s.\n" +
@@ -544,7 +569,7 @@ namespace WizardGame.EditorTools
                                "  • Errar tiro no vazio ou deixar goblin escapar quebra o combo.\n" +
                                "  • HEADSHOT: Acertos no topo da cabeca concedem +1 Ponto Imediato!\n\n" +
                                "CONTROLES: [R] Recarregar Mana  |  [ESC / P] Pausar o Jogo";
-            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 15, Color.white, new Vector2(0f, 15f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
+            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 14, Color.white, new Vector2(0f, 20f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
             var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -305f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
             var closeInstrBtn = closeInstrBtnObj.GetComponent<Button>();
