@@ -21,6 +21,7 @@ namespace WizardGame.Data
         public Sprite[] walkFrames;
         public Sprite[] runFrames;
         public Sprite[] attackFrames;
+        public Sprite[] hitFrames;
         public Sprite[] deathFrames;
         public Sprite specialActionSprite; // Jump (Fugitivo), Shield (Dourado), Portal (Fantasma)
 

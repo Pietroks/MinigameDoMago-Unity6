@@ -151,7 +151,7 @@ namespace WizardGame.EditorTools
 
             var list = new List<WizardDataSO>();
 
-            // 1. Goblin Comum: 1 HP, 1 Ponto
+            // 1. Goblin Comum: 1 HP, 1 Ponto, Velocidade 2.0 (Fiel à spritesheet oficial)
             var comum = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Comum.asset");
             comum.wizardType = WizardType.Comum;
             comum.displayName = "Goblin Comum";
@@ -163,21 +163,40 @@ namespace WizardGame.EditorTools
             comum.escapePenalty = 1;
             comum.baseTint = Color.white;
             comum.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/portrait.png");
-            comum.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_0.png");
-            comum.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/idle.png") };
-            comum.walkFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_0.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_1.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/walk_2.png")
-            };
-            comum.attackFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/attack.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/attack_1.png")
-            };
-            comum.deathFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/death.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/death_1.png")
-            };
+            comum.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/idle_0.png");
+
+            var idleList = new List<Sprite>();
+            for (int i = 0; i < 8; i++)
+            {
+                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/idle_{i}.png");
+                if (s != null) idleList.Add(s);
+            }
+            comum.idleFrames = idleList.ToArray();
+
+            var walkList = new List<Sprite>();
+            for (int i = 0; i < 8; i++)
+            {
+                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/walk_{i}.png");
+                if (s != null) walkList.Add(s);
+            }
+            comum.walkFrames = walkList.ToArray();
+
+            var hitList = new List<Sprite>();
+            for (int i = 0; i < 4; i++)
+            {
+                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/hit_{i}.png");
+                if (s != null) hitList.Add(s);
+            }
+            comum.hitFrames = hitList.ToArray();
+
+            var deathList = new List<Sprite>();
+            for (int i = 0; i < 6; i++)
+            {
+                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/death_{i}.png");
+                if (s != null) deathList.Add(s);
+            }
+            comum.deathFrames = deathList.ToArray();
+
             comum.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/hihi.mp3");
             EditorUtility.SetDirty(comum);
             list.Add(comum);

@@ -154,13 +154,13 @@ namespace WizardGame.Entities
             // Idle
             if (data.idleFrames != null && data.idleFrames.Length > 0)
             {
-                frameAnimator.RegisterState(AnimationState.Idle, data.idleFrames, 6f, true);
+                frameAnimator.RegisterState(AnimationState.Idle, data.idleFrames, 8f, true);
             }
 
             // Walk / Levitation
             if (data.walkFrames != null && data.walkFrames.Length > 0)
             {
-                float fps = (data.wizardType == WizardType.Dourado) ? 10f : 7f;
+                float fps = (data.wizardType == WizardType.Dourado) ? 12f : 8f;
                 frameAnimator.RegisterState(AnimationState.Walk, data.walkFrames, fps, true);
             }
 
@@ -176,10 +176,16 @@ namespace WizardGame.Entities
                 frameAnimator.RegisterState(AnimationState.Attack, data.attackFrames, 8f, false);
             }
 
+            // Hit / Dano Sofrido
+            if (data.hitFrames != null && data.hitFrames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Hit, data.hitFrames, 12f, false);
+            }
+
             // Death
             if (data.deathFrames != null && data.deathFrames.Length > 0)
             {
-                frameAnimator.RegisterState(AnimationState.Death, data.deathFrames, 8f, false);
+                frameAnimator.RegisterState(AnimationState.Death, data.deathFrames, 8.5f, false);
             }
 
             // Comeca andando
@@ -405,13 +411,13 @@ namespace WizardGame.Entities
 
         private IEnumerator DeathAnimationRoutine()
         {
-            // Toca animacao de morte no FrameAnimator
+            // Toca animacao de morte no FrameAnimator (6 quadros de colapso no chão)
             if (frameAnimator != null && currentData.deathFrames != null && currentData.deathFrames.Length > 0)
             {
                 frameAnimator.LockAnimation(AnimationState.Death);
             }
 
-            float duration = 0.45f;
+            float duration = 0.70f;
             float elapsed = 0f;
             Color startCol = spriteRenderer.color;
 
@@ -419,10 +425,10 @@ namespace WizardGame.Entities
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
-                // Fade out suave nos ultimos 40% da animacao
-                if (t > 0.6f)
+                // Fade out suave nos ultimos 25% da animacao (quando ja esta estirado no chao)
+                if (t > 0.75f)
                 {
-                    float fadeT = (t - 0.6f) / 0.4f;
+                    float fadeT = (t - 0.75f) / 0.25f;
                     spriteRenderer.color = new Color(startCol.r, startCol.g, startCol.b, Mathf.Lerp(startCol.a, 0f, fadeT));
                 }
                 yield return null;
@@ -477,6 +483,11 @@ namespace WizardGame.Entities
 
         private IEnumerator CommonJiggleReactionRoutine()
         {
+            if (currentData.hitFrames != null && currentData.hitFrames.Length > 0)
+            {
+                frameAnimator.PlayOneShot(AnimationState.Hit, AnimationState.Walk);
+            }
+
             Vector3 start = transform.position;
             for (int i = 0; i < 4; i++)
             {

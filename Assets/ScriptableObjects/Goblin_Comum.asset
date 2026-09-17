@@ -14,22 +14,43 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
   wizardType: 0
   displayName: Goblin Comum
-  sprite: {fileID: 21300000, guid: 571550b00a86e2e4db739eecb215a8c8, type: 3}
+  sprite: {fileID: 21300000, guid: 2e28dd90b33d94246bbda7ee8933d6e1, type: 3}
   portraitSprite: {fileID: 21300000, guid: 5d8c66762d7002549ba1fbc1ed9a02fd, type: 3}
   baseTint: {r: 1, g: 1, b: 1, a: 1}
   idleFrames:
-  - {fileID: 21300000, guid: b1792daf7cab00a4aaf9e0532ad1bd53, type: 3}
+  - {fileID: 21300000, guid: 2e28dd90b33d94246bbda7ee8933d6e1, type: 3}
+  - {fileID: 21300000, guid: dabb6e37efb5fe44aaf7e2e3bdd20f14, type: 3}
+  - {fileID: 21300000, guid: 22f27e1ba67b54d469bd6037c89db4ea, type: 3}
+  - {fileID: 21300000, guid: a27e4cdf330dd944581c2e56834ffb77, type: 3}
+  - {fileID: 21300000, guid: b64b121bfb727894ab8d8d8aeaf7cd7c, type: 3}
+  - {fileID: 21300000, guid: dcf84ce6a0e756046bbab92963e93eb8, type: 3}
+  - {fileID: 21300000, guid: 8adefdf8421c49942aa2f76a1b158273, type: 3}
+  - {fileID: 21300000, guid: aa51097d115c7244d81cd6f8b7f05f68, type: 3}
   walkFrames:
   - {fileID: 21300000, guid: 571550b00a86e2e4db739eecb215a8c8, type: 3}
   - {fileID: 21300000, guid: 2361b5c05bb22e9428f716f66c6d6c4e, type: 3}
   - {fileID: 21300000, guid: 44aec9c4843583349a21ca5ee7430ca0, type: 3}
+  - {fileID: 21300000, guid: dc51e4a339b782e49ab00a4ab8805c08, type: 3}
+  - {fileID: 21300000, guid: c265a482bb3b3064eaee9628d37644b9, type: 3}
+  - {fileID: 21300000, guid: 05902baa7596eca49bc312fac57509ee, type: 3}
+  - {fileID: 21300000, guid: 7864db341d52c3b4c84fa1477736341f, type: 3}
+  - {fileID: 21300000, guid: d46f9928ae4e21a4dabc961c8d323e8e, type: 3}
   runFrames: []
   attackFrames:
   - {fileID: 21300000, guid: aade57f090b03134cbb2d59477c8496a, type: 3}
   - {fileID: 21300000, guid: 6db5e37f3933c69479bedbee5740ad90, type: 3}
+  hitFrames:
+  - {fileID: 21300000, guid: 56ef5e404d763b8448f7d77fe8e7e904, type: 3}
+  - {fileID: 21300000, guid: f401aff5d98198441b04ac0ad4408361, type: 3}
+  - {fileID: 21300000, guid: 29b54ac7e03594849b0b2b0113550d36, type: 3}
+  - {fileID: 21300000, guid: 438d000705a7da445bf7533a821c360f, type: 3}
   deathFrames:
-  - {fileID: 21300000, guid: 26eceecdd5f16f9408a2fadf8866c210, type: 3}
+  - {fileID: 21300000, guid: 1bf9298f0dd4db24daee330342c576bf, type: 3}
   - {fileID: 21300000, guid: 25dcb94771224fb4bb995a2d43833ad1, type: 3}
+  - {fileID: 21300000, guid: 62e1199fe8a1bcd438e20403be16347e, type: 3}
+  - {fileID: 21300000, guid: dd9f1a5e1a2ffc845a1ab211fba924ac, type: 3}
+  - {fileID: 21300000, guid: 5f349ec1a998a354e9453b2409945cc0, type: 3}
+  - {fileID: 21300000, guid: 6cfa0d977eaab474695c52a31f120e91, type: 3}
   specialActionSprite: {fileID: 0}
   maxHealth: 1
   pointsOnDefeat: 1
