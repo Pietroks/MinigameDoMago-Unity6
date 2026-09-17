@@ -14,28 +14,56 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
   wizardType: 2
   displayName: Goblin Dourado
-  sprite: {fileID: 21300000, guid: a9a2104b5809ef54a9f4bda46b9f5de7, type: 3}
+  sprite: {fileID: 21300000, guid: fa0a6fcb839375d4ba504b8743ce618c, type: 3}
   portraitSprite: {fileID: 21300000, guid: ccbe9508ba2ffa344a55de7ea221fbdc, type: 3}
-  baseTint: {r: 1, g: 0.95, b: 0.4, a: 1}
+  baseTint: {r: 1, g: 1, b: 1, a: 1}
   idleFrames:
-  - {fileID: 21300000, guid: 1fb43e6283db517498398f0628d7a05c, type: 3}
+  - {fileID: 21300000, guid: fa0a6fcb839375d4ba504b8743ce618c, type: 3}
+  - {fileID: 21300000, guid: cfe0401bfc48bbc4883a90f31741493d, type: 3}
+  - {fileID: 21300000, guid: 14414a6e19660ff4dac69f18198325a6, type: 3}
+  - {fileID: 21300000, guid: 37390a86e7a7e9e4ebff5c48d947c4a0, type: 3}
+  - {fileID: 21300000, guid: 54821f66ff87da34eb6200a362bcf3f1, type: 3}
+  - {fileID: 21300000, guid: 9ba0178ad45c9b040985c6d6467caae0, type: 3}
+  - {fileID: 21300000, guid: f7363f39f8de3044cb2b19a8f6017f24, type: 3}
+  - {fileID: 21300000, guid: 710ad891057de154cbc777878f25d719, type: 3}
   walkFrames:
   - {fileID: 21300000, guid: a9a2104b5809ef54a9f4bda46b9f5de7, type: 3}
+  - {fileID: 21300000, guid: 04149ee5d08d29248adc440c9e2f7a9c, type: 3}
+  - {fileID: 21300000, guid: 829d88c9d6b557e4daad4ccfbbabf5c0, type: 3}
+  - {fileID: 21300000, guid: 036a52ef4475f7c4ab415b3b0d732bba, type: 3}
+  - {fileID: 21300000, guid: b86e0aa0ba106e0499173b605061dabb, type: 3}
+  - {fileID: 21300000, guid: 080992a7f1fe2394fa8478ccdbd31745, type: 3}
+  - {fileID: 21300000, guid: a2fbc2237ddbe494984d557cd2cb142c, type: 3}
+  - {fileID: 21300000, guid: d126c55cf00bab042a74f0fc8a455bf3, type: 3}
   runFrames:
-  - {fileID: 21300000, guid: f9007b855f895af4cb145a4949716863, type: 3}
-  - {fileID: 21300000, guid: 68df0380333b8844b85406b3e721b669, type: 3}
-  - {fileID: 21300000, guid: 462a164330db550439642ac0e036f378, type: 3}
+  - {fileID: 21300000, guid: 64ff53e22b4658040abb8100c8015138, type: 3}
+  - {fileID: 21300000, guid: f92562070de64144388602d078c5a27a, type: 3}
+  - {fileID: 21300000, guid: 2148b7990d25fb345a71d629c49555aa, type: 3}
+  - {fileID: 21300000, guid: 95fb6171416bdf64d918132e1350748a, type: 3}
+  - {fileID: 21300000, guid: 0f9ed4e342258d34c83659d9a73b82c9, type: 3}
+  - {fileID: 21300000, guid: 25fd48d48cf15a74e943f566b4ae4985, type: 3}
+  - {fileID: 21300000, guid: 5c8e51023cff65440b36ef7d4efe0ee0, type: 3}
+  - {fileID: 21300000, guid: 734a3fe82b06baa46bfecaef9436566c, type: 3}
   attackFrames:
   - {fileID: 21300000, guid: fa1d307529c6c584385e2838bb8c9a7b, type: 3}
-  hitFrames: []
+  hitFrames:
+  - {fileID: 21300000, guid: 2aba8d4a34791a84d8242806d41f865a, type: 3}
+  - {fileID: 21300000, guid: 83906005d7f0f424fab2fe8c8ea000e5, type: 3}
+  - {fileID: 21300000, guid: 5799bf0c4703960498ccfcfe8bda9724, type: 3}
+  - {fileID: 21300000, guid: 85e0268c1cfcf944bbc0e4a73bea1644, type: 3}
+  teleportFrames: []
   deathFrames:
-  - {fileID: 21300000, guid: 3b315275857e62f41bf17221ca75555b, type: 3}
+  - {fileID: 21300000, guid: 8a818e75a5eb5964fa0be59d209b5e90, type: 3}
   - {fileID: 21300000, guid: 5d1036f13dc78e445855cbce38a45b38, type: 3}
+  - {fileID: 21300000, guid: 3ee998bed0b38754d9de7685d31032d2, type: 3}
+  - {fileID: 21300000, guid: 78c6362e5f82a8b4d97119f62b8e607a, type: 3}
+  - {fileID: 21300000, guid: f3aa97f0a1d14474282b9087fdf26015, type: 3}
+  - {fileID: 21300000, guid: ece8a11a679016f48bbbf977a77824d6, type: 3}
   specialActionSprite: {fileID: 21300000, guid: 2b718702dbff98e4f8a8f00b9c61ccec, type: 3}
   maxHealth: 3
   pointsOnDefeat: 5
-  moveSpeed: 3.6
-  escapeTimeSeconds: 6.5
+  moveSpeed: 4
+  escapeTimeSeconds: 6
   spawnWeight: 10
   escapePenalty: 1
   escapeSound: {fileID: 8300000, guid: aaf1dd34fb2244f48b8e2800310b3f5d, type: 3}

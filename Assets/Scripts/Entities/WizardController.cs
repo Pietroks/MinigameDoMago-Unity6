@@ -182,6 +182,12 @@ namespace WizardGame.Entities
                 frameAnimator.RegisterState(AnimationState.Hit, data.hitFrames, 12f, false);
             }
 
+            // Teleport / Deslocamento Dimensional
+            if (data.teleportFrames != null && data.teleportFrames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Teleport, data.teleportFrames, 12f, false);
+            }
+
             // Death
             if (data.deathFrames != null && data.deathFrames.Length > 0)
             {
@@ -650,33 +656,44 @@ namespace WizardGame.Entities
             Vector3 oldPos = transform.position;
             Vector3 newPos = GetRandomPointInBounds();
 
-            // Spawn portal no ponto de saida
-            SpawnPortalEffect(oldPos);
-
-            // Desaparece
-            float elapsed = 0f;
-            float dur = 0.12f;
-            Vector3 startScale = transform.localScale;
-            while (elapsed < dur)
+            if (currentData.teleportFrames != null && currentData.teleportFrames.Length > 0)
             {
-                elapsed += Time.deltaTime;
-                transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
-                yield return null;
+                // Reproduz animacao completa de deslocamento dimensional (8 quadros a 12 FPS)
+                frameAnimator.PlayOneShot(AnimationState.Teleport, AnimationState.Walk);
+                // Quadros 0..3: desmaterializacao no portal
+                yield return new WaitForSeconds(0.33f);
+                transform.position = newPos;
+                frameAnimator.SetFacingDirection(UnityEngine.Random.value > 0.5f ? 1f : -1f);
+                // Quadros 4..7: rematerializacao no destino
+                yield return new WaitForSeconds(0.34f);
             }
-
-            // Spawn portal no ponto de entrada e move
-            SpawnPortalEffect(newPos);
-            transform.position = newPos;
-
-            // Reaparece no destino
-            elapsed = 0f;
-            while (elapsed < dur)
+            else
             {
-                elapsed += Time.deltaTime;
-                transform.localScale = Vector3.Lerp(Vector3.zero, normalizedScale, elapsed / dur);
-                yield return null;
+                // Fallback classico com efeito de escala e portal
+                SpawnPortalEffect(oldPos);
+
+                float elapsed = 0f;
+                float dur = 0.12f;
+                Vector3 startScale = transform.localScale;
+                while (elapsed < dur)
+                {
+                    elapsed += Time.deltaTime;
+                    transform.localScale = Vector3.Lerp(startScale, Vector3.zero, elapsed / dur);
+                    yield return null;
+                }
+
+                SpawnPortalEffect(newPos);
+                transform.position = newPos;
+
+                elapsed = 0f;
+                while (elapsed < dur)
+                {
+                    elapsed += Time.deltaTime;
+                    transform.localScale = Vector3.Lerp(Vector3.zero, normalizedScale, elapsed / dur);
+                    yield return null;
+                }
+                transform.localScale = normalizedScale;
             }
-            transform.localScale = normalizedScale;
 
             StartBehavior();
         }

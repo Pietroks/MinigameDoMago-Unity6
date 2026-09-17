@@ -165,135 +165,96 @@ namespace WizardGame.EditorTools
             comum.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/portrait.png");
             comum.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Comum/idle_0.png");
 
-            var idleList = new List<Sprite>();
-            for (int i = 0; i < 8; i++)
-            {
-                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/idle_{i}.png");
-                if (s != null) idleList.Add(s);
-            }
-            comum.idleFrames = idleList.ToArray();
-
-            var walkList = new List<Sprite>();
-            for (int i = 0; i < 8; i++)
-            {
-                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/walk_{i}.png");
-                if (s != null) walkList.Add(s);
-            }
-            comum.walkFrames = walkList.ToArray();
-
-            var hitList = new List<Sprite>();
-            for (int i = 0; i < 4; i++)
-            {
-                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/hit_{i}.png");
-                if (s != null) hitList.Add(s);
-            }
-            comum.hitFrames = hitList.ToArray();
-
-            var deathList = new List<Sprite>();
-            for (int i = 0; i < 6; i++)
-            {
-                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"Assets/Sprites/Goblins/Comum/death_{i}.png");
-                if (s != null) deathList.Add(s);
-            }
-            comum.deathFrames = deathList.ToArray();
+            comum.idleFrames = LoadFrames("Assets/Sprites/Goblins/Comum", "idle", 8);
+            comum.walkFrames = LoadFrames("Assets/Sprites/Goblins/Comum", "walk", 8);
+            comum.hitFrames = LoadFrames("Assets/Sprites/Goblins/Comum", "hit", 4);
+            comum.deathFrames = LoadFrames("Assets/Sprites/Goblins/Comum", "death", 6);
 
             comum.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/hihi.mp3");
             EditorUtility.SetDirty(comum);
             list.Add(comum);
 
-            // 2. Goblin Fugitivo: 2 HP, 2 Pontos, salta e corre acelerado ao tomar dano
+            // 2. Goblin Fugitivo: HP 2, Pontos 2, Velocidade 5 (Fiel à spritesheet oficial)
             var fugitivo = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Fugitivo.asset");
             fugitivo.wizardType = WizardType.Fugitivo;
             fugitivo.displayName = "Goblin Fugitivo";
             fugitivo.maxHealth = 2;
             fugitivo.pointsOnDefeat = 2;
-            fugitivo.moveSpeed = 3.2f;
-            fugitivo.escapeTimeSeconds = 5.5f;
+            fugitivo.moveSpeed = 5.0f;
+            fugitivo.escapeTimeSeconds = 5.0f;
             fugitivo.spawnWeight = 25;
             fugitivo.escapePenalty = 2;
             fugitivo.baseTint = Color.white;
             fugitivo.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/portrait.png");
-            fugitivo.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/walk_0.png");
-            fugitivo.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/idle.png") };
-            fugitivo.walkFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/walk_0.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/walk_1.png")
-            };
-            fugitivo.runFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/run_0.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/run_1.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/run_2.png")
-            };
-            fugitivo.specialActionSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/jump.png");
-            fugitivo.deathFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/death.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/death_1.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/death_2.png")
-            };
+            fugitivo.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/idle_0.png");
+            fugitivo.idleFrames = LoadFrames("Assets/Sprites/Goblins/Fugitivo", "idle", 8);
+            fugitivo.walkFrames = LoadFrames("Assets/Sprites/Goblins/Fugitivo", "walk", 8);
+            fugitivo.hitFrames = LoadFrames("Assets/Sprites/Goblins/Fugitivo", "hit", 4);
+            fugitivo.runFrames = LoadFrames("Assets/Sprites/Goblins/Fugitivo", "run", 8);
+            fugitivo.deathFrames = LoadFrames("Assets/Sprites/Goblins/Fugitivo", "death", 6);
             fugitivo.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
             fugitivo.customDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/Zé-Wilker-Filho-da-puta (mp3cut.net).mp3");
             EditorUtility.SetDirty(fugitivo);
             list.Add(fugitivo);
 
-            // 3. Goblin Dourado: 3 HP, 5 Pontos, rapido e agressivo com escudo
+            // 3. Goblin Dourado: HP 3, Pontos 5, Velocidade 4 (Fiel à spritesheet oficial)
             var dourado = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Dourado.asset");
             dourado.wizardType = WizardType.Dourado;
             dourado.displayName = "Goblin Dourado";
             dourado.maxHealth = 3;
             dourado.pointsOnDefeat = 5;
-            dourado.moveSpeed = 3.6f;
-            dourado.escapeTimeSeconds = 6.5f;
+            dourado.moveSpeed = 4.0f;
+            dourado.escapeTimeSeconds = 6.0f;
             dourado.spawnWeight = 10;
             dourado.escapePenalty = 1;
-            dourado.baseTint = new Color(1f, 0.95f, 0.4f);
+            dourado.baseTint = Color.white;
             dourado.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/portrait.png");
-            dourado.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/walk_0.png");
-            dourado.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/idle.png") };
-            dourado.walkFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/walk_0.png") };
-            dourado.runFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/dash_0.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/dash_1.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/dash_2.png")
-            };
-            dourado.attackFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/attack.png") };
-            dourado.specialActionSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/shield.png");
-            dourado.deathFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/death.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/death_1.png")
-            };
+            dourado.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Dourado/idle_0.png");
+            dourado.idleFrames = LoadFrames("Assets/Sprites/Goblins/Dourado", "idle", 8);
+            dourado.walkFrames = LoadFrames("Assets/Sprites/Goblins/Dourado", "walk", 8);
+            dourado.hitFrames = LoadFrames("Assets/Sprites/Goblins/Dourado", "hit", 4);
+            dourado.runFrames = LoadFrames("Assets/Sprites/Goblins/Dourado", "run", 8);
+            dourado.deathFrames = LoadFrames("Assets/Sprites/Goblins/Dourado", "death", 6);
             dourado.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/hihi.mp3");
             dourado.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
             EditorUtility.SetDirty(dourado);
             list.Add(dourado);
 
-            // 4. Goblin Fantasma: 4 HP, 3 Pontos, teleporte dimensional instantaneo
+            // 4. Goblin Fantasma: HP 4, Pontos 3, Velocidade 3 (Fiel à spritesheet oficial)
             var fantasma = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Fantasma.asset");
             fantasma.wizardType = WizardType.Fantasma;
             fantasma.displayName = "Goblin Fantasma";
             fantasma.maxHealth = 4;
             fantasma.pointsOnDefeat = 3;
-            fantasma.moveSpeed = 2.4f;
-            fantasma.escapeTimeSeconds = 8.5f;
+            fantasma.moveSpeed = 3.0f;
+            fantasma.escapeTimeSeconds = 7.5f;
             fantasma.spawnWeight = 15;
             fantasma.escapePenalty = 1;
-            fantasma.baseTint = new Color(0.85f, 0.95f, 1f, 0.9f);
+            fantasma.baseTint = Color.white;
             fantasma.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/portrait.png");
-            fantasma.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/walk_0.png");
-            fantasma.idleFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/idle.png") };
-            fantasma.walkFrames = new[] {
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/float_0.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/float_1.png"),
-                AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/float_2.png")
-            };
-            fantasma.attackFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/cast.png") };
-            fantasma.specialActionSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/portal.png");
-            fantasma.deathFrames = new[] { AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/death.png") };
+            fantasma.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fantasma/idle_0.png");
+            fantasma.idleFrames = LoadFrames("Assets/Sprites/Goblins/Fantasma", "idle", 8);
+            fantasma.walkFrames = LoadFrames("Assets/Sprites/Goblins/Fantasma", "walk", 8);
+            fantasma.hitFrames = LoadFrames("Assets/Sprites/Goblins/Fantasma", "hit", 4);
+            fantasma.teleportFrames = LoadFrames("Assets/Sprites/Goblins/Fantasma", "teleport", 8);
+            fantasma.deathFrames = LoadFrames("Assets/Sprites/Goblins/Fantasma", "death", 6);
             fantasma.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/hihi.mp3");
             fantasma.customDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/dbz-teleport.mp3");
             EditorUtility.SetDirty(fantasma);
             list.Add(fantasma);
 
             return list;
+        }
+
+        private static Sprite[] LoadFrames(string folderPath, string prefix, int count)
+        {
+            var list = new List<Sprite>();
+            for (int i = 0; i < count; i++)
+            {
+                var s = AssetDatabase.LoadAssetAtPath<Sprite>($"{folderPath}/{prefix}_{i}.png");
+                if (s != null) list.Add(s);
+            }
+            return list.ToArray();
         }
 
         private static T GetOrCreateSO<T>(string path) where T : ScriptableObject

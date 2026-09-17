@@ -44,6 +44,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: f401aff5d98198441b04ac0ad4408361, type: 3}
   - {fileID: 21300000, guid: 29b54ac7e03594849b0b2b0113550d36, type: 3}
   - {fileID: 21300000, guid: 438d000705a7da445bf7533a821c360f, type: 3}
+  teleportFrames: []
   deathFrames:
   - {fileID: 21300000, guid: 1bf9298f0dd4db24daee330342c576bf, type: 3}
   - {fileID: 21300000, guid: 25dcb94771224fb4bb995a2d43833ad1, type: 3}

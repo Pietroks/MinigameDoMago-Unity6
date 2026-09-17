@@ -12,7 +12,8 @@ namespace WizardGame.Entities
         Run,
         Attack,
         Hit,
-        Death
+        Death,
+        Teleport
     }
 
     /// <summary>
