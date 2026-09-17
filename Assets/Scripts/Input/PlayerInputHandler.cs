@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using WizardGame.Data;
 using WizardGame.Entities;
 
 namespace WizardGame.Input
@@ -13,16 +14,12 @@ namespace WizardGame.Input
     }
 
     /// <summary>
-    /// Captura entradas do jogador para mira, tiro normal, tiro forte, recarga e pausa.
-    /// Detecta com precisão acertos normais, erros de tiro (para quebra de combo)
-    /// e Headshots / Acertos Perfeitos (terço superior do mago).
+    /// Captura entradas do jogador para mira, tiro normal (LMB), seleção de feitiços
+    /// especiais (1, 2, 3, 4, Scroll) e disparo de feitiços (RMB ou atalhos).
     /// </summary>
     public class PlayerInputHandler : MonoBehaviour
     {
         [Header("Configurações")]
-        [Tooltip("Tempo segurando o botão esquerdo para disparar o tiro forte.")]
-        [SerializeField] private float longPressThreshold = 0.35f;
-
         [Tooltip("Raio de tolerância do clique em unidades de mundo.")]
         [SerializeField] private float clickToleranceRadius = 0.55f;
 
@@ -30,113 +27,161 @@ namespace WizardGame.Input
         [SerializeField] private WeaponSystem weaponSystem;
 
         private Camera mainCamera;
-        private float pointerDownTime;
-        private bool isPointerDown;
         private bool isInputBlocked;
+        private SpellType currentSpecialSpell = SpellType.Arcane;
+
+        public SpellType CurrentSpecialSpell => currentSpecialSpell;
 
         public event Action<ShotHitInfo> OnNormalShot;
-        public event Action<ShotHitInfo> OnStrongShot;
+        public event Action<SpellType, ShotHitInfo> OnSpecialShot;
+        public event Action<SpellType> OnSpecialSpellSelected;
         public event Action OnShotMissed;
         public event Action OnReloadRequested;
         public event Action OnTogglePauseRequested;
 
+        private readonly SpellType[] specialSpellList = new SpellType[]
+        {
+            SpellType.Arcane,
+            SpellType.Ice,
+            SpellType.Lightning,
+            SpellType.Area
+        };
+        private int selectedSpellIndex = 0;
+
         private void Awake()
         {
             mainCamera = Camera.main;
-            if (weaponSystem == null) weaponSystem = FindFirstObjectByType<WeaponSystem>();
+            if (weaponSystem == null) weaponSystem = FindAnyObjectByType<WeaponSystem>();
         }
 
         private void Update()
         {
             if (isInputBlocked) return;
 
-            // Teclas de Atalho
+            // Pausa
             if (UnityEngine.Input.GetKeyDown(KeyCode.Escape) || UnityEngine.Input.GetKeyDown(KeyCode.P))
             {
                 OnTogglePauseRequested?.Invoke();
                 return;
             }
 
+            // Recarga manual da varinha
             if (UnityEngine.Input.GetKeyDown(KeyCode.R))
             {
                 weaponSystem?.StartReload();
                 OnReloadRequested?.Invoke();
             }
 
-            // Tiro Forte no Botão Direito
+            // Seleção rápida de feitiços especiais (Teclas 1, 2, 3, 4 ou Q, E, F, C)
+            if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha1) || UnityEngine.Input.GetKeyDown(KeyCode.Keypad1) || UnityEngine.Input.GetKeyDown(KeyCode.Q))
+            {
+                SelectSpecialSpell(SpellType.Arcane);
+            }
+            else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha2) || UnityEngine.Input.GetKeyDown(KeyCode.Keypad2) || UnityEngine.Input.GetKeyDown(KeyCode.E))
+            {
+                SelectSpecialSpell(SpellType.Ice);
+            }
+            else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha3) || UnityEngine.Input.GetKeyDown(KeyCode.Keypad3) || UnityEngine.Input.GetKeyDown(KeyCode.F))
+            {
+                SelectSpecialSpell(SpellType.Lightning);
+            }
+            else if (UnityEngine.Input.GetKeyDown(KeyCode.Alpha4) || UnityEngine.Input.GetKeyDown(KeyCode.Keypad4) || UnityEngine.Input.GetKeyDown(KeyCode.C) || UnityEngine.Input.GetKeyDown(KeyCode.Space))
+            {
+                SelectSpecialSpell(SpellType.Area);
+            }
+
+            // Alternância de feitiço pela roda do mouse (Scroll Wheel)
+            float scroll = UnityEngine.Input.GetAxis("Mouse ScrollWheel");
+            if (scroll > 0.05f)
+            {
+                CycleSpecialSpell(-1);
+            }
+            else if (scroll < -0.05f)
+            {
+                CycleSpecialSpell(1);
+            }
+
+            // Disparo do feitiço especial ativo via Botão Direito (RMB)
             if (UnityEngine.Input.GetMouseButtonDown(1))
             {
-                TriggerShot(UnityEngine.Input.mousePosition, isStrong: true);
+                TriggerSpecialShot(currentSpecialSpell, UnityEngine.Input.mousePosition);
                 return;
             }
 
-            // Tiro no Botão Esquerdo
+            // Tiro Normal via Botão Esquerdo (LMB)
             if (UnityEngine.Input.GetMouseButtonDown(0))
             {
-                isPointerDown = true;
-                pointerDownTime = Time.time;
-            }
-
-            if (UnityEngine.Input.GetMouseButtonUp(0) && isPointerDown)
-            {
-                isPointerDown = false;
-                float duration = Time.time - pointerDownTime;
-                bool isStrong = duration >= longPressThreshold;
-
-                TriggerShot(UnityEngine.Input.mousePosition, isStrong);
+                TriggerNormalShot(UnityEngine.Input.mousePosition);
             }
         }
 
-        private void TriggerShot(Vector2 screenPosition, bool isStrong)
+        public void SelectSpecialSpell(SpellType spell)
         {
-            // Para tiro normal, verifica munição da varinha
-            if (!isStrong && weaponSystem != null)
+            currentSpecialSpell = spell;
+            for (int i = 0; i < specialSpellList.Length; i++)
             {
-                if (!weaponSystem.TryConsumeAmmo())
+                if (specialSpellList[i] == spell)
                 {
-                    return; // Sem munição ou recarregando
+                    selectedSpellIndex = i;
+                    break;
                 }
             }
+            OnSpecialSpellSelected?.Invoke(currentSpecialSpell);
+        }
 
+        private void CycleSpecialSpell(int direction)
+        {
+            selectedSpellIndex = (selectedSpellIndex + direction + specialSpellList.Length) % specialSpellList.Length;
+            currentSpecialSpell = specialSpellList[selectedSpellIndex];
+            OnSpecialSpellSelected?.Invoke(currentSpecialSpell);
+        }
+
+        private void TriggerNormalShot(Vector2 screenPosition)
+        {
+            if (weaponSystem != null && !weaponSystem.TryConsumeAmmo())
+            {
+                return;
+            }
+
+            ShotHitInfo hitInfo = CalculateHitInfo(screenPosition);
+            if (!hitInfo.isHit)
+            {
+                OnShotMissed?.Invoke();
+            }
+            OnNormalShot?.Invoke(hitInfo);
+        }
+
+        private void TriggerSpecialShot(SpellType spell, Vector2 screenPosition)
+        {
+            ShotHitInfo hitInfo = CalculateHitInfo(screenPosition);
+            OnSpecialShot?.Invoke(spell, hitInfo);
+        }
+
+        private ShotHitInfo CalculateHitInfo(Vector2 screenPosition)
+        {
             if (mainCamera == null) mainCamera = Camera.main;
-            if (mainCamera == null) return;
-
-            Vector3 worldPos = mainCamera.ScreenToWorldPoint(screenPosition);
+            Vector3 worldPos = mainCamera != null ? mainCamera.ScreenToWorldPoint(screenPosition) : Vector3.zero;
             worldPos.z = 0f;
 
             WizardController hitWizard = FindWizardAtPosition(worldPos);
-
-            ShotHitInfo hitInfo = new ShotHitInfo
-            {
-                target = hitWizard,
-                isHit = hitWizard != null,
-                isHeadshot = false,
-                hitPoint = worldPos
-            };
+            bool isHeadshot = false;
 
             if (hitWizard != null)
             {
-                // Headshot / Acerto Perfeito: Se o clique atingir o terço superior do mago (cabeça/chapéu)
                 float relativeY = worldPos.y - hitWizard.transform.position.y;
                 if (relativeY > 0.22f)
                 {
-                    hitInfo.isHeadshot = true;
+                    isHeadshot = true;
                 }
             }
-            else
-            {
-                // Disparo errou todos os magos: quebra de combo
-                OnShotMissed?.Invoke();
-            }
 
-            if (isStrong)
+            return new ShotHitInfo
             {
-                OnStrongShot?.Invoke(hitInfo);
-            }
-            else
-            {
-                OnNormalShot?.Invoke(hitInfo);
-            }
+                target = hitWizard,
+                isHit = hitWizard != null,
+                isHeadshot = isHeadshot,
+                hitPoint = worldPos
+            };
         }
 
         private WizardController FindWizardAtPosition(Vector3 worldPos)

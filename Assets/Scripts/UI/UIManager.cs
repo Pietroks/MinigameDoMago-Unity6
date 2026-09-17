@@ -3,18 +3,19 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using WizardGame.Core;
+using WizardGame.Data;
 using WizardGame.Entities;
 
 namespace WizardGame.UI
 {
     /// <summary>
-    /// Gerencia a interface completa: HUD em tempo real, Sistema de Combos,
-    /// Popups de Headshot, Menu Inicial, Pause e Telas de Fim de Jogo com Estatisticas.
-    /// Adaptado para o tema de cacada aos Goblins.
+    /// Gerencia a interface completa: HUD em tempo real, Arsenal Mágico (Barra de Feitiços),
+    /// Sistema de Combos, Popups de Headshot, Menu Inicial, Pause e Telas de Fim de Jogo.
+    /// Adaptado para o tema de caçada aos Goblins.
     /// </summary>
     public class UIManager : MonoBehaviour
     {
-        [Header("Paineis Principais")]
+        [Header("Painéis Principais")]
         [SerializeField] private GameObject startMenuPanel;
         [SerializeField] private GameObject pauseMenuPanel;
         [SerializeField] private GameObject instructionsPanel;
@@ -29,6 +30,18 @@ namespace WizardGame.UI
         [SerializeField] private Text controlsHintText;
         [SerializeField] private Button muteButton;
         [SerializeField] private Text muteButtonText;
+
+        [Header("Arsenal Mágico (Feitiços Especiais)")]
+        [SerializeField] private GameObject spellArsenalContainer;
+        [SerializeField] private Image arcaneHighlight;
+        [SerializeField] private Text arcaneCooldownText;
+        [SerializeField] private Image iceHighlight;
+        [SerializeField] private Text iceCooldownText;
+        [SerializeField] private Image lightningHighlight;
+        [SerializeField] private Text lightningCooldownText;
+        [SerializeField] private Image areaHighlight;
+        [SerializeField] private Text areaCooldownText;
+        [SerializeField] private Text activeSpellNoticeText;
 
         [Header("Sistema de Combo Visual")]
         [SerializeField] private GameObject comboContainer;
@@ -187,17 +200,69 @@ namespace WizardGame.UI
 
         public void UpdateStrongCooldown(bool ready, float remainingSeconds = 0f)
         {
-            if (strongShotText == null) return;
+            if (strongShotText != null)
+            {
+                if (ready)
+                {
+                    strongShotText.text = "TIRO FORTE [RMB]: PRONTO!";
+                    strongShotText.color = Color.green;
+                }
+                else
+                {
+                    strongShotText.text = $"TIRO FORTE [RMB]: {remainingSeconds:F1}s";
+                    strongShotText.color = new Color(1f, 0.4f, 0.4f);
+                }
+            }
+
+            UpdateSpellCooldown(SpellType.Arcane, ready, remainingSeconds);
+        }
+
+        public void UpdateSelectedSpell(SpellType spell)
+        {
+            Color activeColor = new Color(1f, 0.85f, 0.2f, 1f);
+            Color inactiveColor = new Color(0.25f, 0.25f, 0.35f, 0.65f);
+
+            if (arcaneHighlight != null) arcaneHighlight.color = (spell == SpellType.Arcane) ? activeColor : inactiveColor;
+            if (iceHighlight != null) iceHighlight.color = (spell == SpellType.Ice) ? activeColor : inactiveColor;
+            if (lightningHighlight != null) lightningHighlight.color = (spell == SpellType.Lightning) ? activeColor : inactiveColor;
+            if (areaHighlight != null) areaHighlight.color = (spell == SpellType.Area) ? activeColor : inactiveColor;
+
+            if (activeSpellNoticeText != null)
+            {
+                string spellDesc = spell switch
+                {
+                    SpellType.Arcane => "💥 TIRO ARCANO (Dano 3)",
+                    SpellType.Ice => "❄️ FEITIÇO DE GELO (Congela 2.5s)",
+                    SpellType.Lightning => "⚡ RELÂMPAGO (Corrente em até 3)",
+                    SpellType.Area => "🌀 FEITIÇO DE ÁREA (Explosão mágica)",
+                    _ => "TIRO ESPECIAL"
+                };
+                activeSpellNoticeText.text = $"[RMB]: {spellDesc}";
+            }
+        }
+
+        public void UpdateSpellCooldown(SpellType spell, bool ready, float remainingSeconds = 0f)
+        {
+            Text targetText = spell switch
+            {
+                SpellType.Arcane => arcaneCooldownText,
+                SpellType.Ice => iceCooldownText,
+                SpellType.Lightning => lightningCooldownText,
+                SpellType.Area => areaCooldownText,
+                _ => null
+            };
+
+            if (targetText == null) return;
 
             if (ready)
             {
-                strongShotText.text = "TIRO FORTE [RMB]: PRONTO!";
-                strongShotText.color = Color.green;
+                targetText.text = "PRONTO";
+                targetText.color = new Color(0.2f, 1f, 0.35f);
             }
             else
             {
-                strongShotText.text = $"TIRO FORTE [RMB]: {remainingSeconds:F1}s";
-                strongShotText.color = new Color(1f, 0.4f, 0.4f);
+                targetText.text = $"{remainingSeconds:F1}s";
+                targetText.color = new Color(1f, 0.45f, 0.45f);
             }
         }
 

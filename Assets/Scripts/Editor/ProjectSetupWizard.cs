@@ -338,9 +338,12 @@ namespace WizardGame.EditorTools
             soundMgr.bgmMusicClip = soundMgr.menuMusicClip;
             soundMgr.normalShotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/tiro.mp3");
             soundMgr.strongShotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/raio.mp3");
-            soundMgr.teleportSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/dbz-teleport.mp3");
+            soundMgr.lightningCastSound = soundMgr.strongShotSound;
+            soundMgr.iceCastSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/dbz-teleport.mp3");
+            soundMgr.areaCastSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/heavy-thunder-sound-effect-no-copyright-338980.mp3");
+            soundMgr.teleportSound = soundMgr.iceCastSound;
             soundMgr.victorySound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/award-winners.mp3");
-            soundMgr.defeatSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/heavy-thunder-sound-effect-no-copyright-338980.mp3");
+            soundMgr.defeatSound = soundMgr.areaCastSound;
             soundMgr.hitDamageSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/tiro.mp3");
             soundMgr.headshotSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/surprise-sound-effect-99300.mp3");
             soundMgr.comboBreakSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
@@ -427,7 +430,7 @@ namespace WizardGame.EditorTools
 
             var ammoText = CreateUIText(topBar.transform, "AmmoText", "MANA: 8 / 8  [R]", 24, Color.cyan, new Vector2(0f, -42f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
 
-            var strongText = CreateUIText(topBar.transform, "StrongShotText", "TIRO FORTE [RMB]: PRONTO!", 24, Color.green, new Vector2(-220f, -42f), new Vector2(1f, 1f), defaultFont, TextAnchor.MiddleRight);
+            var strongText = CreateUIText(topBar.transform, "StrongShotText", "[RMB]: 💥 TIRO ARCANO (Dano 3)", 22, new Color(1f, 0.85f, 0.2f), new Vector2(-220f, -42f), new Vector2(1f, 1f), defaultFont, TextAnchor.MiddleRight);
 
             var muteBtnObj = CreateButton(topBar.transform, "MuteButton", "SOM: ATIVO", new Vector2(-25f, -42f), new Vector2(1f, 1f), new Vector2(150f, 44f), defaultFont, new Color(0.2f, 0.2f, 0.35f));
             var muteBtn = muteBtnObj.GetComponent<Button>();
@@ -452,13 +455,25 @@ namespace WizardGame.EditorTools
             hsRect.anchoredPosition = new Vector2(0f, 140f);
             var headshotText = CreateUIText(headshotContainer.transform, "HeadshotText", "🎯 HEADSHOT! +1 PONTO", 32, new Color(0.2f, 1f, 0.3f), Vector2.zero, new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
+            // --- BARRA DO ARSENAL MÁGICO (CAIXA DE FERRAMENTAS DO MAGO) ---
+            GameObject spellBarGo = CreatePanel(hudGo.transform, "SpellArsenalBar", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Color(0.06f, 0.06f, 0.12f, 0.88f));
+            var spellBarRect = spellBarGo.GetComponent<RectTransform>();
+            spellBarRect.pivot = new Vector2(0.5f, 0f);
+            spellBarRect.sizeDelta = new Vector2(820f, 60f);
+            spellBarRect.anchoredPosition = new Vector2(0f, 44f);
+
+            var (arcaneHighlight, arcaneCd) = CreateSpellSlot(spellBarGo.transform, "Slot_Arcane", "[1/Q] 💥 ARCANO", new Vector2(-300f, 30f), defaultFont);
+            var (iceHighlight, iceCd) = CreateSpellSlot(spellBarGo.transform, "Slot_Ice", "[2/E] ❄️ GELO", new Vector2(-100f, 30f), defaultFont);
+            var (lightningHighlight, lightningCd) = CreateSpellSlot(spellBarGo.transform, "Slot_Lightning", "[3/F] ⚡ RAIO", new Vector2(100f, 30f), defaultFont);
+            var (areaHighlight, areaCd) = CreateSpellSlot(spellBarGo.transform, "Slot_Area", "[4/C] 🌀 ÁREA", new Vector2(300f, 30f), defaultFont);
+
             // Bottom Bar Controls Hint
-            GameObject bottomBar = CreatePanel(hudGo.transform, "BottomBar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Color(0.05f, 0.05f, 0.08f, 0.75f));
+            GameObject bottomBar = CreatePanel(hudGo.transform, "BottomBar", new Vector2(0f, 0f), new Vector2(1f, 0f), new Color(0.05f, 0.05f, 0.08f, 0.85f));
             var botBarRect = bottomBar.GetComponent<RectTransform>();
             botBarRect.pivot = new Vector2(0.5f, 0f);
             botBarRect.sizeDelta = new Vector2(0f, 40f);
             botBarRect.anchoredPosition = Vector2.zero;
-            var hintText = CreateUIText(bottomBar.transform, "ControlsHint", "[LMB] Disparo  |  [RMB] Tiro Forte  |  [R] Recarregar Mana  |  [ESC / P] Pausar", 18, new Color(0.85f, 0.85f, 0.85f), new Vector2(0f, 20f), new Vector2(0.5f, 0f), defaultFont, TextAnchor.MiddleCenter);
+            var hintText = CreateUIText(bottomBar.transform, "ControlsHint", "[LMB] Disparo  |  [RMB] Feitiço Especial  |  [1..4 / Q,E,F,C / Scroll] Selecionar Feitiço  |  [R] Mana  |  [ESC] Pausar", 17, new Color(0.88f, 0.88f, 0.88f), new Vector2(0f, 20f), new Vector2(0.5f, 0f), defaultFont, TextAnchor.MiddleCenter);
 
             // --- MENU INICIAL ---
             GameObject startMenu = CreatePanel(canvasGo.transform, "StartMenuPanel", new Vector2(0f, 0f), new Vector2(1f, 1f), new Color(0.04f, 0.04f, 0.08f, 0.95f));
@@ -479,30 +494,34 @@ namespace WizardGame.EditorTools
             var (startBgmSlider, startBgmText) = CreateVolumeSlider(startMenu.transform, "StartBgmSlider", "MÚSICA: 28%", new Vector2(0f, -165f), new Vector2(340f, 36f), defaultFont);
             var (startSfxSlider, startSfxText) = CreateVolumeSlider(startMenu.transform, "StartSfxSlider", "EFEITOS: 75%", new Vector2(0f, -215f), new Vector2(340f, 36f), defaultFont);
 
-            // --- PAINEL DE INSTRUÇÕES (COM OS 4 GOBLINS) ---
+            // --- PAINEL DE INSTRUÇÕES (COM OS 4 GOBLINS E ARSENAL MÁGICO) ---
             GameObject instrPanel = CreatePanel(startMenu.transform, "InstructionsPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.06f, 0.08f, 0.15f, 0.98f));
             var instrRect = instrPanel.GetComponent<RectTransform>();
-            instrRect.sizeDelta = new Vector2(920f, 640f);
+            instrRect.sizeDelta = new Vector2(980f, 690f);
             instrRect.anchoredPosition = Vector2.zero;
 
-            CreateUIText(instrPanel.transform, "InstrTitle", "MANUAL DOS GOBLINS & MECANICAS", 30, Color.yellow, new Vector2(0f, 280f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(instrPanel.transform, "InstrTitle", "MANUAL DOS GOBLINS & ARSENAL MÁGICO", 28, Color.yellow, new Vector2(0f, 305f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             string instrBody = "INIMIGOS (GUIA OFICIAL):\n" +
-                               "  • GOBLIN COMUM: 1 HP | 1 Ponto | Move-se aleatoriamente atacando com facas.\n" +
-                               "  • GOBLIN FUGITIVO: 2 HP | 2 Pontos | Ao ser atingido, salta e foge em disparada acelerada!\n" +
-                               "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido e agressivo com escudo. Vale mais pontos!\n" +
-                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporte dimensional instantaneo atraves de portais ao tomar dano.\n\n" +
-                               "SISTEMA DE COMBOS & MULTIPLICADORES:\n" +
-                               "  • 1-4 abates: x1  |  5-9 abates: x2  |  10-19 abates: x3  |  20+ abates: x4!\n" +
-                               "  • Errar um tiro no vazio ou deixar um goblin fugir QUEBRA O COMBO imediatamente!\n\n" +
-                               "BONUS DE PRECISAO:\n" +
+                               "  • GOBLIN COMUM: 1 HP | 1 Ponto | Move-se atacando com facas.\n" +
+                               "  • GOBLIN FUGITIVO: 2 HP | 2 Pontos | Ao sofrer dano, salta em disparada veloz!\n" +
+                               "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido e agressivo com escudo dourado.\n" +
+                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta atraves de portais misticos ao tomar dano.\n\n" +
+                               "ARSENAL MAGICO (CAIXA DE FERRAMENTAS DO MAGO):\n" +
+                               "  • 🔥 [LMB] TIRO NORMAL: 1 Dano basico (consome mana da varinha).\n" +
+                               "  • 💥 [1 / Q] TIRO ARCANO: 3 Dano concentrado | Cooldown 3.0s.\n" +
+                               "  • ❄️ [2 / E] FEITICO DE GELO: 1 Dano + Congela por 2.5s (pausa movimento e fuga) | Cooldown 4.0s.\n" +
+                               "  • ⚡ [3 / F] RELAMPAGO: 2 Dano no alvo + 1 Dano eletrico em ate 2 goblins proximos | Cooldown 4.5s.\n" +
+                               "  • 🌀 [4 / C] FEITICO DE AREA: Explosao radial (2.5m) causando 2 Dano em todos os inimigos | Cooldown 5.5s.\n" +
+                               "  • [RMB]: Dispara o feitico especial ativo  |  [Roda do Mouse / 1..4]: Alterna o feitico selecionado.\n\n" +
+                               "SISTEMA DE COMBOS & HEADSHOT:\n" +
+                               "  • Multiplicadores: 1-4 (x1) | 5-9 (x2) | 10-19 (x3) | 20+ (x4)!\n" +
+                               "  • Errar tiro no vazio ou deixar goblin escapar quebra o combo.\n" +
                                "  • HEADSHOT: Acertos no topo da cabeca concedem +1 Ponto Imediato!\n\n" +
-                               "COMANDOS:\n" +
-                               "  • [LMB]: Disparo  |  [RMB]: Tiro Forte (Dano 3 - Recarga 3s)\n" +
-                               "  • [R]: Recarregar Mana (Pente de 8)  |  [ESC / P]: Pausar";
-            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 17, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
+                               "CONTROLES: [R] Recarregar Mana  |  [ESC / P] Pausar o Jogo";
+            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 15, Color.white, new Vector2(0f, 15f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
-            var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -270f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
+            var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -305f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
             var closeInstrBtn = closeInstrBtnObj.GetComponent<Button>();
             instrPanel.SetActive(false);
 
@@ -557,9 +576,20 @@ namespace WizardGame.EditorTools
             SetPrivateField(uiMgr, "escapeText", escapeText);
             SetPrivateField(uiMgr, "ammoText", ammoText);
             SetPrivateField(uiMgr, "strongShotText", strongText);
+            SetPrivateField(uiMgr, "activeSpellNoticeText", strongText);
             SetPrivateField(uiMgr, "controlsHintText", hintText);
             SetPrivateField(uiMgr, "muteButton", muteBtn);
             SetPrivateField(uiMgr, "muteButtonText", muteBtnText);
+
+            SetPrivateField(uiMgr, "spellArsenalContainer", spellBarGo);
+            SetPrivateField(uiMgr, "arcaneHighlight", arcaneHighlight);
+            SetPrivateField(uiMgr, "arcaneCooldownText", arcaneCd);
+            SetPrivateField(uiMgr, "iceHighlight", iceHighlight);
+            SetPrivateField(uiMgr, "iceCooldownText", iceCd);
+            SetPrivateField(uiMgr, "lightningHighlight", lightningHighlight);
+            SetPrivateField(uiMgr, "lightningCooldownText", lightningCd);
+            SetPrivateField(uiMgr, "areaHighlight", areaHighlight);
+            SetPrivateField(uiMgr, "areaCooldownText", areaCd);
 
             SetPrivateField(uiMgr, "comboContainer", comboContainer);
             SetPrivateField(uiMgr, "comboText", comboText);
@@ -780,6 +810,28 @@ namespace WizardGame.EditorTools
             slider.direction = Slider.Direction.LeftToRight;
 
             return (slider, textComp);
+        }
+
+        private static (Image highlight, Text cooldown) CreateSpellSlot(Transform parent, string name, string hotkeyAndName, Vector2 anchoredPos, Font font)
+        {
+            GameObject slotGo = CreatePanel(parent, name, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Color(0.12f, 0.14f, 0.22f, 0.95f));
+            var slotRect = slotGo.GetComponent<RectTransform>();
+            slotRect.pivot = new Vector2(0.5f, 0.5f);
+            slotRect.sizeDelta = new Vector2(190f, 50f);
+            slotRect.anchoredPosition = anchoredPos;
+
+            var highlightImg = slotGo.GetComponent<Image>();
+            highlightImg.color = new Color(0.25f, 0.25f, 0.35f, 0.65f);
+
+            var nameText = CreateUIText(slotGo.transform, "Name", hotkeyAndName, 15, Color.white, new Vector2(10f, 10f), new Vector2(0f, 0.5f), font, TextAnchor.MiddleLeft);
+            var nRect = nameText.GetComponent<RectTransform>();
+            nRect.sizeDelta = new Vector2(170f, 22f);
+
+            var cdText = CreateUIText(slotGo.transform, "Cooldown", "PRONTO", 13, new Color(0.2f, 1f, 0.35f), new Vector2(10f, -11f), new Vector2(0f, 0.5f), font, TextAnchor.MiddleLeft);
+            var cdRect = cdText.GetComponent<RectTransform>();
+            cdRect.sizeDelta = new Vector2(170f, 20f);
+
+            return (highlightImg, cdText);
         }
 
         private static void SetPrivateField(object target, string fieldName, object value)

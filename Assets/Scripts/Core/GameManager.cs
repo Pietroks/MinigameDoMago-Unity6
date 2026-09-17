@@ -1,5 +1,7 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using WizardGame.Data;
 using WizardGame.Entities;
 using WizardGame.Input;
 using WizardGame.UI;
@@ -15,8 +17,8 @@ namespace WizardGame.Core
     }
 
     /// <summary>
-    /// Orquestrador principal com Sistema de Combos, Multiplicadores Dinâmicos
-    /// e Bônus de Precisão por Headshot / Acerto Perfeito.
+    /// Orquestrador principal com Arsenal Mágico (Tiro Normal, Arcano, Gelo, Relâmpago e Área),
+    /// Sistema de Combos, Multiplicadores Dinâmicos e Bônus de Precisão por Headshot.
     /// </summary>
     public class GameManager : MonoBehaviour
     {
@@ -29,13 +31,27 @@ namespace WizardGame.Core
         [Header("Regras de Partida")]
         [SerializeField] private int winScoreTarget = 50;
         [SerializeField] private int maxEscapesAllowed = 15;
-        [SerializeField] private float strongShotCooldown = 3.0f;
+
+        [Header("Tempos de Recarga dos Feitiços Especiais")]
+        [SerializeField] private float arcaneCooldownDuration = 3.0f;
+        [SerializeField] private float iceCooldownDuration = 4.0f;
+        [SerializeField] private float lightningCooldownDuration = 4.5f;
+        [SerializeField] private float areaCooldownDuration = 5.5f;
 
         private GameState currentState;
         private int currentScore;
         private int currentEscaped;
-        private float strongCooldownTimer;
-        private bool isStrongReady;
+
+        // Timers e Estados dos Feitiços
+        private float arcaneTimer;
+        private float iceTimer;
+        private float lightningTimer;
+        private float areaTimer;
+
+        private bool isArcaneReady = true;
+        private bool isIceReady = true;
+        private bool isLightningReady = true;
+        private bool isAreaReady = true;
 
         // --- SISTEMA DE COMBOS E ESTATÍSTICAS ---
         private int currentStreak;
@@ -50,7 +66,8 @@ namespace WizardGame.Core
             if (inputHandler != null)
             {
                 inputHandler.OnNormalShot += HandleNormalShot;
-                inputHandler.OnStrongShot += HandleStrongShot;
+                inputHandler.OnSpecialShot += HandleSpecialShot;
+                inputHandler.OnSpecialSpellSelected += HandleSpecialSpellSelected;
                 inputHandler.OnShotMissed += HandleShotMissed;
                 inputHandler.OnTogglePauseRequested += TogglePause;
             }
@@ -82,18 +99,27 @@ namespace WizardGame.Core
         {
             if (currentState == GameState.Playing)
             {
-                if (!isStrongReady)
+                UpdateCooldown(ref arcaneTimer, ref isArcaneReady, SpellType.Arcane);
+                UpdateCooldown(ref iceTimer, ref isIceReady, SpellType.Ice);
+                UpdateCooldown(ref lightningTimer, ref isLightningReady, SpellType.Lightning);
+                UpdateCooldown(ref areaTimer, ref isAreaReady, SpellType.Area);
+            }
+        }
+
+        private void UpdateCooldown(ref float timer, ref bool isReady, SpellType spell)
+        {
+            if (!isReady)
+            {
+                timer -= Time.deltaTime;
+                if (timer <= 0f)
                 {
-                    strongCooldownTimer -= Time.deltaTime;
-                    if (strongCooldownTimer <= 0f)
-                    {
-                        isStrongReady = true;
-                        uiManager?.UpdateStrongCooldown(true);
-                    }
-                    else
-                    {
-                        uiManager?.UpdateStrongCooldown(false, strongCooldownTimer);
-                    }
+                    timer = 0f;
+                    isReady = true;
+                    uiManager?.UpdateSpellCooldown(spell, true);
+                }
+                else
+                {
+                    uiManager?.UpdateSpellCooldown(spell, false, timer);
                 }
             }
         }
@@ -143,13 +169,28 @@ namespace WizardGame.Core
             maxStreak = 0;
             headshotsCount = 0;
 
-            isStrongReady = true;
-            strongCooldownTimer = 0f;
+            isArcaneReady = true;
+            isIceReady = true;
+            isLightningReady = true;
+            isAreaReady = true;
+            arcaneTimer = 0f;
+            iceTimer = 0f;
+            lightningTimer = 0f;
+            areaTimer = 0f;
 
             uiManager?.UpdateScore(currentScore, winScoreTarget);
             uiManager?.UpdateEscapes(currentEscaped, maxEscapesAllowed);
-            uiManager?.UpdateStrongCooldown(true);
             uiManager?.UpdateCombo(currentStreak, currentMultiplier);
+
+            uiManager?.UpdateSpellCooldown(SpellType.Arcane, true);
+            uiManager?.UpdateSpellCooldown(SpellType.Ice, true);
+            uiManager?.UpdateSpellCooldown(SpellType.Lightning, true);
+            uiManager?.UpdateSpellCooldown(SpellType.Area, true);
+
+            if (inputHandler != null)
+            {
+                uiManager?.UpdateSelectedSpell(inputHandler.CurrentSpecialSpell);
+            }
 
             if (weaponSystem != null)
             {
@@ -215,30 +256,140 @@ namespace WizardGame.Core
             }
         }
 
+        private void HandleSpecialSpellSelected(SpellType spell)
+        {
+            uiManager?.UpdateSelectedSpell(spell);
+        }
+
         private void HandleStrongShot(ShotHitInfo hitInfo)
         {
-            if (currentState != GameState.Playing || !isStrongReady) return;
+            HandleSpecialShot(SpellType.Arcane, hitInfo);
+        }
 
-            isStrongReady = false;
-            strongCooldownTimer = strongShotCooldown;
-            uiManager?.UpdateStrongCooldown(false, strongShotCooldown);
+        private void HandleSpecialShot(SpellType spell, ShotHitInfo hitInfo)
+        {
+            if (currentState != GameState.Playing) return;
 
-            SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
-            weaponSystem?.TriggerRecoil();
-
-            if (hitInfo.isHit && hitInfo.target != null)
+            switch (spell)
             {
-                // Bônus de Headshot com tiro forte
-                if (hitInfo.isHeadshot)
-                {
-                    currentScore += 1;
-                    headshotsCount++;
-                    SoundManager.Instance?.PlayHeadshotSound();
-                    uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                    uiManager?.UpdateScore(currentScore, winScoreTarget);
-                }
+                case SpellType.Arcane:
+                    if (!isArcaneReady) return;
+                    isArcaneReady = false;
+                    arcaneTimer = arcaneCooldownDuration;
+                    uiManager?.UpdateSpellCooldown(SpellType.Arcane, false, arcaneCooldownDuration);
+                    SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
+                    weaponSystem?.TriggerRecoil();
 
-                hitInfo.target.TakeDamage(3);
+                    if (hitInfo.isHit && hitInfo.target != null)
+                    {
+                        if (hitInfo.isHeadshot)
+                        {
+                            currentScore += 1;
+                            headshotsCount++;
+                            SoundManager.Instance?.PlayHeadshotSound();
+                            uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
+                            uiManager?.UpdateScore(currentScore, winScoreTarget);
+                        }
+                        hitInfo.target.TakeDamage(3);
+                    }
+                    break;
+
+                case SpellType.Ice:
+                    if (!isIceReady) return;
+                    isIceReady = false;
+                    iceTimer = iceCooldownDuration;
+                    uiManager?.UpdateSpellCooldown(SpellType.Ice, false, iceCooldownDuration);
+                    SoundManager.Instance?.PlayIceCastSound();
+                    weaponSystem?.TriggerRecoil();
+
+                    if (hitInfo.isHit && hitInfo.target != null)
+                    {
+                        if (hitInfo.isHeadshot)
+                        {
+                            currentScore += 1;
+                            headshotsCount++;
+                            SoundManager.Instance?.PlayHeadshotSound();
+                            uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
+                            uiManager?.UpdateScore(currentScore, winScoreTarget);
+                        }
+                        hitInfo.target.TakeDamage(1);
+                        hitInfo.target.Freeze(2.5f);
+                    }
+                    break;
+
+                case SpellType.Lightning:
+                    if (!isLightningReady) return;
+                    isLightningReady = false;
+                    lightningTimer = lightningCooldownDuration;
+                    uiManager?.UpdateSpellCooldown(SpellType.Lightning, false, lightningCooldownDuration);
+                    SoundManager.Instance?.PlayLightningCastSound();
+                    weaponSystem?.TriggerRecoil();
+
+                    Vector3 strikePos = hitInfo.isHit && hitInfo.target != null ? hitInfo.target.transform.position : hitInfo.hitPoint;
+                    strikePos.z = 0f;
+
+                    if (hitInfo.isHit && hitInfo.target != null)
+                    {
+                        if (hitInfo.isHeadshot)
+                        {
+                            currentScore += 1;
+                            headshotsCount++;
+                            SoundManager.Instance?.PlayHeadshotSound();
+                            uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
+                            uiManager?.UpdateScore(currentScore, winScoreTarget);
+                        }
+                        hitInfo.target.TakeDamage(2);
+                    }
+
+                    // Relâmpago em Cadeia: Atinge até 2 outros goblins próximos em um raio de 3.5m
+                    int chainCount = 0;
+                    foreach (var goblin in WizardController.ActiveGoblins)
+                    {
+                        if (goblin == null || goblin == hitInfo.target) continue;
+                        if (Vector2.Distance(strikePos, goblin.transform.position) <= 3.5f)
+                        {
+                            goblin.TakeDamage(1);
+                            chainCount++;
+                            if (chainCount >= 2) break;
+                        }
+                    }
+                    break;
+
+                case SpellType.Area:
+                    if (!isAreaReady) return;
+                    isAreaReady = false;
+                    areaTimer = areaCooldownDuration;
+                    uiManager?.UpdateSpellCooldown(SpellType.Area, false, areaCooldownDuration);
+                    SoundManager.Instance?.PlayAreaCastSound();
+                    weaponSystem?.TriggerRecoil();
+
+                    Vector3 center = hitInfo.isHit && hitInfo.target != null ? hitInfo.target.transform.position : hitInfo.hitPoint;
+                    center.z = 0f;
+
+                    if (hitInfo.isHeadshot)
+                    {
+                        currentScore += 1;
+                        headshotsCount++;
+                        SoundManager.Instance?.PlayHeadshotSound();
+                        uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
+                        uiManager?.UpdateScore(currentScore, winScoreTarget);
+                    }
+
+                    // Feitiço de Área: Explosão radial de 2.5m de raio causando 2 de dano a todos os goblins no raio
+                    var affectedGoblins = new List<WizardController>();
+                    foreach (var goblin in WizardController.ActiveGoblins)
+                    {
+                        if (goblin == null) continue;
+                        if (Vector2.Distance(center, goblin.transform.position) <= 2.5f)
+                        {
+                            affectedGoblins.Add(goblin);
+                        }
+                    }
+                    foreach (var goblin in affectedGoblins)
+                    {
+                        goblin.TakeDamage(2);
+                    }
+                    break;
             }
         }
 

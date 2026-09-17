@@ -38,6 +38,9 @@ namespace WizardGame.Core
         [Header("Clipes de Combate")]
         public AudioClip normalShotSound;
         public AudioClip strongShotSound;
+        public AudioClip iceCastSound;
+        public AudioClip lightningCastSound;
+        public AudioClip areaCastSound;
         public AudioClip teleportSound;
         public AudioClip hitDamageSound;
 
@@ -312,6 +315,24 @@ namespace WizardGame.Core
             {
                 PlaySFX(chosen, 1.0f);
             }
+        }
+
+        public void PlayIceCastSound()
+        {
+            if (iceCastSound != null) PlaySFX(iceCastSound, 0.9f);
+            else if (teleportSound != null) PlaySFX(teleportSound, 0.7f);
+        }
+
+        public void PlayLightningCastSound()
+        {
+            if (lightningCastSound != null) PlaySFX(lightningCastSound, 0.95f);
+            else if (strongShotSound != null) PlaySFX(strongShotSound, 0.9f);
+        }
+
+        public void PlayAreaCastSound()
+        {
+            if (areaCastSound != null) PlaySFX(areaCastSound, 1.0f);
+            else if (defeatSound != null) PlaySFX(defeatSound, 0.9f);
         }
 
         #endregion

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using WizardGame.Data;
 
@@ -30,6 +31,8 @@ namespace WizardGame.Entities
         private int currentHealth;
         private bool isDeadOrEscaping;
         private bool isEnraged; // Para o Goblin Fugitivo ao tomar dano
+        private bool isFrozen;
+        private float remainingEscapeTime;
         private Bounds screenWorldBounds;
         private Vector3 normalizedScale = Vector3.one;
 
@@ -38,6 +41,11 @@ namespace WizardGame.Entities
         private Coroutine escapeCoroutine;
         private Coroutine hitReactionCoroutine;
         private Coroutine attackRoutine;
+        private Coroutine freezeCoroutine;
+
+        private static readonly List<WizardController> activeGoblins = new List<WizardController>();
+        public static IReadOnlyList<WizardController> ActiveGoblins => activeGoblins;
+        public bool IsFrozen => isFrozen;
 
         public event Action<WizardController, int> OnDefeated;
         public event Action<WizardController, int> OnEscaped;
@@ -122,10 +130,19 @@ namespace WizardGame.Entities
             UpdateHealthBar();
             StopAllActiveCoroutines();
 
+            if (!activeGoblins.Contains(this)) activeGoblins.Add(this);
+            isFrozen = false;
+
             StartCoroutine(SpawnScaleInRoutine());
             StartBehavior();
 
             escapeCoroutine = StartCoroutine(EscapeTimerRoutine(data.escapeTimeSeconds));
+        }
+
+        private void OnDisable()
+        {
+            activeGoblins.Remove(this);
+            StopAllActiveCoroutines();
         }
 
         private void SetupAnimations(WizardDataSO data)
@@ -189,6 +206,8 @@ namespace WizardGame.Entities
             if (escapeCoroutine != null) StopCoroutine(escapeCoroutine);
             if (hitReactionCoroutine != null) StopCoroutine(hitReactionCoroutine);
             if (attackRoutine != null) StopCoroutine(attackRoutine);
+            if (freezeCoroutine != null) StopCoroutine(freezeCoroutine);
+            isFrozen = false;
         }
 
         private IEnumerator SpawnScaleInRoutine()
@@ -285,10 +304,20 @@ namespace WizardGame.Entities
 
         private IEnumerator EscapeTimerRoutine(float delaySeconds)
         {
-            yield return new WaitForSeconds(delaySeconds);
+            remainingEscapeTime = delaySeconds;
+            while (remainingEscapeTime > 0f)
+            {
+                if (!isFrozen)
+                {
+                    remainingEscapeTime -= Time.deltaTime;
+                }
+                yield return null;
+            }
+
             if (isDeadOrEscaping) yield break;
 
             isDeadOrEscaping = true;
+            activeGoblins.Remove(this);
             hitCollider.enabled = false;
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
             StopAllActiveCoroutines();
@@ -315,11 +344,42 @@ namespace WizardGame.Entities
         private void Die()
         {
             isDeadOrEscaping = true;
+            activeGoblins.Remove(this);
             hitCollider.enabled = false;
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
             StopAllActiveCoroutines();
 
             StartCoroutine(DeathAnimationRoutine());
+        }
+
+        public void Freeze(float duration = 2.5f)
+        {
+            if (isDeadOrEscaping) return;
+
+            if (freezeCoroutine != null) StopCoroutine(freezeCoroutine);
+            freezeCoroutine = StartCoroutine(FreezeRoutine(duration));
+        }
+
+        private IEnumerator FreezeRoutine(float duration)
+        {
+            isFrozen = true;
+
+            // Interrompe rotinas ativas de movimento e ataque
+            if (movementCoroutine != null) StopCoroutine(movementCoroutine);
+            if (attackRoutine != null) StopCoroutine(attackRoutine);
+            if (hitReactionCoroutine != null) StopCoroutine(hitReactionCoroutine);
+
+            // Tonalidade azul-gelo
+            spriteRenderer.color = new Color(0.35f, 0.85f, 1f, 1f);
+
+            yield return new WaitForSeconds(duration);
+
+            if (isDeadOrEscaping) yield break;
+
+            isFrozen = false;
+            spriteRenderer.color = currentData.baseTint;
+            StartBehavior();
+            freezeCoroutine = null;
         }
 
         private IEnumerator DeathAnimationRoutine()
