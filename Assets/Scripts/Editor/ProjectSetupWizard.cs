@@ -94,14 +94,14 @@ namespace WizardGame.EditorTools
                         importer.alphaIsTransparency = true;
                         dirty = true;
                     }
-                    bool isBackground = path.Contains("Background") || path.Contains("cenario");
-                    FilterMode targetFilter = isBackground ? FilterMode.Bilinear : FilterMode.Point;
+                    bool isSmooth = path.Contains("Background") || path.Contains("cenario") || path.Contains("Weapon") || path.Contains("crosshair") || path.Contains("UI");
+                    FilterMode targetFilter = isSmooth ? FilterMode.Bilinear : FilterMode.Point;
                     if (importer.filterMode != targetFilter)
                     {
                         importer.filterMode = targetFilter;
                         dirty = true;
                     }
-                    if (isBackground && importer.maxTextureSize < 2048)
+                    if (isSmooth && importer.maxTextureSize < 2048)
                     {
                         importer.maxTextureSize = 2048;
                         dirty = true;
@@ -357,37 +357,11 @@ namespace WizardGame.EditorTools
             SetPrivateField(spawner, "wizardPrefab", wizardPrefab);
             SetPrivateField(spawner, "wizardTypes", wizardDatas);
 
-            // 4. Mira (Crosshair)
-            GameObject crosshairGo = new GameObject("Crosshair_Aim");
-            var crossSr = crosshairGo.AddComponent<SpriteRenderer>();
-            crossSr.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Cursor/wand_cursor_cartoon_96.png");
-            crossSr.sortingOrder = 100;
-            crosshairGo.transform.localScale = new Vector3(0.45f, 0.45f, 1f);
-
-            // 5. Varinha POV (Primeira Pessoa)
-            GameObject wandGo = new GameObject("Wand_POV");
-            var wandSr = wandGo.AddComponent<SpriteRenderer>();
-            wandSr.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Cursor/wand_cursor_cartoon_96.png");
-            wandSr.sortingOrder = 90;
-            wandGo.transform.localScale = new Vector3(1.2f, 1.2f, 1f);
-
-            GameObject flashGo = new GameObject("MuzzleFlash");
-            flashGo.transform.SetParent(wandGo.transform, false);
-            flashGo.transform.localPosition = new Vector3(0.5f, 0.5f, 0f);
-            var flashSr = flashGo.AddComponent<SpriteRenderer>();
-            flashSr.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Cursor/wand_cursor_cartoon_96.png");
-            flashSr.color = Color.yellow;
-            flashSr.sortingOrder = 91;
-            flashSr.enabled = false;
-
-            // 6. WeaponSystem
+            // 4. WeaponSystem
             GameObject weaponGo = new GameObject("WeaponSystem");
             var weaponSystem = weaponGo.AddComponent<WeaponSystem>();
-            SetPrivateField(weaponSystem, "wandTransform", wandGo.transform);
-            SetPrivateField(weaponSystem, "crosshairTransform", crosshairGo.transform);
-            SetPrivateField(weaponSystem, "muzzleFlash", flashSr);
 
-            // 7. PlayerInputHandler
+            // 5. PlayerInputHandler
             GameObject inputGo = new GameObject("PlayerInputHandler");
             var inputHandler = inputGo.AddComponent<PlayerInputHandler>();
             SetPrivateField(inputHandler, "weaponSystem", weaponSystem);
@@ -451,6 +425,33 @@ namespace WizardGame.EditorTools
             hsRect.anchoredPosition = new Vector2(0f, 140f);
             var headshotText = CreateUIText(headshotContainer.transform, "HeadshotText", "🎯 HEADSHOT! +1 PONTO", 32, new Color(0.2f, 1f, 0.3f), Vector2.zero, new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
+            // --- ARMA POV EM PRIMEIRA PESSOA (VARINHA & MÃO) ---
+            GameObject wandUIGo = new GameObject("Weapon_POV");
+            wandUIGo.transform.SetParent(hudGo.transform, false);
+            var wandRect = wandUIGo.AddComponent<RectTransform>();
+            wandRect.anchorMin = new Vector2(1f, 0f);
+            wandRect.anchorMax = new Vector2(1f, 0f);
+            wandRect.pivot = new Vector2(0.83f, 0.06f);
+            wandRect.sizeDelta = new Vector2(760f, 760f);
+            wandRect.anchoredPosition = new Vector2(-40f, -35f);
+            var wandImg = wandUIGo.AddComponent<Image>();
+            wandImg.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Weapon/weapon.png");
+            wandImg.raycastTarget = false;
+
+            // Brilho pulsante e dinâmico na ponta do cristal da varinha
+            GameObject glowGo = new GameObject("CrystalGlow");
+            glowGo.transform.SetParent(wandUIGo.transform, false);
+            var glowRect = glowGo.AddComponent<RectTransform>();
+            glowRect.anchorMin = new Vector2(0.462f, 0.715f);
+            glowRect.anchorMax = new Vector2(0.462f, 0.715f);
+            glowRect.pivot = new Vector2(0.5f, 0.5f);
+            glowRect.sizeDelta = new Vector2(120f, 120f);
+            glowRect.anchoredPosition = Vector2.zero;
+            var glowImg = glowGo.AddComponent<Image>();
+            glowImg.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Weapon/crystal_glow.png");
+            glowImg.color = new Color(0.2f, 0.92f, 1f, 0.9f);
+            glowImg.raycastTarget = false;
+
             // --- BARRA DO ARSENAL MÁGICO (CAIXA DE FERRAMENTAS DO MAGO) ---
             GameObject spellBarGo = CreatePanel(hudGo.transform, "SpellArsenalBar", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Color(0.06f, 0.06f, 0.12f, 0.88f));
             var spellBarRect = spellBarGo.GetComponent<RectTransform>();
@@ -470,6 +471,23 @@ namespace WizardGame.EditorTools
             botBarRect.sizeDelta = new Vector2(0f, 40f);
             botBarRect.anchoredPosition = Vector2.zero;
             var hintText = CreateUIText(bottomBar.transform, "ControlsHint", "[LMB] Disparo  |  [RMB] Feitiço Especial  |  [1..4 / Q,E,F,C / Scroll] Selecionar Feitiço  |  [R] Mana  |  [ESC] Pausar", 17, new Color(0.88f, 0.88f, 0.88f), new Vector2(0f, 20f), new Vector2(0.5f, 0f), defaultFont, TextAnchor.MiddleCenter);
+
+            // --- RETÍCULO DE MIRA DE ALTA PRECISÃO (P.O.V) ---
+            GameObject crosshairUIGo = new GameObject("Crosshair_Aim");
+            crosshairUIGo.transform.SetParent(hudGo.transform, false);
+            var crossRect = crosshairUIGo.AddComponent<RectTransform>();
+            crossRect.anchorMin = Vector2.zero;
+            crossRect.anchorMax = Vector2.zero;
+            crossRect.pivot = new Vector2(0.5f, 0.5f);
+            crossRect.sizeDelta = new Vector2(56f, 56f);
+            var crossImg = crosshairUIGo.AddComponent<Image>();
+            crossImg.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/UI/crosshair_reticle.png");
+            crossImg.raycastTarget = false;
+
+            // Vinculação dos componentes de mira e arma ao WeaponSystem
+            SetPrivateField(weaponSystem, "wandRect", wandRect);
+            SetPrivateField(weaponSystem, "crosshairRect", crossRect);
+            SetPrivateField(weaponSystem, "crystalGlowImage", glowImg);
 
             // --- MENU INICIAL ---
             GameObject startMenu = CreatePanel(canvasGo.transform, "StartMenuPanel", new Vector2(0f, 0f), new Vector2(1f, 1f), new Color(0.04f, 0.04f, 0.08f, 0.95f));

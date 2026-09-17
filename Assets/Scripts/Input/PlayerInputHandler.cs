@@ -54,6 +54,11 @@ namespace WizardGame.Input
             if (weaponSystem == null) weaponSystem = FindAnyObjectByType<WeaponSystem>();
         }
 
+        private void Start()
+        {
+            weaponSystem?.SetSpellTheme(currentSpecialSpell);
+        }
+
         private void Update()
         {
             if (isInputBlocked) return;
@@ -126,6 +131,7 @@ namespace WizardGame.Input
                     break;
                 }
             }
+            weaponSystem?.SetSpellTheme(currentSpecialSpell);
             OnSpecialSpellSelected?.Invoke(currentSpecialSpell);
         }
 
@@ -133,6 +139,7 @@ namespace WizardGame.Input
         {
             selectedSpellIndex = (selectedSpellIndex + direction + specialSpellList.Length) % specialSpellList.Length;
             currentSpecialSpell = specialSpellList[selectedSpellIndex];
+            weaponSystem?.SetSpellTheme(currentSpecialSpell);
             OnSpecialSpellSelected?.Invoke(currentSpecialSpell);
         }
 
@@ -153,6 +160,7 @@ namespace WizardGame.Input
 
         private void TriggerSpecialShot(SpellType spell, Vector2 screenPosition)
         {
+            weaponSystem?.TriggerRecoil();
             ShotHitInfo hitInfo = CalculateHitInfo(screenPosition);
             OnSpecialShot?.Invoke(spell, hitInfo);
         }
