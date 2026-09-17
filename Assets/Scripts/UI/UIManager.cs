@@ -52,6 +52,12 @@ namespace WizardGame.UI
         [SerializeField] private GameObject headshotPopupContainer;
         [SerializeField] private Text headshotPopupText;
 
+        [Header("Sistema de Ondas (Wave System UI)")]
+        [SerializeField] private Text waveText;
+        [SerializeField] private GameObject waveBannerContainer;
+        [SerializeField] private Text waveBannerTitle;
+        [SerializeField] private Text waveBannerSubtitle;
+
         [Header("Elementos de Fim de Jogo")]
         [SerializeField] private Text endTitleText;
         [SerializeField] private Text endScoreText;
@@ -90,6 +96,7 @@ namespace WizardGame.UI
         private Coroutine comboPulseCoroutine;
         private Coroutine comboBreakCoroutine;
         private Coroutine headshotCoroutine;
+        private Coroutine waveBannerCoroutine;
 
         private void Awake()
         {
@@ -108,6 +115,7 @@ namespace WizardGame.UI
             if (comboContainer != null) comboContainer.SetActive(false);
             if (headshotPopupContainer != null) headshotPopupContainer.SetActive(false);
             if (comboBreakText != null) comboBreakText.gameObject.SetActive(false);
+            if (waveBannerContainer != null) waveBannerContainer.SetActive(false);
         }
 
         public void ShowStartMenu()
@@ -117,6 +125,7 @@ namespace WizardGame.UI
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
             if (instructionsPanel != null) instructionsPanel.SetActive(false);
+            if (waveBannerContainer != null) waveBannerContainer.SetActive(false);
             Cursor.visible = true;
         }
 
@@ -168,9 +177,12 @@ namespace WizardGame.UI
             }
         }
 
-        public void UpdateScore(int score, int target)
+        public void UpdateScore(int score, int target = -1)
         {
-            if (scoreText != null) scoreText.text = $"Pontos: {score} / {target}";
+            if (scoreText != null)
+            {
+                scoreText.text = target > 0 ? $"Pontos: {score} / {target}" : $"Pontos: {score}";
+            }
         }
 
         public void UpdateEscapes(int current, int max)
@@ -458,5 +470,94 @@ namespace WizardGame.UI
                 muteButtonText.text = SoundManager.Instance.IsMuted ? "SOM: MUDO" : "SOM: ATIVO";
             }
         }
+
+        #region Sistema de Ondas UI
+
+        public void UpdateWaveProgress(int currentWave, int totalWaves, int remainingInWave, int totalInWave)
+        {
+            if (waveText != null)
+            {
+                waveText.text = $"⚔️ ONDA {currentWave} / {totalWaves}  •  Restam: {remainingInWave} / {totalInWave}";
+            }
+        }
+
+        public void ShowWaveStartBanner(int waveNumber, string waveName, string description)
+        {
+            if (waveBannerContainer == null) return;
+
+            if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
+            waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
+                title: $"⚔️ ONDA {waveNumber}: {waveName.ToUpper()}",
+                subtitle: description,
+                titleColor: new Color(1f, 0.85f, 0.2f),
+                duration: 2.8f
+            ));
+        }
+
+        public void ShowWaveClearedBanner(int waveNumber, int bonusPoints)
+        {
+            if (waveBannerContainer == null) return;
+
+            if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
+            waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
+                title: $"🎉 ONDA {waveNumber} CONCLUÍDA!",
+                subtitle: $"+{bonusPoints} Pontos de Bônus!  •  Mana Totalmente Restaurada!",
+                titleColor: new Color(0.25f, 1f, 0.45f),
+                duration: 2.4f
+            ));
+        }
+
+        private IEnumerator WaveBannerRoutine(string title, string subtitle, Color titleColor, float duration)
+        {
+            waveBannerContainer.SetActive(true);
+            if (waveBannerTitle != null)
+            {
+                waveBannerTitle.text = title;
+                waveBannerTitle.color = titleColor;
+            }
+            if (waveBannerSubtitle != null)
+            {
+                waveBannerSubtitle.text = subtitle;
+            }
+
+            var canvasGroup = waveBannerContainer.GetComponent<CanvasGroup>();
+            if (canvasGroup == null) canvasGroup = waveBannerContainer.AddComponent<CanvasGroup>();
+
+            // Fade In com leve pop de escala
+            float elapsed = 0f;
+            float fadeInTime = 0.25f;
+            waveBannerContainer.transform.localScale = Vector3.one * 0.82f;
+
+            while (elapsed < fadeInTime)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / fadeInTime;
+                canvasGroup.alpha = t;
+                waveBannerContainer.transform.localScale = Vector3.Lerp(Vector3.one * 0.82f, Vector3.one, t);
+                yield return null;
+            }
+
+            canvasGroup.alpha = 1f;
+            waveBannerContainer.transform.localScale = Vector3.one;
+
+            yield return new WaitForSeconds(Mathf.Max(0.5f, duration - 0.55f));
+
+            // Fade Out
+            elapsed = 0f;
+            float fadeOutTime = 0.35f;
+            while (elapsed < fadeOutTime)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / fadeOutTime;
+                canvasGroup.alpha = 1f - t;
+                yield return null;
+            }
+
+            canvasGroup.alpha = 0f;
+            waveBannerContainer.SetActive(false);
+            waveBannerCoroutine = null;
+        }
+
+        #endregion
     }
 }

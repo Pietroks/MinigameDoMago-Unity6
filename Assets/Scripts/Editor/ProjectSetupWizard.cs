@@ -394,10 +394,10 @@ namespace WizardGame.EditorTools
             topBarRect.sizeDelta = new Vector2(0f, 85f);
             topBarRect.anchoredPosition = Vector2.zero;
 
-            var scoreText = CreateUIText(topBar.transform, "ScoreText", "Pontos: 0 / 50", 25, Color.white, new Vector2(25f, -22f), new Vector2(0f, 1f), defaultFont);
+            var scoreText = CreateUIText(topBar.transform, "ScoreText", "Pontos: 0", 25, Color.white, new Vector2(25f, -22f), new Vector2(0f, 1f), defaultFont);
             var escapeText = CreateUIText(topBar.transform, "EscapeText", "Escaparam: 0 / 15", 21, new Color(1f, 0.6f, 0.6f), new Vector2(25f, -54f), new Vector2(0f, 1f), defaultFont);
 
-            CreateUIText(topBar.transform, "StageText", "FASE 1: FORTALEZA NOTURNA", 16, new Color(1f, 0.88f, 0.35f), new Vector2(0f, -20f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
+            var waveText = CreateUIText(topBar.transform, "WaveText", "⚔️ ONDA 1 / 5  •  Restam: 5 / 5", 20, new Color(1f, 0.88f, 0.35f), new Vector2(0f, -20f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
             var ammoText = CreateUIText(topBar.transform, "AmmoText", "MANA: 8 / 8  [R]", 22, Color.cyan, new Vector2(0f, -52f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
 
             var strongText = CreateUIText(topBar.transform, "StrongShotText", "[RMB]: 💥 TIRO ARCANO (Dano 3)", 22, new Color(1f, 0.85f, 0.2f), new Vector2(-220f, -42f), new Vector2(1f, 1f), defaultFont, TextAnchor.MiddleRight);
@@ -424,6 +424,16 @@ namespace WizardGame.EditorTools
             hsRect.sizeDelta = new Vector2(500f, 60f);
             hsRect.anchoredPosition = new Vector2(0f, 140f);
             var headshotText = CreateUIText(headshotContainer.transform, "HeadshotText", "🎯 HEADSHOT! +1 PONTO", 32, new Color(0.2f, 1f, 0.3f), Vector2.zero, new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+
+            // --- BANNER DE ANÚNCIO E CONCLUSÃO DE ONDA ---
+            GameObject waveBannerContainer = CreatePanel(hudGo.transform, "WaveBanner", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.04f, 0.05f, 0.12f, 0.94f));
+            var wbRect = waveBannerContainer.GetComponent<RectTransform>();
+            wbRect.sizeDelta = new Vector2(760f, 130f);
+            wbRect.anchoredPosition = new Vector2(0f, 160f);
+
+            var wbTitle = CreateUIText(waveBannerContainer.transform, "BannerTitle", "⚔️ ONDA 1", 38, new Color(1f, 0.85f, 0.2f), new Vector2(0f, 26f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            var wbSubtitle = CreateUIText(waveBannerContainer.transform, "BannerSubtitle", "5 Goblins Comuns se aproximam!", 22, Color.white, new Vector2(0f, -24f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            waveBannerContainer.SetActive(false);
 
             // --- ARMA POV EM PRIMEIRA PESSOA (VARINHA & MÃO) ---
             GameObject wandUIGo = new GameObject("Weapon_POV");
@@ -612,6 +622,11 @@ namespace WizardGame.EditorTools
             SetPrivateField(uiMgr, "headshotPopupContainer", headshotContainer);
             SetPrivateField(uiMgr, "headshotPopupText", headshotText);
 
+            SetPrivateField(uiMgr, "waveText", waveText);
+            SetPrivateField(uiMgr, "waveBannerContainer", waveBannerContainer);
+            SetPrivateField(uiMgr, "waveBannerTitle", wbTitle);
+            SetPrivateField(uiMgr, "waveBannerSubtitle", wbSubtitle);
+
             SetPrivateField(uiMgr, "endTitleText", endTitleText);
             SetPrivateField(uiMgr, "endScoreText", endScoreText);
             SetPrivateField(uiMgr, "endStatsText", endStatsText);
@@ -640,6 +655,7 @@ namespace WizardGame.EditorTools
             // 10. GameManager Wiring
             GameObject gmGo = new GameObject("GameManager");
             var gm = gmGo.AddComponent<GameManager>();
+            gm.PopulateDefaultWaves();
             SetPrivateField(gm, "spawner", spawner);
             SetPrivateField(gm, "inputHandler", inputHandler);
             SetPrivateField(gm, "weaponSystem", weaponSystem);

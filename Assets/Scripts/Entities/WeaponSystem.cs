@@ -322,5 +322,20 @@ namespace WizardGame.Entities
             OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
             OnReloadStateChanged?.Invoke(false);
         }
+
+        /// <summary>
+        /// Recarrega instantaneamente toda a mana do mago (usado como bônus ao concluir uma onda).
+        /// </summary>
+        public void RefillAmmo()
+        {
+            if (isReloading)
+            {
+                StopCoroutine("ReloadRoutine");
+                isReloading = false;
+                OnReloadStateChanged?.Invoke(false);
+            }
+            currentAmmo = maxAmmo;
+            OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
+        }
     }
 }

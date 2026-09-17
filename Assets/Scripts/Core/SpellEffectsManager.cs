@@ -21,7 +21,7 @@ namespace WizardGame.Core
             {
                 if (_instance == null)
                 {
-                    _instance = FindFirstObjectByType<SpellEffectsManager>();
+                    _instance = FindAnyObjectByType<SpellEffectsManager>();
                     if (_instance == null)
                     {
                         var go = new GameObject("SpellEffectsManager");

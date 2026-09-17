@@ -29,8 +29,12 @@ namespace WizardGame.Core
         [SerializeField] private UIManager uiManager;
 
         [Header("Regras de Partida")]
-        [SerializeField] private int winScoreTarget = 50;
         [SerializeField] private int maxEscapesAllowed = 15;
+
+        [Header("Configurações das Ondas (Wave System)")]
+        [SerializeField] private List<WaveConfig> waves = new List<WaveConfig>();
+        [SerializeField] private int waveClearBonusBase = 50;
+        [SerializeField] private float delayBetweenWaves = 2.5f;
 
         [Header("Tempos de Recarga dos Feitiços Especiais")]
         [SerializeField] private float arcaneCooldownDuration = 3.0f;
@@ -41,6 +45,8 @@ namespace WizardGame.Core
         private GameState currentState;
         private int currentScore;
         private int currentEscaped;
+        private int currentWaveIndex = 0;
+        private Coroutine waveTransitionCoroutine;
 
         // Timers e Estados dos Feitiços
         private float arcaneTimer;
@@ -82,6 +88,8 @@ namespace WizardGame.Core
             {
                 spawner.OnWizardDefeated += HandleWizardDefeated;
                 spawner.OnWizardEscaped += HandleWizardEscaped;
+                spawner.OnWaveProgressChanged += HandleWaveProgressChanged;
+                spawner.OnWaveCompleted += HandleWaveCompleted;
             }
 
             if (uiManager != null)
@@ -132,7 +140,8 @@ namespace WizardGame.Core
             {
                 case GameState.Menu:
                     Time.timeScale = 1f;
-                    spawner?.StopSpawning();
+                    if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
+                    spawner?.ClearActiveGoblins();
                     inputHandler?.SetInputBlocked(true);
                     uiManager?.ShowStartMenu();
                     SoundManager.Instance?.PlayMenuMusic();
@@ -142,7 +151,6 @@ namespace WizardGame.Core
                     Time.timeScale = 1f;
                     inputHandler?.SetInputBlocked(false);
                     uiManager?.ShowGameplayHUD();
-                    spawner?.StartSpawning();
                     SoundManager.Instance?.PlayGameplayMusic();
                     break;
 
@@ -154,7 +162,8 @@ namespace WizardGame.Core
 
                 case GameState.GameOver:
                     Time.timeScale = 1f;
-                    spawner?.StopSpawning();
+                    if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
+                    spawner?.ClearActiveGoblins();
                     inputHandler?.SetInputBlocked(true);
                     break;
             }
@@ -168,6 +177,20 @@ namespace WizardGame.Core
             currentMultiplier = 1;
             maxStreak = 0;
             headshotsCount = 0;
+            currentWaveIndex = 0;
+
+            if (waveTransitionCoroutine != null)
+            {
+                StopCoroutine(waveTransitionCoroutine);
+                waveTransitionCoroutine = null;
+            }
+
+            if (waves == null || waves.Count == 0)
+            {
+                PopulateDefaultWaves();
+            }
+
+            spawner?.ClearActiveGoblins();
 
             isArcaneReady = true;
             isIceReady = true;
@@ -178,7 +201,7 @@ namespace WizardGame.Core
             lightningTimer = 0f;
             areaTimer = 0f;
 
-            uiManager?.UpdateScore(currentScore, winScoreTarget);
+            uiManager?.UpdateScore(currentScore);
             uiManager?.UpdateEscapes(currentEscaped, maxEscapesAllowed);
             uiManager?.UpdateCombo(currentStreak, currentMultiplier);
 
@@ -194,10 +217,11 @@ namespace WizardGame.Core
 
             if (weaponSystem != null)
             {
-                uiManager?.UpdateAmmo(weaponSystem.CurrentAmmo, weaponSystem.MaxAmmo, false);
+                weaponSystem.RefillAmmo();
             }
 
             SetState(GameState.Playing);
+            StartNextWave();
         }
 
         public void TogglePause()
@@ -249,7 +273,7 @@ namespace WizardGame.Core
                     headshotsCount++;
                     SoundManager.Instance?.PlayHeadshotSound();
                     uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                    uiManager?.UpdateScore(currentScore, winScoreTarget);
+                    uiManager?.UpdateScore(currentScore);
                 }
 
                 hitInfo.target.TakeDamage(1);
@@ -288,7 +312,7 @@ namespace WizardGame.Core
                             headshotsCount++;
                             SoundManager.Instance?.PlayHeadshotSound();
                             uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                            uiManager?.UpdateScore(currentScore, winScoreTarget);
+                            uiManager?.UpdateScore(currentScore);
                         }
                         hitInfo.target.TakeDamage(3);
                     }
@@ -310,7 +334,7 @@ namespace WizardGame.Core
                             headshotsCount++;
                             SoundManager.Instance?.PlayHeadshotSound();
                             uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                            uiManager?.UpdateScore(currentScore, winScoreTarget);
+                            uiManager?.UpdateScore(currentScore);
                         }
                         hitInfo.target.TakeDamage(1);
                         hitInfo.target.Freeze(2.5f);
@@ -339,7 +363,7 @@ namespace WizardGame.Core
                             headshotsCount++;
                             SoundManager.Instance?.PlayHeadshotSound();
                             uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                            uiManager?.UpdateScore(currentScore, winScoreTarget);
+                            uiManager?.UpdateScore(currentScore);
                         }
                         hitInfo.target.TakeDamage(2);
                         lightningChainPoints.Add(hitInfo.target.transform.position);
@@ -386,7 +410,7 @@ namespace WizardGame.Core
                         headshotsCount++;
                         SoundManager.Instance?.PlayHeadshotSound();
                         uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                        uiManager?.UpdateScore(currentScore, winScoreTarget);
+                        uiManager?.UpdateScore(currentScore);
                     }
 
                     // Feitiço de Área: Explosão radial de 2.5m de raio causando 2 de dano a todos os goblins no raio
@@ -432,7 +456,7 @@ namespace WizardGame.Core
             int pointsEarned = basePoints * currentMultiplier;
             currentScore += pointsEarned;
 
-            uiManager?.UpdateScore(currentScore, winScoreTarget);
+            uiManager?.UpdateScore(currentScore);
             uiManager?.UpdateCombo(currentStreak, currentMultiplier);
 
             // Som de Morte
@@ -443,11 +467,6 @@ namespace WizardGame.Core
             else
             {
                 SoundManager.Instance?.PlayRandomDeathSound();
-            }
-
-            if (currentScore >= winScoreTarget)
-            {
-                EndGame(won: true);
             }
         }
 
@@ -509,6 +528,14 @@ namespace WizardGame.Core
         {
             SetState(GameState.GameOver);
 
+            if (waveTransitionCoroutine != null)
+            {
+                StopCoroutine(waveTransitionCoroutine);
+                waveTransitionCoroutine = null;
+            }
+
+            spawner?.ClearActiveGoblins();
+
             if (won)
             {
                 SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
@@ -520,5 +547,103 @@ namespace WizardGame.Core
 
             uiManager?.ShowGameOver(won, currentScore, currentEscaped, maxStreak, headshotsCount);
         }
+
+        #region Wave System Progression
+
+        private void StartNextWave()
+        {
+            if (currentWaveIndex >= waves.Count)
+            {
+                EndGame(won: true);
+                return;
+            }
+
+            int waveNumber = currentWaveIndex + 1;
+            WaveConfig config = waves[currentWaveIndex];
+
+            spawner?.StartWave(config, waveNumber);
+            uiManager?.ShowWaveStartBanner(waveNumber, config.waveName, config.waveDescription);
+            uiManager?.UpdateWaveProgress(waveNumber, waves.Count, config.TotalEnemies, config.TotalEnemies);
+
+            // Som de início / alerta de onda
+            SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
+        }
+
+        private void HandleWaveProgressChanged(int remaining, int total)
+        {
+            int waveNumber = currentWaveIndex + 1;
+            uiManager?.UpdateWaveProgress(waveNumber, waves.Count, remaining, total);
+        }
+
+        private void HandleWaveCompleted(int completedWaveNumber)
+        {
+            if (currentState != GameState.Playing) return;
+
+            if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
+            waveTransitionCoroutine = StartCoroutine(WaveTransitionRoutine(completedWaveNumber));
+        }
+
+        private IEnumerator WaveTransitionRoutine(int completedWaveNumber)
+        {
+            // Bônus de pontuação proporcional à onda e restauração completa de mana
+            int bonus = waveClearBonusBase * completedWaveNumber;
+            currentScore += bonus;
+            uiManager?.UpdateScore(currentScore);
+
+            weaponSystem?.RefillAmmo();
+
+            // Fanfarra de conclusão de onda
+            SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
+            uiManager?.ShowWaveClearedBanner(completedWaveNumber, bonus);
+
+            yield return new WaitForSeconds(delayBetweenWaves);
+
+            currentWaveIndex++;
+            if (currentWaveIndex >= waves.Count)
+            {
+                EndGame(won: true);
+            }
+            else
+            {
+                StartNextWave();
+            }
+        }
+
+        public void PopulateDefaultWaves()
+        {
+            waves = new List<WaveConfig>
+            {
+                // Onda 1: 5 magos comuns
+                new WaveConfig("Invasão Inicial", "5 Goblins Comuns se aproximam!", 1.4f, 1.0f,
+                    (WizardType.Comum, 5)),
+
+                // Onda 2: 4 comuns + 2 rápidos (fugitivos)
+                new WaveConfig("Batedores Velozes", "4 Comuns + 2 Fugitivos Rápidos!", 1.2f, 1.12f,
+                    (WizardType.Comum, 4),
+                    (WizardType.Fugitivo, 2)),
+
+                // Onda 3: 3 rápidos + 1 dourado (comum como suporte)
+                new WaveConfig("Guarda Real Blindada", "3 Rápidos + 1 Dourado com Escudo!", 1.05f, 1.25f,
+                    (WizardType.Comum, 2),
+                    (WizardType.Fugitivo, 3),
+                    (WizardType.Dourado, 1)),
+
+                // Onda 4: 2 fantasmas + 3 rápidos + 1 dourado
+                new WaveConfig("Espectros e Caos", "2 Fantasmas + 3 Rápidos + 1 Dourado!", 0.9f, 1.38f,
+                    (WizardType.Fantasma, 2),
+                    (WizardType.Fugitivo, 3),
+                    (WizardType.Dourado, 1),
+                    (WizardType.Comum, 2)),
+
+                // Onda 5: Horda Total Noturna
+                new WaveConfig("A Grande Horda Noturna", "Horda Total! Todas as forças combinadas!", 0.75f, 1.5f,
+                    (WizardType.Comum, 4),
+                    (WizardType.Fugitivo, 3),
+                    (WizardType.Dourado, 2),
+                    (WizardType.Fantasma, 2))
+            };
+        }
+
+        #endregion
     }
 }

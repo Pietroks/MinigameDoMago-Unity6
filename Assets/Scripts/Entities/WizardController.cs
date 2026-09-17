@@ -36,7 +36,7 @@ namespace WizardGame.Entities
         private float remainingEscapeTime;
         private Bounds screenWorldBounds;
         private Vector3 normalizedScale = Vector3.one;
-
+        private float currentSpeedMultiplier = 1.0f;
         private Coroutine movementCoroutine;
         private Coroutine pulseCoroutine;
         private Coroutine escapeCoroutine;
@@ -93,11 +93,12 @@ namespace WizardGame.Entities
             return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
         }
 
-        public void Initialize(WizardDataSO data, Vector3 spawnPosition, Bounds bounds)
+        public void Initialize(WizardDataSO data, Vector3 spawnPosition, Bounds bounds, float speedMultiplier = 1.0f)
         {
             currentData = data;
             currentHealth = data.maxHealth;
             screenWorldBounds = bounds;
+            currentSpeedMultiplier = Mathf.Max(0.5f, speedMultiplier);
             isDeadOrEscaping = false;
             isEnraged = false;
 
@@ -138,7 +139,8 @@ namespace WizardGame.Entities
             StartCoroutine(SpawnScaleInRoutine());
             StartBehavior();
 
-            escapeCoroutine = StartCoroutine(EscapeTimerRoutine(data.escapeTimeSeconds));
+            float escapeTime = Mathf.Max(2.5f, data.escapeTimeSeconds / Mathf.Sqrt(currentSpeedMultiplier));
+            escapeCoroutine = StartCoroutine(EscapeTimerRoutine(escapeTime));
         }
 
         private void OnDisable()
@@ -455,7 +457,7 @@ namespace WizardGame.Entities
                 Vector3 target = GetRandomPointInBounds();
                 Vector3 start = transform.position;
                 float dist = Vector3.Distance(start, target);
-                float duration = dist / Mathf.Max(0.5f, currentData.moveSpeed);
+                float duration = dist / Mathf.Max(0.5f, currentData.moveSpeed * currentSpeedMultiplier);
                 float elapsed = 0f;
 
                 frameAnimator.SetFacingDirection(target.x - start.x);
@@ -471,7 +473,7 @@ namespace WizardGame.Entities
 
                 transform.position = target;
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 1.0f));
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 1.0f) / currentSpeedMultiplier);
             }
         }
 
@@ -506,7 +508,8 @@ namespace WizardGame.Entities
         // 2. GOBLIN FUGITIVO: Corrida rapida e pulo ao sofrer dano com disparada acelerada
         private IEnumerator FugitiveRunRoutine()
         {
-            float speed = isEnraged ? (currentData.moveSpeed * 1.8f) : currentData.moveSpeed;
+            float baseSpeed = currentData.moveSpeed * currentSpeedMultiplier;
+            float speed = isEnraged ? (baseSpeed * 1.8f) : baseSpeed;
 
             while (true)
             {
@@ -527,7 +530,7 @@ namespace WizardGame.Entities
                 }
 
                 transform.position = target;
-                yield return new WaitForSeconds(isEnraged ? 0.1f : 0.3f);
+                yield return new WaitForSeconds(isEnraged ? (0.1f / currentSpeedMultiplier) : (0.3f / currentSpeedMultiplier));
             }
         }
 
@@ -577,11 +580,11 @@ namespace WizardGame.Entities
         {
             while (true)
             {
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f));
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f) / currentSpeedMultiplier);
                 Vector3 target = GetRandomPointInBounds();
                 Vector3 start = transform.position;
                 float dist = Vector3.Distance(start, target);
-                float duration = dist / (currentData.moveSpeed * 1.5f);
+                float duration = dist / (currentData.moveSpeed * currentSpeedMultiplier * 1.5f);
                 float elapsed = 0f;
 
                 frameAnimator.SetFacingDirection(target.x - start.x);
@@ -613,7 +616,7 @@ namespace WizardGame.Entities
             Vector3 recoilTarget = start + (recoilDir * 0.5f);
 
             float elapsed = 0f;
-            float dur = 0.15f;
+            float dur = 0.15f / currentSpeedMultiplier;
             while (elapsed < dur)
             {
                 elapsed += Time.deltaTime;
@@ -621,7 +624,7 @@ namespace WizardGame.Entities
                 yield return null;
             }
 
-            yield return new WaitForSeconds(0.1f);
+            yield return new WaitForSeconds(0.1f / currentSpeedMultiplier);
             movementCoroutine = StartCoroutine(GoldenAggressiveRoutine());
         }
 
@@ -642,8 +645,8 @@ namespace WizardGame.Entities
             Vector3 origin = transform.position;
             while (true)
             {
-                float oy = Mathf.Sin(Time.time * 2.5f) * 0.35f;
-                float ox = Mathf.Cos(Time.time * 1.5f) * 0.25f;
+                float oy = Mathf.Sin(Time.time * 2.5f * currentSpeedMultiplier) * 0.35f;
+                float ox = Mathf.Cos(Time.time * 1.5f * currentSpeedMultiplier) * 0.25f;
                 transform.position = new Vector3(origin.x + ox, origin.y + oy, origin.z);
                 yield return null;
             }
