@@ -94,9 +94,16 @@ namespace WizardGame.EditorTools
                         importer.alphaIsTransparency = true;
                         dirty = true;
                     }
-                    if (importer.filterMode != FilterMode.Point)
+                    bool isBackground = path.Contains("Background") || path.Contains("cenario");
+                    FilterMode targetFilter = isBackground ? FilterMode.Bilinear : FilterMode.Point;
+                    if (importer.filterMode != targetFilter)
                     {
-                        importer.filterMode = FilterMode.Point;
+                        importer.filterMode = targetFilter;
+                        dirty = true;
+                    }
+                    if (isBackground && importer.maxTextureSize < 2048)
+                    {
+                        importer.maxTextureSize = 2048;
                         dirty = true;
                     }
                     if (dirty)
@@ -322,6 +329,14 @@ namespace WizardGame.EditorTools
             camGo.transform.position = new Vector3(0f, 0f, -10f);
             camGo.AddComponent<AudioListener>();
 
+            // 1.1. Cenário de Fundo (Fase 1: Fortaleza Noturna - cenario1.png)
+            GameObject bgGo = new GameObject("Background_Stage1");
+            var bgSr = bgGo.AddComponent<SpriteRenderer>();
+            bgSr.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Backgrounds/cenario1.png");
+            bgSr.sortingOrder = -50;
+            var bgScaler = bgGo.AddComponent<BackgroundScaler>();
+            bgScaler.AdjustScale();
+
             // 2. SoundManager
             GameObject soundGo = new GameObject("SoundManager");
             var soundMgr = soundGo.AddComponent<SoundManager>();
@@ -425,10 +440,11 @@ namespace WizardGame.EditorTools
             topBarRect.sizeDelta = new Vector2(0f, 85f);
             topBarRect.anchoredPosition = Vector2.zero;
 
-            var scoreText = CreateUIText(topBar.transform, "ScoreText", "Pontos: 0 / 50", 26, Color.white, new Vector2(25f, -22f), new Vector2(0f, 1f), defaultFont);
-            var escapeText = CreateUIText(topBar.transform, "EscapeText", "Escaparam: 0 / 15", 22, new Color(1f, 0.6f, 0.6f), new Vector2(25f, -54f), new Vector2(0f, 1f), defaultFont);
+            var scoreText = CreateUIText(topBar.transform, "ScoreText", "Pontos: 0 / 50", 25, Color.white, new Vector2(25f, -22f), new Vector2(0f, 1f), defaultFont);
+            var escapeText = CreateUIText(topBar.transform, "EscapeText", "Escaparam: 0 / 15", 21, new Color(1f, 0.6f, 0.6f), new Vector2(25f, -54f), new Vector2(0f, 1f), defaultFont);
 
-            var ammoText = CreateUIText(topBar.transform, "AmmoText", "MANA: 8 / 8  [R]", 24, Color.cyan, new Vector2(0f, -42f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(topBar.transform, "StageText", "FASE 1: FORTALEZA NOTURNA", 16, new Color(1f, 0.88f, 0.35f), new Vector2(0f, -20f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
+            var ammoText = CreateUIText(topBar.transform, "AmmoText", "MANA: 8 / 8  [R]", 22, Color.cyan, new Vector2(0f, -52f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
 
             var strongText = CreateUIText(topBar.transform, "StrongShotText", "[RMB]: 💥 TIRO ARCANO (Dano 3)", 22, new Color(1f, 0.85f, 0.2f), new Vector2(-220f, -42f), new Vector2(1f, 1f), defaultFont, TextAnchor.MiddleRight);
 
@@ -479,7 +495,7 @@ namespace WizardGame.EditorTools
             GameObject startMenu = CreatePanel(canvasGo.transform, "StartMenuPanel", new Vector2(0f, 0f), new Vector2(1f, 1f), new Color(0.04f, 0.04f, 0.08f, 0.95f));
 
             CreateUIText(startMenu.transform, "Title", "CACADA AOS GOBLINS", 56, Color.yellow, new Vector2(0f, 260f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
-            CreateUIText(startMenu.transform, "Subtitle", "Elimine os goblins invasores antes que eles fujam!", 24, Color.white, new Vector2(0f, 195f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            CreateUIText(startMenu.transform, "Subtitle", "Fase 1: Fortaleza Sob a Lua Cheia", 24, Color.white, new Vector2(0f, 195f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             var playBtnObj = CreateButton(startMenu.transform, "PlayButton", "JOGAR AGORA", new Vector2(0f, 60f), new Vector2(0.5f, 0.5f), new Vector2(320f, 65f), defaultFont, new Color(0.5f, 0.1f, 0.8f));
             var playBtn = playBtnObj.GetComponent<Button>();

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Pool;
@@ -127,9 +127,12 @@ namespace WizardGame.Entities
 
         private Vector3 GetRandomWorldPoint()
         {
-            float margin = 1.0f;
-            float rx = UnityEngine.Random.Range(screenBounds.min.x + margin, screenBounds.max.x - margin);
-            float ry = UnityEngine.Random.Range(screenBounds.min.y + margin, screenBounds.max.y - margin);
+            float marginX = 1.2f;
+            float rx = UnityEngine.Random.Range(screenBounds.min.x + marginX, screenBounds.max.x - marginX);
+            // Área jogável adaptada ao cenário: evita sobreposição com o TopBar (topo) e Barra de Feitiços (base)
+            float minY = screenBounds.min.y + 1.4f;
+            float maxY = screenBounds.max.y - 1.4f;
+            float ry = UnityEngine.Random.Range(minY, maxY);
             return new Vector3(rx, ry, 0f);
         }
 
