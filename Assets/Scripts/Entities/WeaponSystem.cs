@@ -19,6 +19,7 @@ namespace WizardGame.Entities
 
         [Tooltip("RectTransform do retículo de mira de alta precisão.")]
         [SerializeField] private RectTransform crosshairRect;
+        [SerializeField] private Image crosshairImage;
 
         [Tooltip("Imagem do brilho mágico pulsante na ponta do cristal.")]
         [SerializeField] private Image crystalGlowImage;
@@ -33,7 +34,7 @@ namespace WizardGame.Entities
         [SerializeField] private float reloadDuration = 1.2f;
 
         [Header("Parâmetros de Mira & Rastreamento")]
-        [SerializeField] private float aimTrackingSpeed = 16f;
+        [SerializeField] private float aimTrackingSpeed = 24f;
         [SerializeField] private float wandBaseAngle = 118.7f; // Ângulo natural da varinha no sprite 1024x1024
         [SerializeField] private Vector2 wandBaseAnchoredPos = new Vector2(-40f, -35f);
 
@@ -62,6 +63,8 @@ namespace WizardGame.Entities
         private Vector2 currentRecoilOffset;
         private float currentRecoilAngle;
         private float crosshairRecoilScale = 1.0f;
+        private float hitMarkerTimer = 0f;
+        private Color currentHitMarkerColor = Color.white;
 
         private Vector2 currentSwayOffset;
         private float currentSwayRotation;
@@ -114,6 +117,41 @@ namespace WizardGame.Entities
                     crosshairRect.position = UnityEngine.Input.mousePosition;
                     crosshairRect.localScale = Vector3.one * crosshairRecoilScale;
                     crosshairRecoilScale = Mathf.Lerp(crosshairRecoilScale, 1.0f, Time.deltaTime * 18f);
+
+                    if (crosshairImage == null)
+                    {
+                        crosshairImage = crosshairRect.GetComponent<Image>();
+                    }
+
+                    if (crosshairImage != null)
+                    {
+                        if (hitMarkerTimer > 0f)
+                        {
+                            hitMarkerTimer -= Time.deltaTime;
+                            crosshairImage.color = currentHitMarkerColor;
+                        }
+                        else
+                        {
+                            bool isHovering = false;
+                            if (mainCam == null) mainCam = Camera.main;
+                            if (mainCam != null)
+                            {
+                                Vector3 mPos = UnityEngine.Input.mousePosition;
+                                mPos.z = -mainCam.transform.position.z;
+                                Vector3 wPos = mainCam.ScreenToWorldPoint(mPos);
+                                wPos.z = 0f;
+
+                                Collider2D hoverCol = Physics2D.OverlapPoint(wPos);
+                                if (hoverCol != null && hoverCol.GetComponent<WizardController>() != null)
+                                {
+                                    isHovering = true;
+                                }
+                            }
+
+                            Color targetColor = isHovering ? new Color(1f, 0.35f, 0.35f, 0.95f) : new Color(1f, 1f, 1f, 0.88f);
+                            crosshairImage.color = Color.Lerp(crosshairImage.color, targetColor, Time.deltaTime * 20f);
+                        }
+                    }
                 }
             }
             else if (crosshairTransform != null)
@@ -165,6 +203,7 @@ namespace WizardGame.Entities
                 {
                     float targetAngle = Mathf.Atan2(aimDir.y, aimDir.x) * Mathf.Rad2Deg;
                     float rotDelta = targetAngle - wandBaseAngle;
+                    rotDelta = Mathf.Clamp(rotDelta, -45f, 40f);
                     float totalAngle = rotDelta + currentRecoilAngle + currentSwayRotation;
 
                     Quaternion targetRot = Quaternion.Euler(0f, 0f, totalAngle);
@@ -260,6 +299,16 @@ namespace WizardGame.Entities
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Ativa o feedback visual de impacto (hit marker) no retículo de mira.
+        /// </summary>
+        public void TriggerHitMarker(bool isHeadshot)
+        {
+            hitMarkerTimer = 0.14f;
+            currentHitMarkerColor = isHeadshot ? new Color(1f, 0.92f, 0.2f, 1f) : new Color(1f, 0.22f, 0.22f, 1f);
+            crosshairRecoilScale = isHeadshot ? 1.55f : 1.38f;
         }
 
         /// <summary>

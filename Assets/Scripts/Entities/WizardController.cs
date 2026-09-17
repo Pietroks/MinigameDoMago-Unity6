@@ -26,7 +26,7 @@ namespace WizardGame.Entities
         [SerializeField] private SpriteRenderer healthBarFill;
 
         [Header("Configuracao de Escala")]
-        [SerializeField] private float targetHeight = 1.4f;
+        [SerializeField] private float targetHeight = 1.85f;
 
         private WizardDataSO currentData;
         private int currentHealth;
@@ -127,9 +127,15 @@ namespace WizardGame.Entities
 
             if (hitCollider is CircleCollider2D circleCol)
             {
-                circleCol.radius = spriteHeight * 0.45f;
+                circleCol.radius = spriteHeight * 0.48f;
             }
 
+            if (healthBarRoot != null)
+            {
+                healthBarRoot.transform.localPosition = new Vector3(0f, spriteHeight * 0.62f, 0f);
+            }
+
+            SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
             UpdateHealthBar();
             StopAllActiveCoroutines();
 
@@ -213,6 +219,15 @@ namespace WizardGame.Entities
                 healthBarFill.transform.localScale = new Vector3(0.86f * pct, 0.11f, 1f);
                 healthBarFill.color = Color.Lerp(Color.red, Color.green, pct);
             }
+        }
+
+        public float GetCurrentHeight() => targetHeight;
+
+        public void SetSortingOrder(int order)
+        {
+            if (spriteRenderer != null) spriteRenderer.sortingOrder = order;
+            if (healthBarBg != null) healthBarBg.sortingOrder = order + 2;
+            if (healthBarFill != null) healthBarFill.sortingOrder = order + 3;
         }
 
         private void StopMovementAndCombatCoroutines()
@@ -375,6 +390,7 @@ namespace WizardGame.Entities
             if (isFrozen)
             {
                 SpellEffectsManager.Instance?.SpawnIceShatter(transform.position);
+                isFrozen = false;
             }
 
             StopMovementAndCombatCoroutines();
@@ -468,6 +484,7 @@ namespace WizardGame.Entities
                     elapsed += Time.deltaTime;
                     float t = elapsed / duration;
                     transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
                     yield return null;
                 }
 
@@ -525,7 +542,9 @@ namespace WizardGame.Entities
                 while (elapsed < duration)
                 {
                     elapsed += Time.deltaTime;
-                    transform.position = Vector3.Lerp(start, target, elapsed / duration);
+                    float t = elapsed / duration;
+                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
                     yield return null;
                 }
 
@@ -595,6 +614,7 @@ namespace WizardGame.Entities
                     elapsed += Time.deltaTime;
                     float t = elapsed / duration;
                     transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
                     yield return null;
                 }
 
@@ -621,6 +641,7 @@ namespace WizardGame.Entities
             {
                 elapsed += Time.deltaTime;
                 transform.position = Vector3.Lerp(start, recoilTarget, elapsed / dur);
+                SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
                 yield return null;
             }
 
@@ -642,13 +663,32 @@ namespace WizardGame.Entities
 
         private IEnumerator GhostLevitateRoutine()
         {
-            Vector3 origin = transform.position;
             while (true)
             {
-                float oy = Mathf.Sin(Time.time * 2.5f * currentSpeedMultiplier) * 0.35f;
-                float ox = Mathf.Cos(Time.time * 1.5f * currentSpeedMultiplier) * 0.25f;
-                transform.position = new Vector3(origin.x + ox, origin.y + oy, origin.z);
-                yield return null;
+                Vector3 startPos = transform.position;
+                Vector3 targetPos = GetRandomPointInBounds();
+                float dist = Vector3.Distance(startPos, targetPos);
+                float duration = dist / Mathf.Max(0.6f, currentData.moveSpeed * currentSpeedMultiplier * 0.85f);
+                float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(targetPos.x - startPos.x);
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / duration;
+                    Vector3 basePos = Vector3.Lerp(startPos, targetPos, Mathf.SmoothStep(0f, 1f, t));
+
+                    float oy = Mathf.Sin(Time.time * 2.8f * currentSpeedMultiplier) * 0.32f;
+                    float ox = Mathf.Cos(Time.time * 1.6f * currentSpeedMultiplier) * 0.18f;
+
+                    transform.position = new Vector3(basePos.x + ox, basePos.y + oy, basePos.z);
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    yield return null;
+                }
+
+                transform.position = targetPos;
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.8f) / currentSpeedMultiplier);
             }
         }
 

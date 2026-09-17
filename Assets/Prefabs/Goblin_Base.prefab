@@ -162,4 +162,4 @@ MonoBehaviour:
   healthBarRoot: {fileID: 0}
   healthBarBg: {fileID: 0}
   healthBarFill: {fileID: 0}
-  targetHeight: 1.4
+  targetHeight: 1.85

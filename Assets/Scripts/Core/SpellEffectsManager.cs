@@ -76,10 +76,11 @@ namespace WizardGame.Core
             sr.sprite = diamondSprite;
             sr.material = spriteMaterial;
             sr.color = new Color(0.45f, 0.85f, 1f, 0.72f);
-            sr.sortingOrder = 7; // Logo à frente do goblin (ordem 5)
+            var goblinSr = goblin.GetComponent<SpriteRenderer>();
+            sr.sortingOrder = goblinSr != null ? goblinSr.sortingOrder + 1 : 10;
 
             // Ajusta tamanho para cobrir o goblin
-            iceGo.transform.localScale = new Vector3(1.6f, 1.9f, 1f);
+            iceGo.transform.localScale = new Vector3(1.8f, 2.2f, 1f);
 
             // Spawna fagulhas de gelo enquanto congelado
             float elapsed = 0f;
@@ -90,6 +91,11 @@ namespace WizardGame.Core
                 if (goblin == null || !goblin.gameObject.activeInHierarchy || !goblin.IsFrozen)
                 {
                     break;
+                }
+
+                if (goblinSr != null)
+                {
+                    sr.sortingOrder = goblinSr.sortingOrder + 1;
                 }
 
                 elapsed += Time.deltaTime;

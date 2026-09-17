@@ -286,7 +286,7 @@ namespace WizardGame.EditorTools
             SetPrivateField(controller, "spriteRenderer", sr);
             SetPrivateField(controller, "hitCollider", col);
             SetPrivateField(controller, "frameAnimator", anim);
-            SetPrivateField(controller, "targetHeight", 1.4f);
+            SetPrivateField(controller, "targetHeight", 1.85f);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             GameObject.DestroyImmediate(go);
@@ -497,6 +497,7 @@ namespace WizardGame.EditorTools
             // Vinculação dos componentes de mira e arma ao WeaponSystem
             SetPrivateField(weaponSystem, "wandRect", wandRect);
             SetPrivateField(weaponSystem, "crosshairRect", crossRect);
+            SetPrivateField(weaponSystem, "crosshairImage", crossImg);
             SetPrivateField(weaponSystem, "crystalGlowImage", glowImg);
 
             // --- MENU INICIAL ---

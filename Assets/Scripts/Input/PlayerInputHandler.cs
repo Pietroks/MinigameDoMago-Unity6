@@ -155,6 +155,10 @@ namespace WizardGame.Input
             {
                 OnShotMissed?.Invoke();
             }
+            else
+            {
+                weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
+            }
             OnNormalShot?.Invoke(hitInfo);
         }
 
@@ -162,13 +166,21 @@ namespace WizardGame.Input
         {
             weaponSystem?.TriggerRecoil();
             ShotHitInfo hitInfo = CalculateHitInfo(screenPosition);
+            if (hitInfo.isHit)
+            {
+                weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
+            }
             OnSpecialShot?.Invoke(spell, hitInfo);
         }
 
         private ShotHitInfo CalculateHitInfo(Vector2 screenPosition)
         {
             if (mainCamera == null) mainCamera = Camera.main;
-            Vector3 worldPos = mainCamera != null ? mainCamera.ScreenToWorldPoint(screenPosition) : Vector3.zero;
+            Vector3 worldPos = Vector3.zero;
+            if (mainCamera != null)
+            {
+                worldPos = mainCamera.ScreenToWorldPoint(new Vector3(screenPosition.x, screenPosition.y, -mainCamera.transform.position.z));
+            }
             worldPos.z = 0f;
 
             WizardController hitWizard = FindWizardAtPosition(worldPos);
@@ -177,7 +189,8 @@ namespace WizardGame.Input
             if (hitWizard != null)
             {
                 float relativeY = worldPos.y - hitWizard.transform.position.y;
-                if (relativeY > 0.22f)
+                float headshotThreshold = hitWizard.GetCurrentHeight() * 0.22f;
+                if (relativeY > headshotThreshold)
                 {
                     isHeadshot = true;
                 }
@@ -194,18 +207,46 @@ namespace WizardGame.Input
 
         private WizardController FindWizardAtPosition(Vector3 worldPos)
         {
+            // 1. Prioridade absoluta: Clique direto no colisor do goblin
+            Collider2D[] directHits = Physics2D.OverlapPointAll(worldPos);
+            WizardController bestDirect = null;
+            int highestDirectOrder = int.MinValue;
+
+            foreach (var col in directHits)
+            {
+                var wizard = col.GetComponent<WizardController>();
+                if (wizard != null)
+                {
+                    var sr = wizard.GetComponent<SpriteRenderer>();
+                    int order = sr != null ? sr.sortingOrder : 0;
+                    if (order > highestDirectOrder)
+                    {
+                        highestDirectOrder = order;
+                        bestDirect = wizard;
+                    }
+                }
+            }
+
+            if (bestDirect != null) return bestDirect;
+
+            // 2. Fallback: Raio de tolerância (clickToleranceRadius), priorizando quem estiver na frente
             Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, clickToleranceRadius);
             WizardController bestTarget = null;
             float closestDist = float.MaxValue;
+            int highestSortingOrder = int.MinValue;
 
             foreach (var col in hits)
             {
                 var wizard = col.GetComponent<WizardController>();
                 if (wizard != null)
                 {
+                    var sr = wizard.GetComponent<SpriteRenderer>();
+                    int order = sr != null ? sr.sortingOrder : 0;
                     float dist = Vector2.Distance(worldPos, wizard.transform.position);
-                    if (dist < closestDist)
+
+                    if (order > highestSortingOrder || (order == highestSortingOrder && dist < closestDist))
                     {
+                        highestSortingOrder = order;
                         closestDist = dist;
                         bestTarget = wizard;
                     }
