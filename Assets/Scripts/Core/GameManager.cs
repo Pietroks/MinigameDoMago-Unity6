@@ -314,6 +314,7 @@ namespace WizardGame.Core
                         }
                         hitInfo.target.TakeDamage(1);
                         hitInfo.target.Freeze(2.5f);
+                        SpellEffectsManager.Instance?.SpawnIceEffect(hitInfo.target, 2.5f);
                     }
                     break;
 
@@ -328,6 +329,8 @@ namespace WizardGame.Core
                     Vector3 strikePos = hitInfo.isHit && hitInfo.target != null ? hitInfo.target.transform.position : hitInfo.hitPoint;
                     strikePos.z = 0f;
 
+                    var lightningChainPoints = new List<Vector3>();
+
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
                         if (hitInfo.isHeadshot)
@@ -339,6 +342,11 @@ namespace WizardGame.Core
                             uiManager?.UpdateScore(currentScore, winScoreTarget);
                         }
                         hitInfo.target.TakeDamage(2);
+                        lightningChainPoints.Add(hitInfo.target.transform.position);
+                    }
+                    else
+                    {
+                        lightningChainPoints.Add(strikePos);
                     }
 
                     // Relâmpago em Cadeia: Atinge até 2 outros goblins próximos em um raio de 3.5m
@@ -349,10 +357,13 @@ namespace WizardGame.Core
                         if (Vector2.Distance(strikePos, goblin.transform.position) <= 3.5f)
                         {
                             goblin.TakeDamage(1);
+                            lightningChainPoints.Add(goblin.transform.position);
                             chainCount++;
                             if (chainCount >= 2) break;
                         }
                     }
+
+                    SpellEffectsManager.Instance?.SpawnLightningChain(strikePos, lightningChainPoints);
                     break;
 
                 case SpellType.Area:
@@ -365,6 +376,9 @@ namespace WizardGame.Core
 
                     Vector3 center = hitInfo.isHit && hitInfo.target != null ? hitInfo.target.transform.position : hitInfo.hitPoint;
                     center.z = 0f;
+
+                    // Aciona o efeito visual expansivo de explosão em área
+                    SpellEffectsManager.Instance?.SpawnAreaExplosion(center, 2.5f);
 
                     if (hitInfo.isHeadshot)
                     {

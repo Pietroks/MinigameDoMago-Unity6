@@ -647,6 +647,10 @@ namespace WizardGame.EditorTools
             SetPrivateField(gm, "weaponSystem", weaponSystem);
             SetPrivateField(gm, "uiManager", uiMgr);
 
+            // 11. SpellEffectsManager (VFX de Gelo, Raio e Explosão de Área)
+            GameObject vfxGo = new GameObject("SpellEffectsManager");
+            vfxGo.AddComponent<SpellEffectsManager>();
+
             EditorSceneManager.SaveScene(scene, scenePath);
         }
 

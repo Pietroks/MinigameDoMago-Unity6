@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using WizardGame.Core;
 using WizardGame.Data;
 
 namespace WizardGame.Entities
@@ -39,6 +40,7 @@ namespace WizardGame.Entities
         private Coroutine movementCoroutine;
         private Coroutine pulseCoroutine;
         private Coroutine escapeCoroutine;
+        private Coroutine deathCoroutine;
         private Coroutine hitReactionCoroutine;
         private Coroutine attackRoutine;
         private Coroutine freezeCoroutine;
@@ -199,14 +201,20 @@ namespace WizardGame.Entities
             }
         }
 
+        private void StopMovementAndCombatCoroutines()
+        {
+            if (movementCoroutine != null) { StopCoroutine(movementCoroutine); movementCoroutine = null; }
+            if (pulseCoroutine != null) { StopCoroutine(pulseCoroutine); pulseCoroutine = null; }
+            if (hitReactionCoroutine != null) { StopCoroutine(hitReactionCoroutine); hitReactionCoroutine = null; }
+            if (attackRoutine != null) { StopCoroutine(attackRoutine); attackRoutine = null; }
+            if (freezeCoroutine != null) { StopCoroutine(freezeCoroutine); freezeCoroutine = null; }
+        }
+
         private void StopAllActiveCoroutines()
         {
-            if (movementCoroutine != null) StopCoroutine(movementCoroutine);
-            if (pulseCoroutine != null) StopCoroutine(pulseCoroutine);
-            if (escapeCoroutine != null) StopCoroutine(escapeCoroutine);
-            if (hitReactionCoroutine != null) StopCoroutine(hitReactionCoroutine);
-            if (attackRoutine != null) StopCoroutine(attackRoutine);
-            if (freezeCoroutine != null) StopCoroutine(freezeCoroutine);
+            StopMovementAndCombatCoroutines();
+            if (escapeCoroutine != null) { StopCoroutine(escapeCoroutine); escapeCoroutine = null; }
+            if (deathCoroutine != null) { StopCoroutine(deathCoroutine); deathCoroutine = null; }
             isFrozen = false;
         }
 
@@ -320,7 +328,7 @@ namespace WizardGame.Entities
             activeGoblins.Remove(this);
             hitCollider.enabled = false;
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
-            StopAllActiveCoroutines();
+            StopMovementAndCombatCoroutines();
 
             // Anima subida e fade out
             float elapsed = 0f;
@@ -338,7 +346,9 @@ namespace WizardGame.Entities
                 yield return null;
             }
 
+            escapeCoroutine = null;
             OnEscaped?.Invoke(this, currentData.escapePenalty);
+            gameObject.SetActive(false);
         }
 
         private void Die()
@@ -347,9 +357,20 @@ namespace WizardGame.Entities
             activeGoblins.Remove(this);
             hitCollider.enabled = false;
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
-            StopAllActiveCoroutines();
 
-            StartCoroutine(DeathAnimationRoutine());
+            if (isFrozen)
+            {
+                SpellEffectsManager.Instance?.SpawnIceShatter(transform.position);
+            }
+
+            StopMovementAndCombatCoroutines();
+            if (escapeCoroutine != null)
+            {
+                StopCoroutine(escapeCoroutine);
+                escapeCoroutine = null;
+            }
+
+            deathCoroutine = StartCoroutine(DeathAnimationRoutine());
         }
 
         public void Freeze(float duration = 2.5f)
@@ -407,7 +428,9 @@ namespace WizardGame.Entities
                 yield return null;
             }
 
+            deathCoroutine = null;
             OnDefeated?.Invoke(this, currentData.pointsOnDefeat);
+            gameObject.SetActive(false);
         }
 
         #region Comportamentos Especificos dos Goblins
