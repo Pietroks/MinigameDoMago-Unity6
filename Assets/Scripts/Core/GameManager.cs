@@ -88,6 +88,7 @@ namespace WizardGame.Core
             {
                 spawner.OnWizardDefeated += HandleWizardDefeated;
                 spawner.OnWizardEscaped += HandleWizardEscaped;
+                spawner.OnBossSpawned += HandleBossSpawned;
                 spawner.OnWaveProgressChanged += HandleWaveProgressChanged;
                 spawner.OnWaveCompleted += HandleWaveCompleted;
             }
@@ -442,6 +443,15 @@ namespace WizardGame.Core
             }
         }
 
+        private void HandleBossSpawned(WizardController wizard, WizardDataSO data)
+        {
+            if (currentState != GameState.Playing) return;
+
+            SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
+            SpellEffectsManager.Instance?.TriggerCameraShake(0.24f, 0.22f);
+            uiManager?.ShowBossSpawnBanner(data.displayName, "O CHEFE ENTROU NO CAMPO DE BATALHA!");
+        }
+
         private void HandleWizardDefeated(WizardController wizard, int basePoints)
         {
             if (currentState != GameState.Playing) return;
@@ -459,15 +469,39 @@ namespace WizardGame.Core
             uiManager?.UpdateScore(currentScore);
             uiManager?.UpdateCombo(currentStreak, currentMultiplier);
 
-            // Som de Morte
-            if (wizard.GetData() != null && wizard.GetData().customDeathSound != null)
+            WizardDataSO data = wizard.GetData();
+            bool isBoss = data != null && WaveConfig.IsBossType(data.wizardType);
+
+            if (isBoss)
             {
-                SoundManager.Instance?.PlaySFX(wizard.GetData().customDeathSound);
+                // Celebração de Boss Derrotado
+                SpellEffectsManager.Instance?.TriggerCameraShake(0.35f, 0.32f);
+                SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
+                uiManager?.ShowBossDefeatedBanner(data.displayName, pointsEarned);
+
+                // No 50º goblin (Chefe Final): Derrotar ele = VITÓRIA IMEDIATA!
+                if (data.wizardType == WizardType.ChefeFinal)
+                {
+                    StartCoroutine(FinalBossVictorySequenceRoutine());
+                    return;
+                }
+            }
+
+            // Som de Morte
+            if (data != null && data.customDeathSound != null)
+            {
+                SoundManager.Instance?.PlaySFX(data.customDeathSound);
             }
             else
             {
                 SoundManager.Instance?.PlayRandomDeathSound();
             }
+        }
+
+        private IEnumerator FinalBossVictorySequenceRoutine()
+        {
+            yield return new WaitForSeconds(1.2f);
+            EndGame(won: true);
         }
 
         private void HandleWizardEscaped(WizardController wizard, int penalty)
@@ -613,35 +647,40 @@ namespace WizardGame.Core
         {
             waves = new List<WaveConfig>
             {
-                // Onda 1: 5 magos comuns
-                new WaveConfig("Invasão Inicial", "5 Goblins Comuns se aproximam!", 1.4f, 1.0f,
-                    (WizardType.Comum, 5)),
+                // Onda 1 (Goblins 1 a 10): 6 Comuns + 3 Fugitivos + 1 Grande Goblin (10º Goblin)
+                new WaveConfig("Fortaleza Sob Cerco", "6 Comuns + 3 Fugitivos + 👑 GRANDE GOBLIN (10º Goblin)!", 1.35f, 1.0f,
+                    (WizardType.Comum, 6),
+                    (WizardType.Fugitivo, 3),
+                    (WizardType.Chefe, 1)),
 
-                // Onda 2: 4 comuns + 2 rápidos (fugitivos)
-                new WaveConfig("Batedores Velozes", "4 Comuns + 2 Fugitivos Rápidos!", 1.2f, 1.12f,
+                // Onda 2 (Goblins 11 a 20): 4 Comuns + 3 Fugitivos + 2 Dourados + 1 Xamã do Caos (20º Goblin)
+                new WaveConfig("Fúria Flamejante", "4 Comuns + 3 Fugitivos + 2 Dourados + 🔥 XAMÃ DO CAOS (20º Goblin)!", 1.15f, 1.12f,
                     (WizardType.Comum, 4),
-                    (WizardType.Fugitivo, 2)),
+                    (WizardType.Fugitivo, 3),
+                    (WizardType.Dourado, 2),
+                    (WizardType.Chefe2, 1)),
 
-                // Onda 3: 3 rápidos + 1 dourado (comum como suporte)
-                new WaveConfig("Guarda Real Blindada", "3 Rápidos + 1 Dourado com Escudo!", 1.05f, 1.25f,
+                // Onda 3 (Goblins 21 a 30): 3 Comuns + 3 Dourados + 3 Fantasmas + 1 Feiticeiro Espectral (30º Goblin)
+                new WaveConfig("Sombras Espectrais", "3 Comuns + 3 Dourados + 3 Fantasmas + 🔮 FEITICEIRO ESPECTRAL (30º Goblin)!", 1.0f, 1.22f,
+                    (WizardType.Comum, 3),
+                    (WizardType.Dourado, 3),
+                    (WizardType.Fantasma, 3),
+                    (WizardType.Chefe3, 1)),
+
+                // Onda 4 (Goblins 31 a 40): 2 Comuns + 3 Fugitivos + 2 Dourados + 2 Fantasmas + 1 Lorde Carmesim (40º Goblin)
+                new WaveConfig("Legião Carmesim", "2 Comuns + 3 Fugitivos + 2 Dourados + 2 Fantasmas + 🩸 LORDE CARMESIM (40º Goblin)!", 0.9f, 1.32f,
                     (WizardType.Comum, 2),
                     (WizardType.Fugitivo, 3),
-                    (WizardType.Dourado, 1)),
-
-                // Onda 4: 2 fantasmas + 3 rápidos + 1 dourado
-                new WaveConfig("Espectros e Caos", "2 Fantasmas + 3 Rápidos + 1 Dourado!", 0.9f, 1.38f,
+                    (WizardType.Dourado, 2),
                     (WizardType.Fantasma, 2),
-                    (WizardType.Fugitivo, 3),
-                    (WizardType.Dourado, 1),
-                    (WizardType.Comum, 2)),
+                    (WizardType.Chefe4, 1)),
 
-                // Onda 5: O Duelo Final com o Goblin Chefe!
-                new WaveConfig("O Goblin Chefe", "O Goblin Chefe e sua guarda de elite atacam!", 0.85f, 1.35f,
-                    (WizardType.Comum, 4),
+                // Onda 5 (Goblins 41 a 50): 2 Fugitivos + 3 Dourados + 4 Fantasmas + ⚔️ GOBLIN REI SUPREMO (50º Goblin)
+                new WaveConfig("O Confronto Supremo", "2 Fugitivos + 3 Dourados + 4 Fantasmas + ⚔️ GOBLIN REI SUPREMO (50º Goblin)!", 0.8f, 1.4f,
                     (WizardType.Fugitivo, 2),
-                    (WizardType.Dourado, 1),
-                    (WizardType.Fantasma, 1),
-                    (WizardType.Chefe, 1))
+                    (WizardType.Dourado, 3),
+                    (WizardType.Fantasma, 4),
+                    (WizardType.ChefeFinal, 1))
             };
         }
 

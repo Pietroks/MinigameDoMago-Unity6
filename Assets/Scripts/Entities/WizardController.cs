@@ -33,6 +33,7 @@ namespace WizardGame.Entities
         private bool isDeadOrEscaping;
         private bool isEnraged; // Para o Goblin Fugitivo ao tomar dano
         private bool isFrozen;
+        private bool isInvulnerable;
         private float remainingEscapeTime;
         private Bounds screenWorldBounds;
         private Vector3 normalizedScale = Vector3.one;
@@ -101,6 +102,7 @@ namespace WizardGame.Entities
             currentSpeedMultiplier = Mathf.Max(0.5f, speedMultiplier);
             isDeadOrEscaping = false;
             isEnraged = false;
+            isInvulnerable = false;
 
             transform.position = spawnPosition;
             transform.rotation = Quaternion.identity;
@@ -121,7 +123,12 @@ namespace WizardGame.Entities
             {
                 spriteHeight = defaultSprite.bounds.size.y;
             }
-            float effectiveTargetHeight = (data.wizardType == WizardType.Chefe) ? (targetHeight * 1.35f) : targetHeight;
+            float effectiveTargetHeight = targetHeight;
+            if (data.wizardType == WizardType.Chefe || data.wizardType == WizardType.Chefe2) effectiveTargetHeight = targetHeight * 1.35f;
+            else if (data.wizardType == WizardType.Chefe3) effectiveTargetHeight = targetHeight * 1.40f;
+            else if (data.wizardType == WizardType.Chefe4) effectiveTargetHeight = targetHeight * 1.45f;
+            else if (data.wizardType == WizardType.ChefeFinal) effectiveTargetHeight = targetHeight * 1.55f;
+
             float scaleFactor = effectiveTargetHeight / Mathf.Max(0.1f, spriteHeight);
             normalizedScale = new Vector3(scaleFactor, scaleFactor, 1f);
             transform.localScale = Vector3.zero;
@@ -133,7 +140,8 @@ namespace WizardGame.Entities
 
             if (healthBarRoot != null)
             {
-                float barYOffset = (data.wizardType == WizardType.Chefe) ? (spriteHeight * 0.70f) : (spriteHeight * 0.62f);
+                bool isBoss = WaveConfig.IsBossType(data.wizardType);
+                float barYOffset = isBoss ? (spriteHeight * 0.70f) : (spriteHeight * 0.62f);
                 healthBarRoot.transform.localPosition = new Vector3(0f, barYOffset, 0f);
             }
 
@@ -183,14 +191,26 @@ namespace WizardGame.Entities
             // Attack / Golpe Forte
             if (data.attackFrames != null && data.attackFrames.Length > 0)
             {
-                float fps = (data.wizardType == WizardType.Chefe) ? 10f : 8f;
+                float fps = WaveConfig.IsBossType(data.wizardType) ? 10f : 8f;
                 frameAnimator.RegisterState(AnimationState.Attack, data.attackFrames, fps, false);
             }
 
-            // Attack2 / Investida Brutal (Chefe)
+            // Attack2 / Investida Brutal ou Habilidade 2
             if (data.attack2Frames != null && data.attack2Frames.Length > 0)
             {
                 frameAnimator.RegisterState(AnimationState.Attack2, data.attack2Frames, 12f, false);
+            }
+
+            // Attack3 / Ataque Mágico Supremo (Chefe Final)
+            if (data.attack3Frames != null && data.attack3Frames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Attack3, data.attack3Frames, 10f, false);
+            }
+
+            // Summon / Invocação Mística
+            if (data.summonFrames != null && data.summonFrames.Length > 0)
+            {
+                frameAnimator.RegisterState(AnimationState.Summon, data.summonFrames, 10f, false);
             }
 
             // Hit / Dano Sofrido
@@ -208,7 +228,7 @@ namespace WizardGame.Entities
             // Death
             if (data.deathFrames != null && data.deathFrames.Length > 0)
             {
-                float fps = (data.wizardType == WizardType.Chefe) ? 7.5f : 8.5f;
+                float fps = WaveConfig.IsBossType(data.wizardType) ? 7.5f : 8.5f;
                 frameAnimator.RegisterState(AnimationState.Death, data.deathFrames, fps, false);
             }
 
@@ -225,21 +245,37 @@ namespace WizardGame.Entities
 
             if (showBar && healthBarFill != null)
             {
-                bool isBoss = currentData.wizardType == WizardType.Chefe;
-                float barWidth = isBoss ? 1.35f : 0.86f;
+                bool isBoss = WaveConfig.IsBossType(currentData.wizardType);
+                float barWidth = (currentData.wizardType == WizardType.ChefeFinal) ? 1.6f : (isBoss ? 1.35f : 0.86f);
                 float barHeight = isBoss ? 0.16f : 0.11f;
 
                 if (healthBarBg != null)
                 {
                     healthBarBg.transform.localScale = new Vector3(barWidth + 0.08f, barHeight + 0.04f, 1f);
-                    healthBarBg.color = isBoss ? new Color(0.18f, 0.02f, 0.02f, 0.92f) : new Color(0.1f, 0.1f, 0.1f, 0.85f);
+                    Color bgColor = currentData.wizardType switch
+                    {
+                        WizardType.Chefe2 => new Color(0.2f, 0.08f, 0.02f, 0.92f), // Laranja escuro / Caos
+                        WizardType.Chefe3 => new Color(0.12f, 0.02f, 0.2f, 0.92f), // Púrpura escuro
+                        WizardType.Chefe4 => new Color(0.22f, 0.02f, 0.05f, 0.92f), // Carmesim profundo
+                        WizardType.ChefeFinal => new Color(0.25f, 0.02f, 0.02f, 0.95f), // Magma profundo
+                        _ => isBoss ? new Color(0.18f, 0.02f, 0.02f, 0.92f) : new Color(0.1f, 0.1f, 0.1f, 0.85f)
+                    };
+                    healthBarBg.color = bgColor;
                 }
 
                 float pct = Mathf.Clamp01((float)currentHealth / currentData.maxHealth);
                 healthBarFill.transform.localScale = new Vector3(barWidth * pct, barHeight, 1f);
-                healthBarFill.color = isBoss
-                    ? Color.Lerp(new Color(0.85f, 0.15f, 0.1f), new Color(1f, 0.85f, 0.2f), pct)
-                    : Color.Lerp(Color.red, Color.green, pct);
+
+                Color fillColor = currentData.wizardType switch
+                {
+                    WizardType.Chefe2 => Color.Lerp(new Color(1f, 0.3f, 0.05f), new Color(1f, 0.85f, 0.2f), pct),
+                    WizardType.Chefe3 => Color.Lerp(new Color(0.6f, 0.1f, 0.9f), new Color(0.2f, 0.85f, 1f), pct),
+                    WizardType.Chefe4 => Color.Lerp(new Color(0.85f, 0.05f, 0.15f), new Color(1f, 0.35f, 0.45f), pct),
+                    WizardType.ChefeFinal => Color.Lerp(new Color(0.95f, 0.1f, 0.05f), new Color(1f, 0.9f, 0.25f), pct),
+                    WizardType.Chefe => Color.Lerp(new Color(0.85f, 0.15f, 0.1f), new Color(1f, 0.85f, 0.2f), pct),
+                    _ => Color.Lerp(Color.red, Color.green, pct)
+                };
+                healthBarFill.color = fillColor;
             }
         }
 
@@ -311,12 +347,24 @@ namespace WizardGame.Entities
                 case WizardType.Chefe:
                     movementCoroutine = StartCoroutine(BossBehaviorRoutine());
                     break;
+                case WizardType.Chefe2:
+                    movementCoroutine = StartCoroutine(Boss2BehaviorRoutine());
+                    break;
+                case WizardType.Chefe3:
+                    movementCoroutine = StartCoroutine(Boss3BehaviorRoutine());
+                    break;
+                case WizardType.Chefe4:
+                    movementCoroutine = StartCoroutine(Boss4BehaviorRoutine());
+                    break;
+                case WizardType.ChefeFinal:
+                    movementCoroutine = StartCoroutine(BossFinalBehaviorRoutine());
+                    break;
             }
         }
 
         public void TakeDamage(int damage)
         {
-            if (isDeadOrEscaping) return;
+            if (isDeadOrEscaping || isInvulnerable) return;
 
             currentHealth -= damage;
             UpdateHealthBar();
@@ -359,6 +407,10 @@ namespace WizardGame.Entities
                     hitReactionCoroutine = StartCoroutine(GoldenShieldReactionRoutine());
                     break;
                 case WizardType.Chefe:
+                case WizardType.Chefe2:
+                case WizardType.Chefe3:
+                case WizardType.Chefe4:
+                case WizardType.ChefeFinal:
                     hitReactionCoroutine = StartCoroutine(BossHitReactionRoutine());
                     break;
                 default:
@@ -898,6 +950,381 @@ namespace WizardGame.Entities
                 yield return new WaitForSeconds(0.025f);
             }
             transform.position = start;
+        }
+
+        // =========================================================================
+        // COMPORTAMENTOS DOS 4 NOVOS CHEFES (FASE 2, 3, 4 E FINAL)
+        // =========================================================================
+
+        // --- CHEFE 2: XAMÃ DO CAOS (Fogo, Projéteis e Labaredas) ---
+        private IEnumerator Boss2BehaviorRoutine()
+        {
+            float speed = currentData.moveSpeed * currentSpeedMultiplier;
+
+            while (true)
+            {
+                Vector3 target = GetRandomPointInBounds();
+                Vector3 start = transform.position;
+                float dist = Vector3.Distance(start, target);
+                float walkDuration = dist / Mathf.Max(0.5f, speed);
+                float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(target.x - start.x);
+                frameAnimator.Play(AnimationState.Walk);
+
+                while (elapsed < walkDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / walkDuration;
+                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    yield return null;
+                }
+
+                transform.position = target;
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.6f) / currentSpeedMultiplier);
+                if (isDeadOrEscaping) yield break;
+
+                // Alterna entre Projétil de Fogo (Ataque 1) e Labareda em Área (Ataque 2)
+                bool doFlameBurst = UnityEngine.Random.value > 0.5f;
+
+                if (doFlameBurst && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
+                {
+                    // Ataque 2: Labareda em Área
+                    frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.35f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.18f, 0.16f);
+                    SpawnBossBurstFX(transform.position, new Color(1f, 0.45f, 0.1f, 0.9f), 1.8f);
+                    yield return new WaitForSeconds(0.4f);
+                }
+                else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
+                {
+                    // Ataque 1: Disparo de Projétil de Fogo
+                    Vector3 aimTarget = GetRandomPointInBounds();
+                    frameAnimator.SetFacingDirection(aimTarget.x - transform.position.x);
+                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.35f);
+                    Vector3 dir = (aimTarget - transform.position).normalized;
+                    StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.5f, dir, new Color(1f, 0.5f, 0.1f), 8f));
+                    yield return new WaitForSeconds(0.35f);
+                }
+
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f) / currentSpeedMultiplier);
+            }
+        }
+
+        // --- CHEFE 3: FEITICEIRO ESPECTRAL (Teleporte, Invisibilidade e Invocações) ---
+        private IEnumerator Boss3BehaviorRoutine()
+        {
+            float speed = currentData.moveSpeed * currentSpeedMultiplier;
+
+            while (true)
+            {
+                // Escolha de ação mística: Teleporte, Invisibilidade, Invocação ou Ataque Púrpura
+                float roll = UnityEngine.Random.value;
+
+                if (roll < 0.28f && currentData.teleportFrames != null && currentData.teleportFrames.Length > 0)
+                {
+                    // Habilidade: Teleporte Dimensional Instantâneo
+                    frameAnimator.PlayOneShot(AnimationState.Teleport, AnimationState.Idle);
+                    SpawnBossBurstFX(transform.position, new Color(0.7f, 0.2f, 1f, 0.85f), 1.5f);
+                    yield return new WaitForSeconds(0.3f);
+
+                    Vector3 newPos = GetRandomPointInBounds();
+                    transform.position = newPos;
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    SpawnBossBurstFX(newPos, new Color(0.7f, 0.2f, 1f, 0.85f), 1.5f);
+                    yield return new WaitForSeconds(0.3f);
+                }
+                else if (roll < 0.52f)
+                {
+                    // Habilidade: Invisibilidade Temporária & Deslocamento Furtivo (Invulnerável por 2s)
+                    isInvulnerable = true;
+                    Color normalColor = spriteRenderer.color;
+                    spriteRenderer.color = new Color(normalColor.r, normalColor.g, normalColor.b, 0.18f);
+
+                    Vector3 stealthTarget = GetRandomPointInBounds();
+                    Vector3 stealthStart = transform.position;
+                    float stealthDist = Vector3.Distance(stealthStart, stealthTarget);
+                    float stealthDur = stealthDist / Mathf.Max(1f, speed * 1.5f);
+                    float stealthElapsed = 0f;
+
+                    frameAnimator.SetFacingDirection(stealthTarget.x - stealthStart.x);
+                    frameAnimator.Play(AnimationState.Walk);
+
+                    while (stealthElapsed < stealthDur)
+                    {
+                        stealthElapsed += Time.deltaTime;
+                        transform.position = Vector3.Lerp(stealthStart, stealthTarget, stealthElapsed / stealthDur);
+                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                        yield return null;
+                    }
+
+                    transform.position = stealthTarget;
+                    yield return new WaitForSeconds(0.4f);
+
+                    // Reaparece e cancela invulnerabilidade
+                    spriteRenderer.color = normalColor;
+                    isInvulnerable = false;
+                    SpawnBossBurstFX(transform.position, new Color(0.5f, 0.1f, 0.9f, 0.8f), 1.4f);
+                }
+                else if (roll < 0.76f && currentData.summonFrames != null && currentData.summonFrames.Length > 0)
+                {
+                    // Habilidade: Invocação de Servos Espectrais
+                    frameAnimator.PlayOneShot(AnimationState.Summon, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.4f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.12f, 0.12f);
+                    SpawnBossBurstFX(transform.position + Vector3.up * 0.4f, new Color(0.8f, 0.2f, 1f, 0.9f), 2.2f);
+                    yield return new WaitForSeconds(0.4f);
+                }
+                else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
+                {
+                    // Ataque 1: Orbe Púrpura de Energia Sombria
+                    Vector3 aimTarget = GetRandomPointInBounds();
+                    frameAnimator.SetFacingDirection(aimTarget.x - transform.position.x);
+                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.35f);
+                    Vector3 dir = (aimTarget - transform.position).normalized;
+                    StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.5f, dir, new Color(0.7f, 0.15f, 0.95f), 7.5f));
+                    yield return new WaitForSeconds(0.35f);
+                }
+                else
+                {
+                    // Deslocamento padrão
+                    Vector3 target = GetRandomPointInBounds();
+                    Vector3 start = transform.position;
+                    float dist = Vector3.Distance(start, target);
+                    float dur = dist / Mathf.Max(0.5f, speed);
+                    float el = 0f;
+                    frameAnimator.SetFacingDirection(target.x - start.x);
+                    frameAnimator.Play(AnimationState.Walk);
+                    while (el < dur)
+                    {
+                        el += Time.deltaTime;
+                        transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, el / dur));
+                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                        yield return null;
+                    }
+                    transform.position = target;
+                }
+
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.75f) / currentSpeedMultiplier);
+            }
+        }
+
+        // --- CHEFE 4: LORDE CARMESIM (Golpe de Cetro, Orbe Carmesim e Caveiras) ---
+        private IEnumerator Boss4BehaviorRoutine()
+        {
+            float speed = currentData.moveSpeed * currentSpeedMultiplier;
+
+            while (true)
+            {
+                Vector3 target = GetRandomPointInBounds();
+                Vector3 start = transform.position;
+                float dist = Vector3.Distance(start, target);
+                float walkDuration = dist / Mathf.Max(0.5f, speed);
+                float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(target.x - start.x);
+                frameAnimator.Play(AnimationState.Walk);
+
+                while (elapsed < walkDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / walkDuration;
+                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    yield return null;
+                }
+
+                transform.position = target;
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.6f) / currentSpeedMultiplier);
+                if (isDeadOrEscaping) yield break;
+
+                float actionRoll = UnityEngine.Random.value;
+
+                if (actionRoll < 0.35f && currentData.attackFrames != null && currentData.attackFrames.Length > 0)
+                {
+                    // Ataque 1: Golpe Brutal de Cetro com Tremor
+                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.35f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.2f, 0.2f);
+                    SpawnBossBurstFX(transform.position + Vector3.down * 0.2f, new Color(0.9f, 0.1f, 0.1f, 0.9f), 1.6f);
+                    yield return new WaitForSeconds(0.35f);
+                }
+                else if (actionRoll < 0.70f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
+                {
+                    // Ataque 2: Disparo de Orbe Carmesim
+                    Vector3 aimTarget = GetRandomPointInBounds();
+                    frameAnimator.SetFacingDirection(aimTarget.x - transform.position.x);
+                    frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.35f);
+                    Vector3 dir = (aimTarget - transform.position).normalized;
+                    StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.5f, dir, new Color(0.95f, 0.05f, 0.15f), 9f));
+                    yield return new WaitForSeconds(0.35f);
+                }
+                else if (currentData.summonFrames != null && currentData.summonFrames.Length > 0)
+                {
+                    // Summon: Rito de Sangue Carmesim
+                    frameAnimator.PlayOneShot(AnimationState.Summon, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.4f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.15f, 0.15f);
+                    SpawnBossBurstFX(transform.position, new Color(0.85f, 0.05f, 0.2f, 0.95f), 2.4f);
+                    yield return new WaitForSeconds(0.4f);
+                }
+
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.7f) / currentSpeedMultiplier);
+            }
+        }
+
+        // --- CHEFE FINAL: ⚔️ GOBLIN REI SUPREMO (O Confronto Épico Supremo) ---
+        private IEnumerator BossFinalBehaviorRoutine()
+        {
+            float speed = currentData.moveSpeed * currentSpeedMultiplier;
+
+            while (true)
+            {
+                // Marcha Imponente
+                Vector3 target = GetRandomPointInBounds();
+                Vector3 start = transform.position;
+                float dist = Vector3.Distance(start, target);
+                float walkDuration = dist / Mathf.Max(0.5f, speed);
+                float elapsed = 0f;
+
+                frameAnimator.SetFacingDirection(target.x - start.x);
+                frameAnimator.Play(AnimationState.Walk);
+
+                while (elapsed < walkDuration)
+                {
+                    elapsed += Time.deltaTime;
+                    float t = elapsed / walkDuration;
+                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    yield return null;
+                }
+
+                transform.position = target;
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.25f, 0.5f) / currentSpeedMultiplier);
+                if (isDeadOrEscaping) yield break;
+
+                // Ciclo Supremo: Golpe Sísmico, Choque de Magma, Rajada em Leque ou Invocação Vulcânica
+                float roll = UnityEngine.Random.value;
+
+                if (roll < 0.28f && currentData.attackFrames != null && currentData.attackFrames.Length > 0)
+                {
+                    // Ataque 1: Maça Sísmica Colossal
+                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.35f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.25f, 0.28f);
+                    SpawnBossBurstFX(transform.position + Vector3.down * 0.3f, new Color(1f, 0.3f, 0.05f, 0.95f), 2.2f);
+                    yield return new WaitForSeconds(0.35f);
+                }
+                else if (roll < 0.55f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
+                {
+                    // Ataque 2: Choque de Magma com Abalo Sísmico
+                    frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.4f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.22f, 0.24f);
+                    SpawnBossBurstFX(transform.position, new Color(1f, 0.55f, 0.1f, 0.95f), 2.8f);
+                    yield return new WaitForSeconds(0.35f);
+                }
+                else if (roll < 0.80f && currentData.attack3Frames != null && currentData.attack3Frames.Length > 0)
+                {
+                    // Ataque 3: Projéteis Triplos de Magma em Leque
+                    frameAnimator.PlayOneShot(AnimationState.Attack3, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.35f);
+
+                    Vector3 centerAim = GetRandomPointInBounds();
+                    Vector3 baseDir = (centerAim - transform.position).normalized;
+                    float[] angles = new float[] { -22f, 0f, 22f };
+
+                    foreach (float ang in angles)
+                    {
+                        Vector3 dir = Quaternion.Euler(0f, 0f, ang) * baseDir;
+                        StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.6f, dir, new Color(1f, 0.4f, 0.05f), 8.5f));
+                    }
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.15f, 0.15f);
+                    yield return new WaitForSeconds(0.35f);
+                }
+                else if (currentData.summonFrames != null && currentData.summonFrames.Length > 0)
+                {
+                    // Invocação: Ritual do Vulcão Ancestral
+                    frameAnimator.PlayOneShot(AnimationState.Summon, AnimationState.Idle);
+                    yield return new WaitForSeconds(0.4f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.25f, 0.25f);
+                    SpawnBossBurstFX(transform.position, new Color(1f, 0.85f, 0.2f, 0.95f), 3.2f);
+                    yield return new WaitForSeconds(0.4f);
+                }
+
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.65f) / currentSpeedMultiplier);
+            }
+        }
+
+        private IEnumerator BossProjectileRoutine(Vector3 startPos, Vector3 dir, Color color, float speed)
+        {
+            GameObject proj = new GameObject("BossProjectile");
+            proj.transform.position = startPos;
+            proj.transform.localScale = Vector3.one * 0.45f;
+
+            SpriteRenderer sr = proj.AddComponent<SpriteRenderer>();
+            sr.sprite = CreateSolidWhiteSprite();
+            sr.color = color;
+            sr.sortingOrder = 30;
+
+            float lifetime = 1.8f;
+            float elapsed = 0f;
+
+            while (elapsed < lifetime)
+            {
+                elapsed += Time.deltaTime;
+                proj.transform.position += dir * (speed * Time.deltaTime);
+                yield return null;
+            }
+
+            SpawnBossBurstFX(proj.transform.position, color, 0.8f);
+            Destroy(proj);
+        }
+
+        private void SpawnBossBurstFX(Vector3 pos, Color color, float radius)
+        {
+            GameObject burst = new GameObject("BossBurstFX");
+            burst.transform.position = pos;
+            burst.transform.localScale = Vector3.one * 0.2f;
+
+            SpriteRenderer sr = burst.AddComponent<SpriteRenderer>();
+            sr.sprite = CreateSolidWhiteSprite();
+            sr.color = color;
+            sr.sortingOrder = 32;
+
+            StartCoroutine(BossBurstFadeRoutine(burst, color, radius));
+        }
+
+        private IEnumerator BossBurstFadeRoutine(GameObject burst, Color color, float maxScale)
+        {
+            float dur = 0.35f;
+            float elapsed = 0f;
+            SpriteRenderer sr = burst.GetComponent<SpriteRenderer>();
+
+            while (elapsed < dur)
+            {
+                elapsed += Time.deltaTime;
+                float t = elapsed / dur;
+                burst.transform.localScale = Vector3.one * Mathf.Lerp(0.2f, maxScale, Mathf.Sin(t * Mathf.PI * 0.5f));
+                if (sr != null)
+                {
+                    sr.color = new Color(color.r, color.g, color.b, Mathf.Lerp(color.a, 0f, t));
+                }
+                yield return null;
+            }
+
+            Destroy(burst);
         }
 
         private Vector3 GetRandomPointInBounds()

@@ -41,6 +41,7 @@ namespace WizardGame.Entities
 
         public event Action<WizardController, int> OnWizardDefeated;
         public event Action<WizardController, int> OnWizardEscaped;
+        public event Action<WizardController, WizardDataSO> OnBossSpawned;
         public event Action<int, int> OnWaveProgressChanged; // (restantes, total)
         public event Action<int> OnWaveCompleted; // (numeroDaOnda)
 
@@ -202,6 +203,11 @@ namespace WizardGame.Entities
             wizard.Initialize(data, spawnPos, screenBounds, speedMultiplier);
             wizard.OnDefeated += HandleDefeated;
             wizard.OnEscaped += HandleEscaped;
+
+            if (WaveConfig.IsBossType(data.wizardType))
+            {
+                OnBossSpawned?.Invoke(wizard, data);
+            }
         }
 
         private void SpawnRandomWizard()

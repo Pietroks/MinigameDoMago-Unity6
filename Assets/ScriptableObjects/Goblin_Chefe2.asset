@@ -1,0 +1,83 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3902d0460b1dba429a7756001e3ad13, type: 3}
+  m_Name: Goblin_Chefe2
+  m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
+  wizardType: 5
+  displayName: "Xam\xE3 do Caos"
+  sprite: {fileID: 21300000, guid: 0c77d4406de1d5f468647946ab352c56, type: 3}
+  portraitSprite: {fileID: 21300000, guid: 7bf9c51cfae0aff43b2a29817d27de45, type: 3}
+  baseTint: {r: 1, g: 1, b: 1, a: 1}
+  idleFrames:
+  - {fileID: 21300000, guid: 0c77d4406de1d5f468647946ab352c56, type: 3}
+  - {fileID: 21300000, guid: d50b6447a4b909f47a0954716e578efe, type: 3}
+  - {fileID: 21300000, guid: cd345599a4011d9499e15b820879df46, type: 3}
+  - {fileID: 21300000, guid: f494c1d0cc54d1544a77d3704e0aee33, type: 3}
+  - {fileID: 21300000, guid: 30ac25b397cd2094da5ab241c2cf93f5, type: 3}
+  - {fileID: 21300000, guid: a9703220198330b4db9c1b0097ad1116, type: 3}
+  - {fileID: 21300000, guid: fc4df54adb105d84297d27d4649d263d, type: 3}
+  - {fileID: 21300000, guid: 9cc7635c81dbf62489c1b674c9300a18, type: 3}
+  walkFrames:
+  - {fileID: 21300000, guid: f8f566b2ef35bee489b2534694e65ce5, type: 3}
+  - {fileID: 21300000, guid: 043c0d4ce964ee5418a0eeb024851451, type: 3}
+  - {fileID: 21300000, guid: 91c6ec08f3bb41445b4ded5fd2e39444, type: 3}
+  - {fileID: 21300000, guid: 00fd09f9b3b8b8f4e9458087b37bb4b6, type: 3}
+  - {fileID: 21300000, guid: a68ac81b584881e4e9174406f528cf45, type: 3}
+  - {fileID: 21300000, guid: 0967723218bd69340aa37c97e5c02a1a, type: 3}
+  - {fileID: 21300000, guid: 0ea7a1b882a640748953ca9a2aff7d95, type: 3}
+  - {fileID: 21300000, guid: 251413247b15d894c891b81b5ed54c50, type: 3}
+  runFrames: []
+  attackFrames:
+  - {fileID: 21300000, guid: 53ef4dad00322a147859017dfb0c7b5a, type: 3}
+  - {fileID: 21300000, guid: 7ab9406f525038f429e46eae41d45267, type: 3}
+  - {fileID: 21300000, guid: f8ba3bde59b3d00499391aa34b38bef4, type: 3}
+  - {fileID: 21300000, guid: 629ed7632c093d844ac33ccecf2e90ce, type: 3}
+  - {fileID: 21300000, guid: 16f1f0b52d70539499e9b66108a1930d, type: 3}
+  - {fileID: 21300000, guid: a3ff7dff0fed0a84b9824498acf4ed30, type: 3}
+  - {fileID: 21300000, guid: f68e0cde50eec964c8947405bf2fede8, type: 3}
+  - {fileID: 21300000, guid: 72bc7c2594079994fa3c12690cd2881a, type: 3}
+  attack2Frames:
+  - {fileID: 21300000, guid: 127f844a15266274b8c629d41ca1ae92, type: 3}
+  - {fileID: 21300000, guid: 0d6fec24cbd10ee46a74c7f41209403a, type: 3}
+  - {fileID: 21300000, guid: 210a43144cf87354fb4a5041fc3ce4d6, type: 3}
+  - {fileID: 21300000, guid: be563b3b903f96a459eade9d2a74f8e2, type: 3}
+  - {fileID: 21300000, guid: 131d12ded07932b48a0ca4af63ae8535, type: 3}
+  - {fileID: 21300000, guid: 7229443f4cca6ae4daa907733cf2bdca, type: 3}
+  - {fileID: 21300000, guid: 6a13b9791b67aec4f844ed9b3f6e5e33, type: 3}
+  - {fileID: 21300000, guid: f45276df05c50aa429dfcf96dc7e87ce, type: 3}
+  attack3Frames: []
+  summonFrames: []
+  hitFrames:
+  - {fileID: 21300000, guid: 8d9a10f52fdc48049bb0ef3c9f786e9b, type: 3}
+  - {fileID: 21300000, guid: b94c6f77c650c81429e18f2d8bbf9250, type: 3}
+  - {fileID: 21300000, guid: 103eab049ce782b4f838d0ae9329a3fa, type: 3}
+  - {fileID: 21300000, guid: bca44a7c55056894f8c4a4c3f3040473, type: 3}
+  teleportFrames: []
+  deathFrames:
+  - {fileID: 21300000, guid: be2b5a6c898ba7d43bfe41f53330c067, type: 3}
+  - {fileID: 21300000, guid: 548fa61ee5754f941a65c5de2762ecbb, type: 3}
+  - {fileID: 21300000, guid: 6ea35b634f4cd404ca74ea7f2e419b0f, type: 3}
+  - {fileID: 21300000, guid: 2983e55bb83b5bf4fa4dc377dc40461a, type: 3}
+  - {fileID: 21300000, guid: 27280ae5df2eef04daff455c1f712301, type: 3}
+  - {fileID: 21300000, guid: ea3a28a48f116d543a30913f1cb7d318, type: 3}
+  - {fileID: 21300000, guid: 6a01670450a94ab4084a6c99ac1ba1e9, type: 3}
+  - {fileID: 21300000, guid: c189b7288ec65b8499458fa358a16856, type: 3}
+  specialActionSprite: {fileID: 0}
+  maxHealth: 25
+  pointsOnDefeat: 50
+  moveSpeed: 2.2
+  escapeTimeSeconds: 22
+  spawnWeight: 5
+  escapePenalty: 3
+  escapeSound: {fileID: 8300000, guid: 7a42177b24244084db1878919656fb4d, type: 3}
+  customDamageSound: {fileID: 0}
+  customDeathSound: {fileID: 8300000, guid: a8ea7ba7bed7a6941b20d78cde1a9fb2, type: 3}

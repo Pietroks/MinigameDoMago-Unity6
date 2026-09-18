@@ -12,6 +12,8 @@ namespace WizardGame.Entities
         Run,
         Attack,
         Attack2,
+        Attack3,
+        Summon,
         Hit,
         Death,
         Teleport

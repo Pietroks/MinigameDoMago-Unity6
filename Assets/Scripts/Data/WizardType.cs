@@ -9,6 +9,10 @@ namespace WizardGame.Data
         Fugitivo,
         Dourado,
         Fantasma,
-        Chefe
+        Chefe,
+        Chefe2,
+        Chefe3,
+        Chefe4,
+        ChefeFinal
     }
 }

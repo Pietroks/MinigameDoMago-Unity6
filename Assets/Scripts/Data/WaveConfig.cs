@@ -64,32 +64,58 @@ namespace WizardGame.Data
         }
 
         /// <summary>
-        /// Gera a lista sequencial embaralhada de tipos de inimigos para esta onda.
+        /// Verifica se o tipo de mago/goblin é um chefe.
+        /// </summary>
+        public static bool IsBossType(WizardType type)
+        {
+            return type == WizardType.Chefe ||
+                   type == WizardType.Chefe2 ||
+                   type == WizardType.Chefe3 ||
+                   type == WizardType.Chefe4 ||
+                   type == WizardType.ChefeFinal;
+        }
+
+        /// <summary>
+        /// Gera a lista sequencial de tipos de inimigos para esta onda.
+        /// Minions comuns são embaralhados aleatoriamente, enquanto Chefes são posicionados
+        /// estritamente no final da onda (ex: no 10º goblin) como clímax da batalha.
         /// </summary>
         public List<WizardType> GenerateShuffledEnemyList()
         {
-            List<WizardType> list = new List<WizardType>();
+            List<WizardType> minions = new List<WizardType>();
+            List<WizardType> bosses = new List<WizardType>();
+
             if (enemies != null)
             {
                 foreach (var entry in enemies)
                 {
                     for (int i = 0; i < entry.count; i++)
                     {
-                        list.Add(entry.wizardType);
+                        if (IsBossType(entry.wizardType))
+                        {
+                            bosses.Add(entry.wizardType);
+                        }
+                        else
+                        {
+                            minions.Add(entry.wizardType);
+                        }
                     }
                 }
             }
 
-            // Fisher-Yates Shuffle para variação orgânica no spawn
-            for (int i = list.Count - 1; i > 0; i--)
+            // Fisher-Yates Shuffle para variação orgânica nos lacaios
+            for (int i = minions.Count - 1; i > 0; i--)
             {
                 int rnd = UnityEngine.Random.Range(0, i + 1);
-                WizardType temp = list[i];
-                list[i] = list[rnd];
-                list[rnd] = temp;
+                WizardType temp = minions[i];
+                minions[i] = minions[rnd];
+                minions[rnd] = temp;
             }
 
-            return list;
+            // Chefes sempre entram no final da onda
+            minions.AddRange(bosses);
+
+            return minions;
         }
     }
 }

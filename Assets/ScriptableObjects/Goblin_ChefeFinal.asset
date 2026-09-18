@@ -1,0 +1,99 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3902d0460b1dba429a7756001e3ad13, type: 3}
+  m_Name: Goblin_ChefeFinal
+  m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
+  wizardType: 8
+  displayName: Goblin Rei Supremo
+  sprite: {fileID: 21300000, guid: 7fdc23fff2fd3d94aa0e7b29670283a6, type: 3}
+  portraitSprite: {fileID: 21300000, guid: 8a7ee1c551bd14b4b82d49cf875cabd5, type: 3}
+  baseTint: {r: 1, g: 1, b: 1, a: 1}
+  idleFrames:
+  - {fileID: 21300000, guid: 7fdc23fff2fd3d94aa0e7b29670283a6, type: 3}
+  - {fileID: 21300000, guid: 0c2354d91e26f9f4898ea7971f3605be, type: 3}
+  - {fileID: 21300000, guid: c0fd01b572d0f90449e93cd62c43cb27, type: 3}
+  - {fileID: 21300000, guid: 574e40027d87dda4fad3df72d8dbe82e, type: 3}
+  - {fileID: 21300000, guid: 0237f4cca1f4b9c49a7c0ceeb792a815, type: 3}
+  - {fileID: 21300000, guid: ec2b441157514594886bb829b9693a00, type: 3}
+  - {fileID: 21300000, guid: ee0dffc1a95e1634199adced54e163c3, type: 3}
+  - {fileID: 21300000, guid: eff7d56604c2719449376c510a795c78, type: 3}
+  walkFrames:
+  - {fileID: 21300000, guid: 2bad3afe58c69e945b0536ca2026e823, type: 3}
+  - {fileID: 21300000, guid: 9cf1262bb2864cf4088f1539281ebd04, type: 3}
+  - {fileID: 21300000, guid: abff487a8f03e6142ba9391b44ffd678, type: 3}
+  - {fileID: 21300000, guid: be5eaea1689316147b10c71bdd5e9e82, type: 3}
+  - {fileID: 21300000, guid: 295e52c5bbf466540a178b6458329254, type: 3}
+  - {fileID: 21300000, guid: 70423511078614a4d9c6e746017ee325, type: 3}
+  - {fileID: 21300000, guid: b766ee9897b4cd34692b44e78e5d33c8, type: 3}
+  - {fileID: 21300000, guid: bee6257e7847f3e4aa9bf74357e559ec, type: 3}
+  runFrames: []
+  attackFrames:
+  - {fileID: 21300000, guid: a54bb08c0947f374b975b21bfa0522b4, type: 3}
+  - {fileID: 21300000, guid: c54fccc2421bf96468f723a1930bd971, type: 3}
+  - {fileID: 21300000, guid: 61007459ba140354083fd6834ff3e1d5, type: 3}
+  - {fileID: 21300000, guid: a8e5ea973e332e244b4a4bc1b7ff5e06, type: 3}
+  - {fileID: 21300000, guid: a82cf870f0fbaec409eda173e9eec805, type: 3}
+  - {fileID: 21300000, guid: 9739f91f0e42f8848bf402458ae03564, type: 3}
+  - {fileID: 21300000, guid: 7b0e2edd1f70c5545bfe6a44969c86e1, type: 3}
+  - {fileID: 21300000, guid: 6b65a99be636ffb438ab768068f17586, type: 3}
+  attack2Frames:
+  - {fileID: 21300000, guid: eca5754c8f6bd5e4294be3696922a31e, type: 3}
+  - {fileID: 21300000, guid: 083219bb728894f4fb5d391012313d2b, type: 3}
+  - {fileID: 21300000, guid: 4d6081110b99e2642878197c6149c7e0, type: 3}
+  - {fileID: 21300000, guid: 3e1432c1837114240b4e86dd1d30eb95, type: 3}
+  - {fileID: 21300000, guid: 2cacee631e1750446a6b4adb7391b063, type: 3}
+  - {fileID: 21300000, guid: fa1f9c405a11cb643a90b950628bc682, type: 3}
+  - {fileID: 21300000, guid: b1bbb6748b8fb184c922237eb6042c6a, type: 3}
+  - {fileID: 21300000, guid: 1d6e758587e004344bf6aa70cfec5576, type: 3}
+  attack3Frames:
+  - {fileID: 21300000, guid: a69133074cd87f14e9fd73f4aa2a1d87, type: 3}
+  - {fileID: 21300000, guid: f8879d476ec451744a39d9f2b29d116a, type: 3}
+  - {fileID: 21300000, guid: bc9250bbc2fe49f41b8dc53c17ea202c, type: 3}
+  - {fileID: 21300000, guid: 5dade01d8994fc7449ebffebe397ac55, type: 3}
+  - {fileID: 21300000, guid: dfad60b06fd3e1b4b949afc33157947b, type: 3}
+  - {fileID: 21300000, guid: 62bf02743f094334c91af82ceb7f903e, type: 3}
+  - {fileID: 21300000, guid: e6c1cd08adc46e6439c099b405c35c2b, type: 3}
+  summonFrames:
+  - {fileID: 21300000, guid: 78ea1fa0fc7cf064694ae3634571e053, type: 3}
+  - {fileID: 21300000, guid: 9f46c60c3b659c84b8b58c10354308a7, type: 3}
+  - {fileID: 21300000, guid: ef734d75cf5a8b84fa8576c12d5c1dfd, type: 3}
+  - {fileID: 21300000, guid: be38a53a19bfc614c9364ebd34ab653c, type: 3}
+  - {fileID: 21300000, guid: c6a3afa6fe185134e9ca6976259c0e48, type: 3}
+  - {fileID: 21300000, guid: c38ff5611ab106c41be2d4c263c3dfba, type: 3}
+  - {fileID: 21300000, guid: 5dac7da48959fb94a8911c4d3c4b969b, type: 3}
+  - {fileID: 21300000, guid: f93be27cbaad2f447bc304798de52ce5, type: 3}
+  hitFrames:
+  - {fileID: 21300000, guid: d1ec6b3e2dee3ce479a161ccfa6c0fd3, type: 3}
+  - {fileID: 21300000, guid: d75f48797331b4247949b701968dfedc, type: 3}
+  - {fileID: 21300000, guid: cee10692731c7dc439c2166cacc661bc, type: 3}
+  - {fileID: 21300000, guid: e5df01225f865b6409c6b903fccd3fa2, type: 3}
+  - {fileID: 21300000, guid: a24332234598fc64a9c474c505eff53a, type: 3}
+  teleportFrames: []
+  deathFrames:
+  - {fileID: 21300000, guid: 5da1b7d71ca361f42b6a6f3ff0bcd4ff, type: 3}
+  - {fileID: 21300000, guid: 5b2cc8d341003164ba36410b237290b8, type: 3}
+  - {fileID: 21300000, guid: eeb6a327edcc9d1489158292bb0a75d4, type: 3}
+  - {fileID: 21300000, guid: 0798790dc4e77d749879fb7b32847d0a, type: 3}
+  - {fileID: 21300000, guid: 4e09f50fa69eb284f96f8414a24f6825, type: 3}
+  - {fileID: 21300000, guid: 56b85d519997b0c4ba4432df3737f175, type: 3}
+  - {fileID: 21300000, guid: ecf185230a23f1448952bc7b2757fe66, type: 3}
+  - {fileID: 21300000, guid: ff3cd3230f620fb43b8f94e1e92fd2b9, type: 3}
+  specialActionSprite: {fileID: 0}
+  maxHealth: 80
+  pointsOnDefeat: 500
+  moveSpeed: 2.5
+  escapeTimeSeconds: 35
+  spawnWeight: 5
+  escapePenalty: 4
+  escapeSound: {fileID: 8300000, guid: 7a42177b24244084db1878919656fb4d, type: 3}
+  customDamageSound: {fileID: 0}
+  customDeathSound: {fileID: 8300000, guid: a8ea7ba7bed7a6941b20d78cde1a9fb2, type: 3}

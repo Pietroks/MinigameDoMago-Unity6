@@ -46,6 +46,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: a14e34a9b9f20db4ba0df8ae883102fd, type: 3}
   attackFrames: []
   attack2Frames: []
+  attack3Frames: []
+  summonFrames: []
   hitFrames:
   - {fileID: 21300000, guid: 7e9b9ef1016cde247a560660d8d4fe54, type: 3}
   - {fileID: 21300000, guid: fe6b41ef99a44d24c84249ffbd126032, type: 3}

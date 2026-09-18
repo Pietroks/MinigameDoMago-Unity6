@@ -243,16 +243,16 @@ namespace WizardGame.EditorTools
             EditorUtility.SetDirty(fantasma);
             list.Add(fantasma);
 
-            // 5. Goblin Chefe: HP 20, Pontos 50, Velocidade 2 (Fiel à spritesheet oficial)
+            // 5. Goblin Chefe (Fase 1 - 10º Goblin): Grande Goblin (HP 15, Pontos 25)
             var chefe = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe.asset");
             chefe.wizardType = WizardType.Chefe;
-            chefe.displayName = "Goblin Chefe";
-            chefe.maxHealth = 20;
-            chefe.pointsOnDefeat = 50;
+            chefe.displayName = "Grande Goblin";
+            chefe.maxHealth = 15;
+            chefe.pointsOnDefeat = 25;
             chefe.moveSpeed = 2.0f;
-            chefe.escapeTimeSeconds = 14.0f;
+            chefe.escapeTimeSeconds = 18.0f;
             chefe.spawnWeight = 5;
-            chefe.escapePenalty = 5;
+            chefe.escapePenalty = 3;
             chefe.baseTint = Color.white;
             chefe.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe/portrait.png");
             chefe.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe/idle_0.png");
@@ -266,6 +266,106 @@ namespace WizardGame.EditorTools
             chefe.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
             EditorUtility.SetDirty(chefe);
             list.Add(chefe);
+
+            // 6. Goblin Chefe Fase 2 (20º Goblin): Xamã do Caos (HP 25, Pontos 50)
+            var chefe2 = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe2.asset");
+            chefe2.wizardType = WizardType.Chefe2;
+            chefe2.displayName = "Xamã do Caos";
+            chefe2.maxHealth = 25;
+            chefe2.pointsOnDefeat = 50;
+            chefe2.moveSpeed = 2.2f;
+            chefe2.escapeTimeSeconds = 22.0f;
+            chefe2.spawnWeight = 5;
+            chefe2.escapePenalty = 3;
+            chefe2.baseTint = Color.white;
+            chefe2.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe2/portrait.png");
+            chefe2.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe2/idle_0.png");
+            chefe2.idleFrames = LoadFrames("Assets/Sprites/Goblins/Chefe2", "idle", 8);
+            chefe2.walkFrames = LoadFrames("Assets/Sprites/Goblins/Chefe2", "walk", 8);
+            chefe2.attackFrames = LoadFrames("Assets/Sprites/Goblins/Chefe2", "attack1", 8);
+            chefe2.attack2Frames = LoadFrames("Assets/Sprites/Goblins/Chefe2", "attack2", 8);
+            chefe2.hitFrames = LoadFrames("Assets/Sprites/Goblins/Chefe2", "hit", 4);
+            chefe2.deathFrames = LoadFrames("Assets/Sprites/Goblins/Chefe2", "death", 8);
+            chefe2.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
+            chefe2.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
+            EditorUtility.SetDirty(chefe2);
+            list.Add(chefe2);
+
+            // 7. Goblin Chefe Fase 3 (30º Goblin): Feiticeiro Espectral (HP 35, Pontos 100)
+            var chefe3 = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe3.asset");
+            chefe3.wizardType = WizardType.Chefe3;
+            chefe3.displayName = "Feiticeiro Espectral";
+            chefe3.maxHealth = 35;
+            chefe3.pointsOnDefeat = 100;
+            chefe3.moveSpeed = 2.3f;
+            chefe3.escapeTimeSeconds = 25.0f;
+            chefe3.spawnWeight = 5;
+            chefe3.escapePenalty = 3;
+            chefe3.baseTint = Color.white;
+            chefe3.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe3/portrait.png");
+            chefe3.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe3/idle_0.png");
+            chefe3.idleFrames = LoadFrames("Assets/Sprites/Goblins/Chefe3", "idle", 8);
+            chefe3.walkFrames = LoadFrames("Assets/Sprites/Goblins/Chefe3", "walk", 8);
+            chefe3.attackFrames = LoadFrames("Assets/Sprites/Goblins/Chefe3", "attack1", 8);
+            chefe3.summonFrames = LoadFrames("Assets/Sprites/Goblins/Chefe3", "summon", 8);
+            chefe3.teleportFrames = LoadFrames("Assets/Sprites/Goblins/Chefe3", "teleport", 8);
+            chefe3.hitFrames = LoadFrames("Assets/Sprites/Goblins/Chefe3", "hit", 4);
+            chefe3.deathFrames = LoadFrames("Assets/Sprites/Goblins/Chefe3", "death", 8);
+            chefe3.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
+            chefe3.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
+            EditorUtility.SetDirty(chefe3);
+            list.Add(chefe3);
+
+            // 8. Goblin Chefe Fase 4 (40º Goblin): Lorde Carmesim (HP 50, Pontos 150)
+            var chefe4 = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe4.asset");
+            chefe4.wizardType = WizardType.Chefe4;
+            chefe4.displayName = "Lorde Carmesim";
+            chefe4.maxHealth = 50;
+            chefe4.pointsOnDefeat = 150;
+            chefe4.moveSpeed = 2.4f;
+            chefe4.escapeTimeSeconds = 28.0f;
+            chefe4.spawnWeight = 5;
+            chefe4.escapePenalty = 3;
+            chefe4.baseTint = Color.white;
+            chefe4.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe4/portrait.png");
+            chefe4.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Chefe4/idle_0.png");
+            chefe4.idleFrames = LoadFrames("Assets/Sprites/Goblins/Chefe4", "idle", 8);
+            chefe4.walkFrames = LoadFrames("Assets/Sprites/Goblins/Chefe4", "walk", 8);
+            chefe4.attackFrames = LoadFrames("Assets/Sprites/Goblins/Chefe4", "attack1", 8);
+            chefe4.attack2Frames = LoadFrames("Assets/Sprites/Goblins/Chefe4", "attack2", 8);
+            chefe4.summonFrames = LoadFrames("Assets/Sprites/Goblins/Chefe4", "summon", 8);
+            chefe4.hitFrames = LoadFrames("Assets/Sprites/Goblins/Chefe4", "hit", 8);
+            chefe4.deathFrames = LoadFrames("Assets/Sprites/Goblins/Chefe4", "death", 8);
+            chefe4.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
+            chefe4.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
+            EditorUtility.SetDirty(chefe4);
+            list.Add(chefe4);
+
+            // 9. Goblin Chefe Final (50º Goblin): ⚔️ GOBLIN REI SUPREMO (HP 80, Pontos 500)
+            var chefeFinal = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_ChefeFinal.asset");
+            chefeFinal.wizardType = WizardType.ChefeFinal;
+            chefeFinal.displayName = "Goblin Rei Supremo";
+            chefeFinal.maxHealth = 80;
+            chefeFinal.pointsOnDefeat = 500;
+            chefeFinal.moveSpeed = 2.5f;
+            chefeFinal.escapeTimeSeconds = 35.0f;
+            chefeFinal.spawnWeight = 5;
+            chefeFinal.escapePenalty = 4;
+            chefeFinal.baseTint = Color.white;
+            chefeFinal.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/ChefeFinal/portrait.png");
+            chefeFinal.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/ChefeFinal/idle_0.png");
+            chefeFinal.idleFrames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "idle", 8);
+            chefeFinal.walkFrames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "walk", 8);
+            chefeFinal.attackFrames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "attack1", 8);
+            chefeFinal.attack2Frames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "attack2", 8);
+            chefeFinal.attack3Frames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "attack3", 7);
+            chefeFinal.summonFrames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "summon", 8);
+            chefeFinal.hitFrames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "hit", 5);
+            chefeFinal.deathFrames = LoadFrames("Assets/Sprites/Goblins/ChefeFinal", "death", 8);
+            chefeFinal.escapeSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/the-simpsons-nelsons-haha.mp3");
+            chefeFinal.customDeathSound = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/Audio/SFX/Special/peppino-angry-scream-ear-rape.mp3");
+            EditorUtility.SetDirty(chefeFinal);
+            list.Add(chefeFinal);
 
             return list;
         }
@@ -551,25 +651,22 @@ namespace WizardGame.EditorTools
 
             CreateUIText(instrPanel.transform, "InstrTitle", "MANUAL DOS GOBLINS & ARSENAL MÁGICO", 28, Color.yellow, new Vector2(0f, 320f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
-            string instrBody = "INIMIGOS (GUIA OFICIAL):\n" +
+            string instrBody = "INIMIGOS (GUIA OFICIAL DOS GOBLINS):\n" +
                                "  • GOBLIN COMUM: 1 HP | 1 Ponto | Move-se atacando com facas.\n" +
                                "  • GOBLIN FUGITIVO: 2 HP | 2 Pontos | Ao sofrer dano, salta em disparada veloz!\n" +
-                               "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido e agressivo com escudo dourado.\n" +
-                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta atraves de portais misticos ao tomar dano.\n" +
-                               "  • 👑 GOBLIN CHEFE (BOSS): 20 HP | 50 Pontos | Golpe Forte sismico e investidas brutais!\n\n" +
-                               "ARSENAL MAGICO (CAIXA DE FERRAMENTAS DO MAGO):\n" +
-                               "  • 🔥 [LMB] TIRO NORMAL: 1 Dano basico (consome mana da varinha).\n" +
-                               "  • 💥 [1 / Q] TIRO ARCANO: 3 Dano concentrado | Cooldown 3.0s.\n" +
-                               "  • ❄️ [2 / E] FEITICO DE GELO: 1 Dano + Congela por 2.5s (pausa movimento e fuga) | Cooldown 4.0s.\n" +
-                               "  • ⚡ [3 / F] RELAMPAGO: 2 Dano no alvo + 1 Dano eletrico em ate 2 goblins proximos | Cooldown 4.5s.\n" +
-                               "  • 🌀 [4 / C] FEITICO DE AREA: Explosao radial (2.5m) causando 2 Dano em todos os inimigos | Cooldown 5.5s.\n" +
-                               "  • [RMB]: Dispara o feitico especial ativo  |  [Roda do Mouse / 1..4]: Alterna o feitico selecionado.\n\n" +
-                               "SISTEMA DE COMBOS & HEADSHOT:\n" +
-                               "  • Multiplicadores: 1-4 (x1) | 5-9 (x2) | 10-19 (x3) | 20+ (x4)!\n" +
-                               "  • Errar tiro no vazio ou deixar goblin escapar quebra o combo.\n" +
-                               "  • HEADSHOT: Acertos no topo da cabeca concedem +1 Ponto Imediato!\n\n" +
-                               "CONTROLES: [R] Recarregar Mana  |  [ESC / P] Pausar o Jogo";
-            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 14, Color.white, new Vector2(0f, 20f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
+                               "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido com escudo impenetravel temporario.\n" +
+                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta atraves de portais misticos ao tomar dano.\n\n" +
+                               "OS 5 GRANDES CHEFES (A CADA 10 GOBLINS):\n" +
+                               "  • 👑 10º: GRANDE GOBLIN: 15 HP | +25 Pts | Golpe sismico e investida brutal.\n" +
+                               "  • 🔥 20º: XAMÃ DO CAOS: 25 HP | +50 Pts | Projeteis de fogo e erupcoes em area.\n" +
+                               "  • 🔮 30º: FEITICEIRO ESPECTRAL: 35 HP | +100 Pts | Teleporte, invisibilidade e servos.\n" +
+                               "  • 🩸 40º: LORDE CARMESIM: 50 HP | +150 Pts | Cetro sismico, orbe de sangue e rito carmesim.\n" +
+                               "  • ⚔️ 50º: GOBLIN REI SUPREMO: 80 HP | +500 Pts | Abalo colossal, magma triplo! DERROTAR = VITORIA!\n\n" +
+                               "ARSENAL MAGICO:\n" +
+                               "  • 🔥 [LMB] NORMAL: 1 Dano | 💥 [1/Q] ARCANO: 3 Dano | ❄️ [2/E] GELO: Congela 2.5s\n" +
+                               "  • ⚡ [3/F] RELAMPAGO: Corrente eletrica | 🌀 [4/C] AREA: Explosao 2.5m (2 Dano)\n\n" +
+                               "COMBOS & HEADSHOT: Multiplicadores x1..x4! Acertos no topo da cabeca dao +1 Ponto Imediato!";
+            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 13, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
             var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -305f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
             var closeInstrBtn = closeInstrBtnObj.GetComponent<Button>();

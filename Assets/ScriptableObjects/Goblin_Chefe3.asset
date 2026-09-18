@@ -1,0 +1,91 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3902d0460b1dba429a7756001e3ad13, type: 3}
+  m_Name: Goblin_Chefe3
+  m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
+  wizardType: 6
+  displayName: Feiticeiro Espectral
+  sprite: {fileID: 21300000, guid: 390d7cf858eaedc4d87fe5115a662834, type: 3}
+  portraitSprite: {fileID: 21300000, guid: adc32dd8c897c324eaa03f5ac1192174, type: 3}
+  baseTint: {r: 1, g: 1, b: 1, a: 1}
+  idleFrames:
+  - {fileID: 21300000, guid: 390d7cf858eaedc4d87fe5115a662834, type: 3}
+  - {fileID: 21300000, guid: 797ac58afffd17d40a7a06a40f3ce9b0, type: 3}
+  - {fileID: 21300000, guid: 431f36f735350dc439e627bb8562c7b4, type: 3}
+  - {fileID: 21300000, guid: be60184b235e3c64f8d13993c06707ca, type: 3}
+  - {fileID: 21300000, guid: d761799a54f205d46ac47eac22c9093a, type: 3}
+  - {fileID: 21300000, guid: d2003d55d7d737041b8f0297bf6d3247, type: 3}
+  - {fileID: 21300000, guid: 5a59e8313a0b68744b23aea8bdbf7643, type: 3}
+  - {fileID: 21300000, guid: 5063dfa1e3317a446b71aa318cf4b0e6, type: 3}
+  walkFrames:
+  - {fileID: 21300000, guid: 4b3d8f27480514e40984fe6cbd1e31f7, type: 3}
+  - {fileID: 21300000, guid: 516ee61cd56f3af4a8888add53f538ca, type: 3}
+  - {fileID: 21300000, guid: d0e1a67b95d71ea48a7a744405027f7c, type: 3}
+  - {fileID: 21300000, guid: dc6b740acd3b7354e996f41acc750795, type: 3}
+  - {fileID: 21300000, guid: 21597e7856ffd6e4085ae22464a07aea, type: 3}
+  - {fileID: 21300000, guid: 437a05a6d94fb1d4dab6b084b3121d4b, type: 3}
+  - {fileID: 21300000, guid: 8f3841923e7c2b64498a869c82a76e8f, type: 3}
+  - {fileID: 21300000, guid: 3d71c6bd18ce31d488e82fbdfa05f968, type: 3}
+  runFrames: []
+  attackFrames:
+  - {fileID: 21300000, guid: 5606a766cd8d2444c8983cf147a7f9a5, type: 3}
+  - {fileID: 21300000, guid: c05c3219fc15d584587657b09c9913e4, type: 3}
+  - {fileID: 21300000, guid: 4cc0d21a086a10d48aa70864cbdf6ae4, type: 3}
+  - {fileID: 21300000, guid: 5612c4fb150e1154190e4fc3cff45e67, type: 3}
+  - {fileID: 21300000, guid: 905ebb96e1fac1740ad33de168aaf5d4, type: 3}
+  - {fileID: 21300000, guid: b77ef633a3f74cb408f0c3169c482b65, type: 3}
+  - {fileID: 21300000, guid: 78d73ad756062854fb3e1e80afc8c185, type: 3}
+  - {fileID: 21300000, guid: 47464a48e4d58924a9477e43dc6527bc, type: 3}
+  attack2Frames: []
+  attack3Frames: []
+  summonFrames:
+  - {fileID: 21300000, guid: a83027ac74cb4b74185871ff13752644, type: 3}
+  - {fileID: 21300000, guid: f994af87be24f204db3cdb2b3250ecc3, type: 3}
+  - {fileID: 21300000, guid: 91b7e389548e6b542978fccda8a65a2f, type: 3}
+  - {fileID: 21300000, guid: 983a93c8ff04c4242926e4b24145b6c4, type: 3}
+  - {fileID: 21300000, guid: 1a6be34dce86c9c43966a878e3bf912c, type: 3}
+  - {fileID: 21300000, guid: 98cef3006ce03cd48ba9795832b7c522, type: 3}
+  - {fileID: 21300000, guid: f83a51eec9d3ffd48a101f199284106e, type: 3}
+  - {fileID: 21300000, guid: 89af605500c2c1d47bd91a4c79d29fac, type: 3}
+  hitFrames:
+  - {fileID: 21300000, guid: 8e3ec7e64e505d341926d2c22a1375d3, type: 3}
+  - {fileID: 21300000, guid: 82f4d3177ffe1fa4ca89e04d71cae88c, type: 3}
+  - {fileID: 21300000, guid: e9f8d8606d9454845a6491cdab1214d5, type: 3}
+  - {fileID: 21300000, guid: 91f9d453a0d350544887aabe32cae79c, type: 3}
+  teleportFrames:
+  - {fileID: 21300000, guid: d6fcb15706148504898c4b3a7db78800, type: 3}
+  - {fileID: 21300000, guid: 7a4e2f27aa568fe408b54add203d39b0, type: 3}
+  - {fileID: 21300000, guid: ecf3670b71ff1294f9d0c5950db8d0b6, type: 3}
+  - {fileID: 21300000, guid: ab695753712ab594abab769ef29586ed, type: 3}
+  - {fileID: 21300000, guid: f0f4973a82c4ac14496af2b0b61777f6, type: 3}
+  - {fileID: 21300000, guid: 9d2754d971c6c084288fc92e3177a6f3, type: 3}
+  - {fileID: 21300000, guid: eefd79b768d459c48878539e753b94f9, type: 3}
+  - {fileID: 21300000, guid: 2f0f812c81a6c9645ace6577289ab559, type: 3}
+  deathFrames:
+  - {fileID: 21300000, guid: e4b2608ad8eb9f04d9c70383e7275325, type: 3}
+  - {fileID: 21300000, guid: 3eb202378692ad34a9e14e2fb2d75ab6, type: 3}
+  - {fileID: 21300000, guid: 5843102abf1380441b81e70855d31d69, type: 3}
+  - {fileID: 21300000, guid: 1508bb4599158be4896de220a81e403c, type: 3}
+  - {fileID: 21300000, guid: d170aba729ab5f045acc33a9c6a15578, type: 3}
+  - {fileID: 21300000, guid: cb4c3cf3387b9fb4ab40e2c262e91e8b, type: 3}
+  - {fileID: 21300000, guid: 0c2c976080f61b14bb00a864e3f1d523, type: 3}
+  - {fileID: 21300000, guid: ea6965de99143964a923ee58c7ed7e18, type: 3}
+  specialActionSprite: {fileID: 0}
+  maxHealth: 35
+  pointsOnDefeat: 100
+  moveSpeed: 2.3
+  escapeTimeSeconds: 25
+  spawnWeight: 5
+  escapePenalty: 3
+  escapeSound: {fileID: 8300000, guid: 7a42177b24244084db1878919656fb4d, type: 3}
+  customDamageSound: {fileID: 0}
+  customDeathSound: {fileID: 8300000, guid: a8ea7ba7bed7a6941b20d78cde1a9fb2, type: 3}

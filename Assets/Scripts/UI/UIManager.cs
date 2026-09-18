@@ -507,6 +507,32 @@ namespace WizardGame.UI
             ));
         }
 
+        public void ShowBossSpawnBanner(string bossName, string description)
+        {
+            if (waveBannerContainer == null) return;
+
+            if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
+            waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
+                title: $"⚠️ ALERTA DE BOSS: {bossName.ToUpper()}!",
+                subtitle: description,
+                titleColor: new Color(1f, 0.25f, 0.25f),
+                duration: 3.2f
+            ));
+        }
+
+        public void ShowBossDefeatedBanner(string bossName, int bonusPoints)
+        {
+            if (waveBannerContainer == null) return;
+
+            if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
+            waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
+                title: $"👑 BOSS DERROTADO! +{bonusPoints}",
+                subtitle: $"{bossName.ToUpper()} FOI ANIQUILADO COM MAESTRIA!",
+                titleColor: new Color(1f, 0.85f, 0.15f),
+                duration: 3.0f
+            ));
+        }
+
         private IEnumerator WaveBannerRoutine(string title, string subtitle, Color titleColor, float duration)
         {
             waveBannerContainer.SetActive(true);

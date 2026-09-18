@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Goblin_Chefe
   m_EditorClassIdentifier: Assembly-CSharp::WizardGame.Data.WizardDataSO
   wizardType: 4
-  displayName: Goblin Chefe
+  displayName: Grande Goblin
   sprite: {fileID: 21300000, guid: e24e86c7ada5ac649ae523acd8933768, type: 3}
   portraitSprite: {fileID: 21300000, guid: 1825ce08bfb22564a83d68d9e994a316, type: 3}
   baseTint: {r: 1, g: 1, b: 1, a: 1}
@@ -53,6 +53,8 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 05e639c39c18464488513ed9b8eae771, type: 3}
   - {fileID: 21300000, guid: e4e0f9aa3180ee647995e16d92347325, type: 3}
   - {fileID: 21300000, guid: da8afb4efd3c3b44abac20a6a603dbd1, type: 3}
+  attack3Frames: []
+  summonFrames: []
   hitFrames:
   - {fileID: 21300000, guid: fdb24a7b84fa3514b9f95d7ddd28da52, type: 3}
   - {fileID: 21300000, guid: 1de37bd0e52dbc04d9531d9c2e2a5ce8, type: 3}
@@ -69,12 +71,12 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 6750c0d2e25ed2747bcbe338922ed998, type: 3}
   - {fileID: 21300000, guid: e8a812a081099fe4a9a6444f495f808f, type: 3}
   specialActionSprite: {fileID: 0}
-  maxHealth: 20
-  pointsOnDefeat: 50
+  maxHealth: 15
+  pointsOnDefeat: 25
   moveSpeed: 2
-  escapeTimeSeconds: 14
+  escapeTimeSeconds: 18
   spawnWeight: 5
-  escapePenalty: 5
+  escapePenalty: 3
   escapeSound: {fileID: 8300000, guid: 7a42177b24244084db1878919656fb4d, type: 3}
   customDamageSound: {fileID: 0}
   customDeathSound: {fileID: 8300000, guid: a8ea7ba7bed7a6941b20d78cde1a9fb2, type: 3}
