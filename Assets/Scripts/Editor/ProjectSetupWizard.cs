@@ -540,8 +540,18 @@ namespace WizardGame.EditorTools
 
             var comboText = CreateUIText(comboContainer.transform, "ComboText", "COMBO x2 — 5 ABATES", 28, Color.yellow, new Vector2(0f, -24f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
 
+            // --- SISTEMA DE BUFFS ATIVOS (POWER-UPS) NO HUD ---
+            GameObject buffsContainer = CreatePanel(hudGo.transform, "ActiveBuffsContainer", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Color(0.06f, 0.12f, 0.22f, 0.88f));
+            var buffsRect = buffsContainer.GetComponent<RectTransform>();
+            buffsRect.pivot = new Vector2(0.5f, 1f);
+            buffsRect.sizeDelta = new Vector2(620f, 40f);
+            buffsRect.anchoredPosition = new Vector2(0f, -148f);
+
+            var buffsText = CreateUIText(buffsContainer.transform, "ActiveBuffsText", "🔥 FÚRIA: 5s   ⏱️ TEMPO: 3s", 19, new Color(0.25f, 1f, 0.9f), new Vector2(0f, -20f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
+            buffsContainer.SetActive(false);
+
             // Aviso de quebra de combo
-            var comboBreakText = CreateUIText(hudGo.transform, "ComboBreakText", "COMBO QUEBRADO!", 24, Color.red, new Vector2(0f, -155f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
+            var comboBreakText = CreateUIText(hudGo.transform, "ComboBreakText", "COMBO QUEBRADO!", 24, Color.red, new Vector2(0f, -198f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
 
             // --- POPUP DE HEADSHOT / BÔNUS DE HABILIDADE ---
             GameObject headshotContainer = CreatePanel(hudGo.transform, "HeadshotPopup", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0, 0, 0, 0));
@@ -671,6 +681,12 @@ namespace WizardGame.EditorTools
                                "🧙 VIDA DO JOGADOR & CONDIÇÕES DE DERROTA:\n" +
                                "  • Você possui 5 Pontos de Vida (❤️❤️❤️❤️❤️). Se zerar, VOCÊ CAI EM COMBATE!\n" +
                                "  • Deixar 15 Goblins escaparem também resulta em invasão e Derrota.\n\n" +
+                               "✨ POWER-UPS ESPECIAIS (ITENS FLUTUANTES RAROS):\n" +
+                               "  • 🔵 MANA: Recupera instantaneamente 4 tiros!\n" +
+                               "  • 🔥 FÚRIA ARCANA: Tiros causam +1 de dano durante 5s!\n" +
+                               "  • ⏱️ TEMPO ARCANO: O mundo desacelera 50% durante 3s!\n" +
+                               "  • 💥 TEMPESTADE: Próximo tiro eletrocuta todos los magos comuns na tela!\n" +
+                               "  • 🎯 PRECISÃO: Retículo de mira compacto e cirúrgico por 5s!\n\n" +
                                "ARSENAL MÁGICO & COMBOS:\n" +
                                "  • 🔥 [LMB] NORMAL: 1 Dano | 💥 [1/Q] ARCANO: 3 Dano | ❄️ [2/E] GELO: Congela 2.5s\n" +
                                "  • ⚡ [3/F] RELÂMPAGO: Corrente elétrica | 🌀 [4/C] ÁREA: Explosão 2.5m (2 Dano)\n" +
@@ -680,7 +696,7 @@ namespace WizardGame.EditorTools
                                "  • 🌀 INTERRUPÇÃO TELEPORTE: +10 Pts | 🛡️ DESAFIO DOURADO: +3 Pts | ⚡ FEITIÇO DUPLO: +10 Pts\n\n" +
                                "SISTEMA DE RANK (S / A / B / C / D):\n" +
                                "  • Calculado por: Mortes, Precisão %, Tempo, Escapados, Maior Combo e Feitiços Fortes!";
-            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 13, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
+            CreateUIText(instrPanel.transform, "InstrBody", instrBody, 12, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
             var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -305f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));
             var closeInstrBtn = closeInstrBtnObj.GetComponent<Button>();
@@ -766,6 +782,9 @@ namespace WizardGame.EditorTools
             SetPrivateField(uiMgr, "comboText", comboText);
             SetPrivateField(uiMgr, "comboBreakText", comboBreakText);
 
+            SetPrivateField(uiMgr, "activeBuffsContainer", buffsContainer);
+            SetPrivateField(uiMgr, "activeBuffsText", buffsText);
+
             SetPrivateField(uiMgr, "headshotPopupContainer", headshotContainer);
             SetPrivateField(uiMgr, "headshotPopupText", headshotText);
 
@@ -810,7 +829,14 @@ namespace WizardGame.EditorTools
             SetPrivateField(gm, "uiManager", uiMgr);
             SetPrivateField(gm, "maxPlayerHealth", 5);
 
-            // 11. SpellEffectsManager (VFX de Gelo, Raio e Explosão de Área)
+            // 11. PowerUpManager (Orbes Mágicos Flutuantes Raros)
+            GameObject powerUpGo = new GameObject("PowerUpManager");
+            var powerUpMgr = powerUpGo.AddComponent<PowerUpManager>();
+            SetPrivateField(powerUpMgr, "weaponSystem", weaponSystem);
+            SetPrivateField(powerUpMgr, "uiManager", uiMgr);
+            SetPrivateField(gm, "powerUpManager", powerUpMgr);
+
+            // 12. SpellEffectsManager (VFX de Gelo, Raio e Explosão de Área)
             GameObject vfxGo = new GameObject("SpellEffectsManager");
             vfxGo.AddComponent<SpellEffectsManager>();
 

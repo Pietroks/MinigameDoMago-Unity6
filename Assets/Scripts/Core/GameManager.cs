@@ -52,6 +52,7 @@ namespace WizardGame.Core
         [SerializeField] private PlayerInputHandler inputHandler;
         [SerializeField] private WeaponSystem weaponSystem;
         [SerializeField] private UIManager uiManager;
+        [SerializeField] private PowerUpManager powerUpManager;
 
         [Header("Regras de Partida")]
         [SerializeField] private int maxEscapesAllowed = 15;
@@ -200,6 +201,8 @@ namespace WizardGame.Core
                 case GameState.Menu:
                     Time.timeScale = 1f;
                     if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
+                    powerUpManager?.ResetAllBuffs();
+                    powerUpManager?.SetSpawningEnabled(false);
                     spawner?.ClearActiveGoblins();
                     inputHandler?.SetInputBlocked(true);
                     uiManager?.ShowStartMenu();
@@ -207,7 +210,15 @@ namespace WizardGame.Core
                     break;
 
                 case GameState.Playing:
-                    Time.timeScale = 1f;
+                    if (powerUpManager != null && powerUpManager.IsArcaneTimeActive)
+                    {
+                        Time.timeScale = 0.5f;
+                    }
+                    else
+                    {
+                        Time.timeScale = 1f;
+                    }
+                    powerUpManager?.SetSpawningEnabled(true);
                     inputHandler?.SetInputBlocked(false);
                     uiManager?.ShowGameplayHUD();
                     SoundManager.Instance?.PlayGameplayMusic();
@@ -215,6 +226,7 @@ namespace WizardGame.Core
 
                 case GameState.Paused:
                     Time.timeScale = 0f;
+                    powerUpManager?.SetSpawningEnabled(false);
                     inputHandler?.SetInputBlocked(true);
                     uiManager?.ShowPauseMenu(true);
                     break;
@@ -222,6 +234,8 @@ namespace WizardGame.Core
                 case GameState.GameOver:
                     Time.timeScale = 1f;
                     if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
+                    powerUpManager?.ResetAllBuffs();
+                    powerUpManager?.SetSpawningEnabled(false);
                     spawner?.ClearActiveGoblins();
                     inputHandler?.SetInputBlocked(true);
                     break;
@@ -264,6 +278,8 @@ namespace WizardGame.Core
             }
 
             spawner?.ClearActiveGoblins();
+            powerUpManager?.ResetAllBuffs();
+            powerUpManager?.SetSpawningEnabled(true);
 
             isArcaneReady = true;
             isIceReady = true;
@@ -340,10 +356,30 @@ namespace WizardGame.Core
             totalShotsFired++;
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.normalShotSound);
 
+            // Coleta de Power-up flutuante atingido pelo disparo
+            if (hitInfo.powerUpTarget != null)
+            {
+                totalHits++;
+                hitInfo.powerUpTarget.Collect();
+                return;
+            }
+
+            // Power-up: Tempestade (aniquila todos os magos comuns na tela)
+            if (powerUpManager != null && powerUpManager.IsStormCharged)
+            {
+                int stormKills = powerUpManager.ConsumeStormAndAnnihilateCommonGoblins();
+                if (stormKills > 0)
+                {
+                    AwardBonus(10, $"💥 TEMPESTADE! {stormKills} ABATES", new Color(0.7f, 0.4f, 1f), SoundManager.Instance?.lightningCastSound);
+                }
+            }
+
             if (hitInfo.isHit && hitInfo.target != null)
             {
                 totalHits++;
-                totalDamageDealt += 1;
+                int bonusDamage = (powerUpManager != null && powerUpManager.IsArcaneFuryActive) ? 1 : 0;
+                int damageToDeal = 1 + bonusDamage;
+                totalDamageDealt += damageToDeal;
 
                 // Bônus 1: Primeiro Tiro (+5)
                 if (isFirstShotAttempt)
@@ -359,7 +395,7 @@ namespace WizardGame.Core
                     AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
                 }
 
-                hitInfo.target.TakeDamage(1, isNormalShot: true);
+                hitInfo.target.TakeDamage(damageToDeal, isNormalShot: true);
             }
             else
             {
@@ -392,6 +428,20 @@ namespace WizardGame.Core
                     AwardBonus(5, "✨ PRIMEIRO TIRO! +5", new Color(1f, 0.85f, 0.2f), SoundManager.Instance?.headshotSound);
                 }
                 isFirstShotAttempt = false;
+            }
+
+            if (hitInfo.powerUpTarget != null)
+            {
+                hitInfo.powerUpTarget.Collect();
+            }
+
+            if (powerUpManager != null && powerUpManager.IsStormCharged)
+            {
+                int stormKills = powerUpManager.ConsumeStormAndAnnihilateCommonGoblins();
+                if (stormKills > 0)
+                {
+                    AwardBonus(10, $"💥 TEMPESTADE! {stormKills} ABATES", new Color(0.7f, 0.4f, 1f), SoundManager.Instance?.lightningCastSound);
+                }
             }
 
             switch (spell)

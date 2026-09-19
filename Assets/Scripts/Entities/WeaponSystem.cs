@@ -63,6 +63,8 @@ namespace WizardGame.Entities
         private Vector2 currentRecoilOffset;
         private float currentRecoilAngle;
         private float crosshairRecoilScale = 1.0f;
+        private float targetCrosshairBaseScale = 1.0f;
+        private float currentCrosshairBaseScale = 1.0f;
         private float hitMarkerTimer = 0f;
         private Color currentHitMarkerColor = Color.white;
 
@@ -115,7 +117,8 @@ namespace WizardGame.Entities
                 {
                     crosshairRect.gameObject.SetActive(true);
                     crosshairRect.position = UnityEngine.Input.mousePosition;
-                    crosshairRect.localScale = Vector3.one * crosshairRecoilScale;
+                    currentCrosshairBaseScale = Mathf.Lerp(currentCrosshairBaseScale, targetCrosshairBaseScale, Time.deltaTime * 12f);
+                    crosshairRect.localScale = Vector3.one * (crosshairRecoilScale * currentCrosshairBaseScale);
                     crosshairRecoilScale = Mathf.Lerp(crosshairRecoilScale, 1.0f, Time.deltaTime * 18f);
 
                     if (crosshairImage == null)
@@ -385,6 +388,29 @@ namespace WizardGame.Entities
             }
             currentAmmo = maxAmmo;
             OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
+        }
+
+        /// <summary>
+        /// Restaura munição instantaneamente (usado pelo power-up de Mana).
+        /// </summary>
+        public void AddAmmo(int amount)
+        {
+            if (isReloading)
+            {
+                StopCoroutine("ReloadRoutine");
+                isReloading = false;
+                OnReloadStateChanged?.Invoke(false);
+            }
+            currentAmmo = Mathf.Clamp(currentAmmo + amount, 0, maxAmmo);
+            OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
+        }
+
+        /// <summary>
+        /// Modifica o tamanho do retículo de mira para modo de precisão cirúrgica (Power-up de Precisão).
+        /// </summary>
+        public void SetPrecisionMode(bool enabled)
+        {
+            targetCrosshairBaseScale = enabled ? 0.60f : 1.0f;
         }
     }
 }

@@ -54,6 +54,10 @@ namespace WizardGame.UI
         [SerializeField] private GameObject headshotPopupContainer;
         [SerializeField] private Text headshotPopupText;
 
+        [Header("Sistema de Power-ups (Buffs Ativos)")]
+        [SerializeField] private GameObject activeBuffsContainer;
+        [SerializeField] private Text activeBuffsText;
+
         [Header("Sistema de Ondas (Wave System UI)")]
         [SerializeField] private Text waveText;
         [SerializeField] private GameObject waveBannerContainer;
@@ -121,6 +125,7 @@ namespace WizardGame.UI
             if (comboBreakText != null) comboBreakText.gameObject.SetActive(false);
             if (waveBannerContainer != null) waveBannerContainer.SetActive(false);
             if (damageFlashOverlay != null) damageFlashOverlay.gameObject.SetActive(false);
+            if (activeBuffsContainer != null) activeBuffsContainer.SetActive(false);
         }
 
         public void ShowStartMenu()
@@ -578,6 +583,18 @@ namespace WizardGame.UI
             }
         }
 
+        public void UpdateActiveBuffs(bool active, string buffText)
+        {
+            if (activeBuffsContainer != null)
+            {
+                activeBuffsContainer.SetActive(active);
+            }
+            if (activeBuffsText != null)
+            {
+                activeBuffsText.text = buffText;
+            }
+        }
+
         #region Sistema de Ondas UI
 
         public void UpdateWaveProgress(int currentWave, int totalWaves, int remainingInWave, int totalInWave)
@@ -637,6 +654,19 @@ namespace WizardGame.UI
                 subtitle: $"{bossName.ToUpper()} FOI ANIQUILADO COM MAESTRIA!",
                 titleColor: new Color(1f, 0.85f, 0.15f),
                 duration: 3.0f
+            ));
+        }
+
+        public void ShowPowerUpBanner(string title, string subtitle, Color color)
+        {
+            if (waveBannerContainer == null) return;
+
+            if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
+            waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
+                title: title,
+                subtitle: subtitle,
+                titleColor: color,
+                duration: 2.2f
             ));
         }
 

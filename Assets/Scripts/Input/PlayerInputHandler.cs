@@ -8,6 +8,7 @@ namespace WizardGame.Input
     public struct ShotHitInfo
     {
         public WizardController target;
+        public PowerUpItem powerUpTarget;
         public bool isHit;
         public bool isHeadshot;
         public Vector3 hitPoint;
@@ -184,6 +185,7 @@ namespace WizardGame.Input
             worldPos.z = 0f;
 
             WizardController hitWizard = FindWizardAtPosition(worldPos);
+            PowerUpItem hitPowerUp = (hitWizard == null) ? FindPowerUpAtPosition(worldPos) : null;
             bool isHeadshot = false;
 
             if (hitWizard != null)
@@ -199,7 +201,8 @@ namespace WizardGame.Input
             return new ShotHitInfo
             {
                 target = hitWizard,
-                isHit = hitWizard != null,
+                powerUpTarget = hitPowerUp,
+                isHit = (hitWizard != null || hitPowerUp != null),
                 isHeadshot = isHeadshot,
                 hitPoint = worldPos
             };
@@ -256,6 +259,20 @@ namespace WizardGame.Input
             }
 
             return bestTarget;
+        }
+
+        private PowerUpItem FindPowerUpAtPosition(Vector3 worldPos)
+        {
+            int circleCount = Physics2D.OverlapCircleNonAlloc(worldPos, clickToleranceRadius * 1.35f, hitBuffer);
+            for (int i = 0; i < circleCount; i++)
+            {
+                var col = hitBuffer[i];
+                if (col != null && col.TryGetComponent<PowerUpItem>(out var powerUp))
+                {
+                    if (!powerUp.IsCollected) return powerUp;
+                }
+            }
+            return null;
         }
 
         public void SetInputBlocked(bool blocked)
