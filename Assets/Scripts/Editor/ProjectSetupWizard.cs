@@ -662,10 +662,12 @@ namespace WizardGame.EditorTools
                                "  • 🔮 30º: FEITICEIRO ESPECTRAL: 35 HP | +100 Pts | Teleporte, invisibilidade e servos.\n" +
                                "  • 🩸 40º: LORDE CARMESIM: 50 HP | +150 Pts | Cetro sismico, orbe de sangue e rito carmesim.\n" +
                                "  • ⚔️ 50º: GOBLIN REI SUPREMO: 80 HP | +500 Pts | Abalo colossal, magma triplo! DERROTAR = VITORIA!\n\n" +
-                               "ARSENAL MAGICO:\n" +
+                               "ARSENAL MAGICO & COMBOS:\n" +
                                "  • 🔥 [LMB] NORMAL: 1 Dano | 💥 [1/Q] ARCANO: 3 Dano | ❄️ [2/E] GELO: Congela 2.5s\n" +
-                               "  • ⚡ [3/F] RELAMPAGO: Corrente eletrica | 🌀 [4/C] AREA: Explosao 2.5m (2 Dano)\n\n" +
-                               "COMBOS & HEADSHOT: Multiplicadores x1..x4! Acertos no topo da cabeca dao +1 Ponto Imediato!";
+                               "  • ⚡ [3/F] RELAMPAGO: Corrente eletrica | 🌀 [4/C] AREA: Explosao 2.5m (2 Dano)\n" +
+                               "  • 🎯 HEADSHOT: +1 Ponto! | 🔥 COMBOS: Multiplicadores x1..x4!\n\n" +
+                               "SISTEMA DE RANK (S / A / B / C / D):\n" +
+                               "  • Calculado por: Mortes, Precisão, Tempo, Escapados, Maior Combo e Feitiços Fortes!";
             CreateUIText(instrPanel.transform, "InstrBody", instrBody, 13, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
             var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -305f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));

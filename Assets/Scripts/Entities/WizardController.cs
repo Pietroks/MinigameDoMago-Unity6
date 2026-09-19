@@ -88,10 +88,15 @@ namespace WizardGame.Entities
             fillGo.transform.localScale = new Vector3(0.86f, 0.11f, 1f);
         }
 
-        private Sprite CreateSolidWhiteSprite()
+        private static Sprite cachedWhiteSprite;
+        private static Sprite CreateSolidWhiteSprite()
         {
-            Texture2D tex = Texture2D.whiteTexture;
-            return Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            if (cachedWhiteSprite == null)
+            {
+                Texture2D tex = Texture2D.whiteTexture;
+                cachedWhiteSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+            }
+            return cachedWhiteSprite;
         }
 
         public void Initialize(WizardDataSO data, Vector3 spawnPosition, Bounds bounds, float speedMultiplier = 1.0f)
@@ -521,14 +526,15 @@ namespace WizardGame.Entities
                 frameAnimator.LockAnimation(AnimationState.Death);
             }
 
-            bool isBoss = currentData != null && currentData.wizardType == WizardType.Chefe;
-            float duration = isBoss ? 1.15f : 0.70f;
+            bool isBoss = currentData != null && WaveConfig.IsBossType(currentData.wizardType);
+            bool isFinalBoss = currentData != null && currentData.wizardType == WizardType.ChefeFinal;
+            float duration = isFinalBoss ? 1.35f : (isBoss ? 1.15f : 0.70f);
             float elapsed = 0f;
             Color startCol = spriteRenderer.color;
 
             if (isBoss)
             {
-                SpellEffectsManager.Instance?.TriggerCameraShake(0.25f, 0.22f);
+                SpellEffectsManager.Instance?.TriggerCameraShake(isFinalBoss ? 0.38f : 0.25f, isFinalBoss ? 0.30f : 0.22f);
             }
 
             while (elapsed < duration)

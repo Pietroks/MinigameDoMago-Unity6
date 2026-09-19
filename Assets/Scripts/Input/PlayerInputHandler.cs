@@ -205,17 +205,19 @@ namespace WizardGame.Input
             };
         }
 
+        private static readonly Collider2D[] hitBuffer = new Collider2D[24];
+
         private WizardController FindWizardAtPosition(Vector3 worldPos)
         {
-            // 1. Prioridade absoluta: Clique direto no colisor do goblin
-            Collider2D[] directHits = Physics2D.OverlapPointAll(worldPos);
+            // 1. Prioridade absoluta: Clique direto no colisor do goblin (Zero-GC via NonAlloc)
+            int directCount = Physics2D.OverlapPointNonAlloc(worldPos, hitBuffer);
             WizardController bestDirect = null;
             int highestDirectOrder = int.MinValue;
 
-            foreach (var col in directHits)
+            for (int i = 0; i < directCount; i++)
             {
-                var wizard = col.GetComponent<WizardController>();
-                if (wizard != null)
+                var col = hitBuffer[i];
+                if (col != null && col.TryGetComponent<WizardController>(out var wizard))
                 {
                     var sr = wizard.GetComponent<SpriteRenderer>();
                     int order = sr != null ? sr.sortingOrder : 0;
@@ -230,15 +232,15 @@ namespace WizardGame.Input
             if (bestDirect != null) return bestDirect;
 
             // 2. Fallback: Raio de tolerância (clickToleranceRadius), priorizando quem estiver na frente
-            Collider2D[] hits = Physics2D.OverlapCircleAll(worldPos, clickToleranceRadius);
+            int circleCount = Physics2D.OverlapCircleNonAlloc(worldPos, clickToleranceRadius, hitBuffer);
             WizardController bestTarget = null;
             float closestDist = float.MaxValue;
             int highestSortingOrder = int.MinValue;
 
-            foreach (var col in hits)
+            for (int i = 0; i < circleCount; i++)
             {
-                var wizard = col.GetComponent<WizardController>();
-                if (wizard != null)
+                var col = hitBuffer[i];
+                if (col != null && col.TryGetComponent<WizardController>(out var wizard))
                 {
                     var sr = wizard.GetComponent<SpriteRenderer>();
                     int order = sr != null ? sr.sortingOrder : 0;

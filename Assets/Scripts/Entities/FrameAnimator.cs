@@ -103,6 +103,7 @@ namespace WizardGame.Entities
             Sprite[] frames = stateFrames[state];
             float delay = 1f / Mathf.Max(1f, stateFps.ContainsKey(state) ? stateFps[state] : 8f);
             bool loop = stateLoops.ContainsKey(state) ? stateLoops[state] : true;
+            var wait = new WaitForSeconds(delay);
             int frameIndex = 0;
 
             while (true)
@@ -112,7 +113,7 @@ namespace WizardGame.Entities
                     spriteRenderer.sprite = frames[frameIndex];
                 }
 
-                yield return new WaitForSeconds(delay);
+                yield return wait;
 
                 frameIndex++;
                 if (frameIndex >= frames.Length)
@@ -134,6 +135,7 @@ namespace WizardGame.Entities
         {
             Sprite[] frames = stateFrames[state];
             float delay = 1f / Mathf.Max(1f, stateFps.ContainsKey(state) ? stateFps[state] : 8f);
+            var wait = new WaitForSeconds(delay);
 
             for (int i = 0; i < frames.Length; i++)
             {
@@ -141,7 +143,7 @@ namespace WizardGame.Entities
                 {
                     spriteRenderer.sprite = frames[i];
                 }
-                yield return new WaitForSeconds(delay);
+                yield return wait;
             }
 
             onComplete?.Invoke();

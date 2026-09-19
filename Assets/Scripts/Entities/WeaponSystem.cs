@@ -142,7 +142,7 @@ namespace WizardGame.Entities
                                 wPos.z = 0f;
 
                                 Collider2D hoverCol = Physics2D.OverlapPoint(wPos);
-                                if (hoverCol != null && hoverCol.GetComponent<WizardController>() != null)
+                                if (hoverCol != null && hoverCol.TryGetComponent<WizardController>(out _))
                                 {
                                     isHovering = true;
                                 }
