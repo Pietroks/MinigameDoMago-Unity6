@@ -341,37 +341,74 @@ namespace WizardGame.Entities
             if (pulseCoroutine != null) StopCoroutine(pulseCoroutine);
             if (attackRoutine != null) StopCoroutine(attackRoutine);
 
-            switch (currentData.wizardType)
+            if (currentData == null) return;
+
+            // Se for um dos Chefes, direciona para a rotina tática correspondente
+            if (WaveConfig.IsBossType(currentData.wizardType) || currentData.movementPattern == AIMovementPattern.BossTactical)
             {
-                case WizardType.Comum:
-                    movementCoroutine = StartCoroutine(CommonPatrolRoutine());
-                    attackRoutine = StartCoroutine(PeriodicAttackRoutine(3f, 5f));
+                switch (currentData.wizardType)
+                {
+                    case WizardType.Chefe:
+                        movementCoroutine = StartCoroutine(BossBehaviorRoutine());
+                        break;
+                    case WizardType.Chefe2:
+                        movementCoroutine = StartCoroutine(Boss2BehaviorRoutine());
+                        break;
+                    case WizardType.Chefe3:
+                        movementCoroutine = StartCoroutine(Boss3BehaviorRoutine());
+                        break;
+                    case WizardType.Chefe4:
+                        movementCoroutine = StartCoroutine(Boss4BehaviorRoutine());
+                        break;
+                    case WizardType.ChefeFinal:
+                        movementCoroutine = StartCoroutine(BossFinalBehaviorRoutine());
+                        break;
+                    default:
+                        movementCoroutine = StartCoroutine(BossBehaviorRoutine());
+                        break;
+                }
+                return;
+            }
+
+            // Ativa auras passivas visuais
+            if (currentData.wizardType == WizardType.Dourado || currentData.personalityArchetype == AIPersonalityArchetype.GoldenStraight)
+            {
+                pulseCoroutine = StartCoroutine(GoldenGlowRoutine());
+            }
+            else if (currentData.wizardType == WizardType.Fantasma || currentData.movementPattern == AIMovementPattern.SpectralHover)
+            {
+                pulseCoroutine = StartCoroutine(GhostSpectralAlphaRoutine());
+            }
+
+            // Inicia padrão primário de locomoção baseado no WizardDataSO
+            switch (currentData.movementPattern)
+            {
+                case AIMovementPattern.Wander:
+                    movementCoroutine = StartCoroutine(WanderRoutine());
+                    if (currentData.wizardType == WizardType.Comum)
+                    {
+                        attackRoutine = StartCoroutine(PeriodicAttackRoutine(3f, 5f));
+                    }
                     break;
-                case WizardType.Fugitivo:
-                    movementCoroutine = StartCoroutine(FugitiveRunRoutine());
+
+                case AIMovementPattern.StraightMovement:
+                    movementCoroutine = StartCoroutine(StraightMovementRoutine());
                     break;
-                case WizardType.Dourado:
-                    pulseCoroutine = StartCoroutine(GoldenGlowRoutine());
-                    movementCoroutine = StartCoroutine(GoldenAggressiveRoutine());
+
+                case AIMovementPattern.SpectralHover:
+                    movementCoroutine = StartCoroutine(SpectralHoverRoutine());
                     break;
-                case WizardType.Fantasma:
-                    pulseCoroutine = StartCoroutine(GhostSpectralAlphaRoutine());
-                    movementCoroutine = StartCoroutine(GhostLevitateRoutine());
+
+                case AIMovementPattern.ProtectAlly:
+                    movementCoroutine = StartCoroutine(ProtectAllyRoutine());
                     break;
-                case WizardType.Chefe:
-                    movementCoroutine = StartCoroutine(BossBehaviorRoutine());
+
+                case AIMovementPattern.HealerSupport:
+                    movementCoroutine = StartCoroutine(HealerSupportRoutine());
                     break;
-                case WizardType.Chefe2:
-                    movementCoroutine = StartCoroutine(Boss2BehaviorRoutine());
-                    break;
-                case WizardType.Chefe3:
-                    movementCoroutine = StartCoroutine(Boss3BehaviorRoutine());
-                    break;
-                case WizardType.Chefe4:
-                    movementCoroutine = StartCoroutine(Boss4BehaviorRoutine());
-                    break;
-                case WizardType.ChefeFinal:
-                    movementCoroutine = StartCoroutine(BossFinalBehaviorRoutine());
+
+                default:
+                    movementCoroutine = StartCoroutine(WanderRoutine());
                     break;
             }
         }
@@ -410,24 +447,29 @@ namespace WizardGame.Entities
         {
             if (hitReactionCoroutine != null) StopCoroutine(hitReactionCoroutine);
 
-            switch (currentData.wizardType)
+            if (WaveConfig.IsBossType(currentData.wizardType))
             {
-                case WizardType.Fugitivo:
-                    hitReactionCoroutine = StartCoroutine(FugitiveJumpReactionRoutine());
+                hitReactionCoroutine = StartCoroutine(BossHitReactionRoutine());
+                return;
+            }
+
+            switch (currentData.hitReaction)
+            {
+                case AIHitReaction.FleeAfterHit:
+                    hitReactionCoroutine = StartCoroutine(FleeAfterHitRoutine());
                     break;
-                case WizardType.Fantasma:
-                    hitReactionCoroutine = StartCoroutine(GhostTeleportReactionRoutine());
-                    break;
-                case WizardType.Dourado:
+                case AIHitReaction.DefensiveShield:
                     hitReactionCoroutine = StartCoroutine(GoldenShieldReactionRoutine());
                     break;
-                case WizardType.Chefe:
-                case WizardType.Chefe2:
-                case WizardType.Chefe3:
-                case WizardType.Chefe4:
-                case WizardType.ChefeFinal:
-                    hitReactionCoroutine = StartCoroutine(BossHitReactionRoutine());
+                case AIHitReaction.TeleportAfterHit:
+                    hitReactionCoroutine = StartCoroutine(GhostTeleportReactionRoutine());
                     break;
+                case AIHitReaction.SpawnDecoy:
+                    hitReactionCoroutine = StartCoroutine(SpawnDecoyReactionRoutine());
+                    break;
+                case AIHitReaction.None:
+                    break;
+                case AIHitReaction.Jiggle:
                 default:
                     hitReactionCoroutine = StartCoroutine(CommonJiggleReactionRoutine());
                     break;
@@ -512,7 +554,14 @@ namespace WizardGame.Entities
                 escapeCoroutine = null;
             }
 
-            deathCoroutine = StartCoroutine(DeathAnimationRoutine());
+            if (currentData != null && currentData.deathReaction == AIDeathReaction.ExplodeOnDeath)
+            {
+                deathCoroutine = StartCoroutine(ExplodeOnDeathRoutine());
+            }
+            else
+            {
+                deathCoroutine = StartCoroutine(DeathAnimationRoutine());
+            }
         }
 
         public void Freeze(float duration = 2.5f)
@@ -582,21 +631,23 @@ namespace WizardGame.Entities
             gameObject.SetActive(false);
         }
 
-        #region Comportamentos Especificos dos Goblins
+        #region Comportamentos e Personalidades de IA
 
-        // 1. GOBLIN COMUM: Movimento aleatorio e ataques periodicos
-        private IEnumerator CommonPatrolRoutine()
+        // 1. WANDER: Perambulação orgânica e errática com pausas e ataques ocasionais
+        private IEnumerator WanderRoutine()
         {
+            float baseSpeed = currentData.moveSpeed * currentSpeedMultiplier;
+
             while (true)
             {
                 Vector3 target = GetRandomPointInBounds();
                 Vector3 start = transform.position;
                 float dist = Vector3.Distance(start, target);
-                float duration = dist / Mathf.Max(0.5f, currentData.moveSpeed * currentSpeedMultiplier);
+                float duration = dist / Mathf.Max(0.5f, baseSpeed);
                 float elapsed = 0f;
 
                 frameAnimator.SetFacingDirection(target.x - start.x);
-                frameAnimator.Play(AnimationState.Walk);
+                frameAnimator.Play(isEnraged ? AnimationState.Run : AnimationState.Walk);
 
                 while (elapsed < duration)
                 {
@@ -609,7 +660,7 @@ namespace WizardGame.Entities
 
                 transform.position = target;
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 1.0f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.9f) / currentSpeedMultiplier);
             }
         }
 
@@ -620,7 +671,7 @@ namespace WizardGame.Entities
                 yield return new WaitForSeconds(UnityEngine.Random.Range(minInterval, maxInterval));
                 if (isDeadOrEscaping) yield break;
 
-                // Executa um ataque rapido com faca
+                // Executa um ataque rápido com faca
                 frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Walk);
             }
         }
@@ -641,69 +692,157 @@ namespace WizardGame.Entities
             transform.position = start;
         }
 
-        // 2. GOBLIN FUGITIVO: Corrida rapida e pulo ao sofrer dano com disparada acelerada
-        private IEnumerator FugitiveRunRoutine()
-        {
-            float baseSpeed = currentData.moveSpeed * currentSpeedMultiplier;
-            float speed = isEnraged ? (baseSpeed * 1.8f) : baseSpeed;
-
-            while (true)
-            {
-                Vector3 target = GetRandomPointInBounds();
-                Vector3 start = transform.position;
-                float dist = Vector3.Distance(start, target);
-                float duration = dist / speed;
-                float elapsed = 0f;
-
-                frameAnimator.SetFacingDirection(target.x - start.x);
-                frameAnimator.Play(isEnraged ? AnimationState.Run : AnimationState.Walk);
-
-                while (elapsed < duration)
-                {
-                    elapsed += Time.deltaTime;
-                    float t = elapsed / duration;
-                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
-                    yield return null;
-                }
-
-                transform.position = target;
-                yield return new WaitForSeconds(isEnraged ? (0.1f / currentSpeedMultiplier) : (0.3f / currentSpeedMultiplier));
-            }
-        }
-
-        private IEnumerator FugitiveJumpReactionRoutine()
+        // 2. FLEE AFTER HIT: Pulo em choque e disparada acelerada em direção oposta ao dano
+        private IEnumerator FleeAfterHitRoutine()
         {
             isEnraged = true;
             if (movementCoroutine != null) StopCoroutine(movementCoroutine);
 
-            // Se tiver sprite de jump, aplica
+            // Reação visual inicial (sprite especial de salto ou frame de dano)
             if (currentData.specialActionSprite != null)
             {
                 spriteRenderer.sprite = currentData.specialActionSprite;
             }
-
-            // Pulo de reacao no ar
-            Vector3 startPos = transform.position;
-            float jumpDuration = 0.28f;
-            float elapsed = 0f;
-            float jumpHeight = 0.8f;
-
-            while (elapsed < jumpDuration)
+            else if (currentData.hitFrames != null && currentData.hitFrames.Length > 0)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / jumpDuration;
+                frameAnimator.PlayOneShot(AnimationState.Hit, AnimationState.Run);
+            }
+
+            // Pulo de choque / pânico
+            Vector3 startPos = transform.position;
+            float jumpDuration = 0.22f;
+            float jumpElapsed = 0f;
+            float jumpHeight = 0.70f;
+
+            while (jumpElapsed < jumpDuration)
+            {
+                jumpElapsed += Time.deltaTime;
+                float t = jumpElapsed / jumpDuration;
                 float yOffset = Mathf.Sin(t * Mathf.PI) * jumpHeight;
                 transform.position = new Vector3(startPos.x, startPos.y + yOffset, startPos.z);
                 yield return null;
             }
             transform.position = startPos;
 
-            // Retoma corrida em disparada total
-            movementCoroutine = StartCoroutine(FugitiveRunRoutine());
+            // Corrida frenética (Flee)
+            float fleeTimer = Mathf.Max(1.5f, currentData.fleeDuration);
+            float fleeSpeed = currentData.moveSpeed * currentSpeedMultiplier * Mathf.Max(1.6f, currentData.fleeSpeedMultiplier);
+
+            frameAnimator.Play(AnimationState.Run);
+
+            // Vetor de fuga oposto ao cursor / centro de dano
+            Vector3 fleeOrigin = Vector3.zero;
+            if (Camera.main != null)
+            {
+                fleeOrigin = Camera.main.ScreenToWorldPoint(UnityEngine.Input.mousePosition);
+                fleeOrigin.z = 0f;
+            }
+            Vector3 fleeDir = (transform.position - fleeOrigin).normalized;
+            if (fleeDir.sqrMagnitude < 0.01f) fleeDir = UnityEngine.Random.insideUnitCircle.normalized;
+
+            float margin = 0.9f;
+
+            while (fleeTimer > 0f)
+            {
+                fleeTimer -= Time.deltaTime;
+
+                Vector3 nextPos = transform.position + fleeDir * (fleeSpeed * Time.deltaTime);
+                bool bounced = false;
+
+                if (nextPos.x <= screenWorldBounds.min.x + margin || nextPos.x >= screenWorldBounds.max.x - margin)
+                {
+                    fleeDir.x = -fleeDir.x;
+                    bounced = true;
+                }
+                if (nextPos.y <= screenWorldBounds.min.y + margin || nextPos.y >= screenWorldBounds.max.y - margin)
+                {
+                    fleeDir.y = -fleeDir.y;
+                    bounced = true;
+                }
+
+                if (bounced)
+                {
+                    // Pequena perturbação angular para trajetória evasiva orgânica
+                    fleeDir = (Quaternion.Euler(0f, 0f, UnityEngine.Random.Range(-25f, 25f)) * fleeDir).normalized;
+                }
+
+                transform.position = new Vector3(
+                    Mathf.Clamp(nextPos.x, screenWorldBounds.min.x + margin, screenWorldBounds.max.x - margin),
+                    Mathf.Clamp(nextPos.y, screenWorldBounds.min.y + margin, screenWorldBounds.max.y - margin),
+                    0f
+                );
+
+                frameAnimator.SetFacingDirection(fleeDir.x);
+                SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                yield return null;
+            }
+
+            isEnraged = false;
+            // Após a disparada de fuga, retoma a perambulação padrão
+            movementCoroutine = StartCoroutine(WanderRoutine());
         }
 
-        // 3. GOBLIN DOURADO: Brilho pulsante, investidas com escudo e dash agressivo
+        // 3. STRAIGHT MOVEMENT: Marcha retilínea contínua, disciplinada e militar
+        private IEnumerator StraightMovementRoutine()
+        {
+            float speed = currentData.moveSpeed * currentSpeedMultiplier * 1.35f;
+            float margin = 1.0f;
+
+            // Escolhe um rumo inicial reto
+            Vector2 dir = UnityEngine.Random.insideUnitCircle.normalized;
+            if (Mathf.Abs(dir.x) < 0.35f) dir.x = Mathf.Sign(dir.x) * 0.5f;
+            dir.Normalize();
+
+            frameAnimator.Play(AnimationState.Run);
+
+            while (true)
+            {
+                frameAnimator.SetFacingDirection(dir.x);
+
+                Vector3 nextPos = transform.position + (Vector3)(dir * (speed * Time.deltaTime));
+                bool hitBoundary = false;
+
+                if (nextPos.x <= screenWorldBounds.min.x + margin)
+                {
+                    nextPos.x = screenWorldBounds.min.x + margin;
+                    dir.x = Mathf.Abs(dir.x);
+                    hitBoundary = true;
+                }
+                else if (nextPos.x >= screenWorldBounds.max.x - margin)
+                {
+                    nextPos.x = screenWorldBounds.max.x - margin;
+                    dir.x = -Mathf.Abs(dir.x);
+                    hitBoundary = true;
+                }
+
+                if (nextPos.y <= screenWorldBounds.min.y + margin)
+                {
+                    nextPos.y = screenWorldBounds.min.y + margin;
+                    dir.y = Mathf.Abs(dir.y);
+                    hitBoundary = true;
+                }
+                else if (nextPos.y >= screenWorldBounds.max.y - margin)
+                {
+                    nextPos.y = screenWorldBounds.max.y - margin;
+                    dir.y = -Mathf.Abs(dir.y);
+                    hitBoundary = true;
+                }
+
+                transform.position = nextPos;
+                SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+
+                if (hitBoundary)
+                {
+                    // Breve postura marcial ao atingir a borda antes de continuar a patrulha
+                    frameAnimator.Play(AnimationState.Idle);
+                    yield return new WaitForSeconds(0.16f / currentSpeedMultiplier);
+                    frameAnimator.Play(AnimationState.Run);
+                }
+
+                yield return null;
+            }
+        }
+
         private IEnumerator GoldenGlowRoutine()
         {
             while (true)
@@ -714,48 +853,20 @@ namespace WizardGame.Entities
             }
         }
 
-        private IEnumerator GoldenAggressiveRoutine()
-        {
-            while (true)
-            {
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f) / currentSpeedMultiplier);
-                Vector3 target = GetRandomPointInBounds();
-                Vector3 start = transform.position;
-                float dist = Vector3.Distance(start, target);
-                float duration = dist / (currentData.moveSpeed * currentSpeedMultiplier * 1.5f);
-                float elapsed = 0f;
-
-                frameAnimator.SetFacingDirection(target.x - start.x);
-                frameAnimator.Play(AnimationState.Run);
-
-                while (elapsed < duration)
-                {
-                    elapsed += Time.deltaTime;
-                    float t = elapsed / duration;
-                    transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
-                    yield return null;
-                }
-
-                transform.position = target;
-                frameAnimator.Play(AnimationState.Idle);
-            }
-        }
-
         private IEnumerator GoldenShieldReactionRoutine()
         {
             if (currentData.specialActionSprite != null)
             {
-                spriteRenderer.sprite = currentData.specialActionSprite; // Postura com escudo
+                spriteRenderer.sprite = currentData.specialActionSprite; // Postura erguendo escudo
             }
 
-            // Recuo defensivo
+            // Recuo defensivo absorvendo impacto
             Vector3 start = transform.position;
             Vector3 recoilDir = (UnityEngine.Random.insideUnitCircle.normalized);
-            Vector3 recoilTarget = start + (recoilDir * 0.5f);
+            Vector3 recoilTarget = start + (recoilDir * 0.45f);
 
             float elapsed = 0f;
-            float dur = 0.15f / currentSpeedMultiplier;
+            float dur = 0.14f / currentSpeedMultiplier;
             while (elapsed < dur)
             {
                 elapsed += Time.deltaTime;
@@ -764,11 +875,11 @@ namespace WizardGame.Entities
                 yield return null;
             }
 
-            yield return new WaitForSeconds(0.1f / currentSpeedMultiplier);
-            movementCoroutine = StartCoroutine(GoldenAggressiveRoutine());
+            yield return new WaitForSeconds(0.12f / currentSpeedMultiplier);
+            StartBehavior();
         }
 
-        // 4. GOBLIN FANTASMA: Levitacao espectral e teleporte dimensional atraves de portais
+        // 4. SPECTRAL HOVER & TELEPORT: Flutuação etérea e salto dimensional ao tomar dano
         private IEnumerator GhostSpectralAlphaRoutine()
         {
             while (true)
@@ -780,7 +891,7 @@ namespace WizardGame.Entities
             }
         }
 
-        private IEnumerator GhostLevitateRoutine()
+        private IEnumerator SpectralHoverRoutine()
         {
             while (true)
             {
@@ -810,6 +921,148 @@ namespace WizardGame.Entities
                 yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.8f) / currentSpeedMultiplier);
             }
         }
+
+        // 5. EXTENSÕES FUTURAS: Suporte, Proteção, Ilusão e Kamikaze
+        private IEnumerator ProtectAllyRoutine()
+        {
+            while (true)
+            {
+                WizardController ally = null;
+                float closestDist = float.MaxValue;
+
+                foreach (var goblin in activeGoblins)
+                {
+                    if (goblin != this && goblin.gameObject.activeInHierarchy && !goblin.isDeadOrEscaping)
+                    {
+                        float d = Vector3.Distance(transform.position, goblin.transform.position);
+                        if (d < closestDist)
+                        {
+                            closestDist = d;
+                            ally = goblin;
+                        }
+                    }
+                }
+
+                if (ally != null)
+                {
+                    Vector3 protectPos = ally.transform.position + new Vector3(0.4f, 0f, 0f);
+                    Vector3 start = transform.position;
+                    float duration = Vector3.Distance(start, protectPos) / (currentData.moveSpeed * currentSpeedMultiplier * 1.3f);
+                    float elapsed = 0f;
+
+                    frameAnimator.Play(AnimationState.Walk);
+                    frameAnimator.SetFacingDirection(protectPos.x - start.x);
+
+                    while (elapsed < duration && ally != null && ally.gameObject.activeInHierarchy)
+                    {
+                        elapsed += Time.deltaTime;
+                        transform.position = Vector3.Lerp(start, protectPos, elapsed / duration);
+                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                        yield return null;
+                    }
+
+                    frameAnimator.Play(AnimationState.Idle);
+                    yield return new WaitForSeconds(1.0f);
+                }
+                else
+                {
+                    yield return StartCoroutine(WanderRoutine());
+                }
+
+                yield return null;
+            }
+        }
+
+        private IEnumerator HealerSupportRoutine()
+        {
+            while (true)
+            {
+                Vector3 retreatPoint = GetRandomPointInBounds();
+                Vector3 start = transform.position;
+                float duration = Vector3.Distance(start, retreatPoint) / (currentData.moveSpeed * currentSpeedMultiplier);
+                float elapsed = 0f;
+
+                frameAnimator.Play(AnimationState.Walk);
+                frameAnimator.SetFacingDirection(retreatPoint.x - start.x);
+
+                while (elapsed < duration)
+                {
+                    elapsed += Time.deltaTime;
+                    transform.position = Vector3.Lerp(start, retreatPoint, elapsed / duration);
+                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    yield return null;
+                }
+
+                frameAnimator.Play(AnimationState.Idle);
+                yield return new WaitForSeconds(1.5f);
+
+                PulseHealingWave();
+                yield return new WaitForSeconds(2.0f);
+            }
+        }
+
+        private void PulseHealingWave()
+        {
+            float radius = currentData.supportRadius > 0f ? currentData.supportRadius : 3.5f;
+            SpawnBossBurstFX(transform.position, new Color(0.2f, 1f, 0.4f, 0.8f), radius * 0.6f);
+
+            foreach (var goblin in activeGoblins)
+            {
+                if (goblin != this && goblin.gameObject.activeInHierarchy && !goblin.isDeadOrEscaping)
+                {
+                    if (Vector3.Distance(transform.position, goblin.transform.position) <= radius)
+                    {
+                        goblin.Heal(1);
+                    }
+                }
+            }
+        }
+
+        public void Heal(int amount)
+        {
+            if (isDeadOrEscaping || currentHealth >= currentData.maxHealth) return;
+            currentHealth = Mathf.Min(currentData.maxHealth, currentHealth + amount);
+            UpdateHealthBar();
+            StartCoroutine(FlashHealRoutine());
+        }
+
+        private IEnumerator FlashHealRoutine()
+        {
+            Color orig = spriteRenderer.color;
+            spriteRenderer.color = Color.green;
+            yield return new WaitForSeconds(0.12f);
+            if (!isDeadOrEscaping) spriteRenderer.color = orig;
+        }
+
+        private IEnumerator SpawnDecoyReactionRoutine()
+        {
+            SpawnBossBurstFX(transform.position, new Color(0.7f, 0.5f, 1f, 0.8f), 1.2f);
+            yield return StartCoroutine(CommonJiggleReactionRoutine());
+        }
+
+        private IEnumerator ExplodeOnDeathRoutine()
+        {
+            // Tique-taque de contagem regressiva piscando em vermelho
+            for (int i = 0; i < 4; i++)
+            {
+                spriteRenderer.color = Color.red;
+                yield return new WaitForSeconds(0.06f);
+                spriteRenderer.color = Color.white;
+                yield return new WaitForSeconds(0.06f);
+            }
+
+            SpellEffectsManager.Instance?.TriggerCameraShake(0.35f, 0.30f);
+            SpawnBossBurstFX(transform.position, new Color(1f, 0.4f, 0.1f, 0.95f), 2.5f);
+
+            yield return StartCoroutine(DeathAnimationRoutine());
+        }
+
+        // Aliases de compatibilidade
+        private IEnumerator CommonPatrolRoutine() => WanderRoutine();
+        private IEnumerator FugitiveRunRoutine() => WanderRoutine();
+        private IEnumerator GoldenAggressiveRoutine() => StraightMovementRoutine();
+        private IEnumerator GhostLevitateRoutine() => SpectralHoverRoutine();
+        private IEnumerator FugitiveJumpReactionRoutine() => FleeAfterHitRoutine();
 
         private IEnumerator GhostTeleportReactionRoutine()
         {

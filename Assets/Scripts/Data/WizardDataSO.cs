@@ -58,5 +58,92 @@ namespace WizardGame.Data
 
         [Tooltip("Audio especial de morte.")]
         public AudioClip customDeathSound;
+
+        [Header("Inteligência Artificial & Personalidade")]
+        [Tooltip("Arquétipo comportamental que define o estilo e personalidade da IA.")]
+        public AIPersonalityArchetype personalityArchetype = AIPersonalityArchetype.CommonWanderer;
+
+        [Tooltip("Padrão primário de locomoção.")]
+        public AIMovementPattern movementPattern = AIMovementPattern.Wander;
+
+        [Tooltip("Reação disparada imediatamente ao receber dano.")]
+        public AIHitReaction hitReaction = AIHitReaction.Jiggle;
+
+        [Tooltip("Efeito de retaliação disparado na derrota.")]
+        public AIDeathReaction deathReaction = AIDeathReaction.NormalFade;
+
+        [Header("Parâmetros de Personalidade")]
+        [Tooltip("Multiplicador de velocidade durante a fuga (FleeAfterHit).")]
+        public float fleeSpeedMultiplier = 2.2f;
+
+        [Tooltip("Duração do estado de disparada e pânico em segundos.")]
+        public float fleeDuration = 2.5f;
+
+        [Tooltip("Raio de ação para magos de suporte (Cura/Proteção).")]
+        public float supportRadius = 3.5f;
+
+        /// <summary>
+        /// Aplica os comportamentos padrão de acordo com o arquétipo de personalidade escolhido.
+        /// </summary>
+        public void ApplyArchetypeDefaults()
+        {
+            switch (personalityArchetype)
+            {
+                case AIPersonalityArchetype.CommonWanderer:
+                    movementPattern = AIMovementPattern.Wander;
+                    hitReaction = AIHitReaction.Jiggle;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+                case AIPersonalityArchetype.FastFleeAfterHit:
+                    movementPattern = AIMovementPattern.Wander;
+                    hitReaction = AIHitReaction.FleeAfterHit;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+                case AIPersonalityArchetype.GoldenStraight:
+                    movementPattern = AIMovementPattern.StraightMovement;
+                    hitReaction = AIHitReaction.DefensiveShield;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+                case AIPersonalityArchetype.GhostTeleporter:
+                    movementPattern = AIMovementPattern.SpectralHover;
+                    hitReaction = AIHitReaction.TeleportAfterHit;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+                case AIPersonalityArchetype.ShieldProtector:
+                    movementPattern = AIMovementPattern.ProtectAlly;
+                    hitReaction = AIHitReaction.DefensiveShield;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+                case AIPersonalityArchetype.HealerSupport:
+                    movementPattern = AIMovementPattern.HealerSupport;
+                    hitReaction = AIHitReaction.FleeAfterHit;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+                case AIPersonalityArchetype.Illusionist:
+                    movementPattern = AIMovementPattern.Wander;
+                    hitReaction = AIHitReaction.SpawnDecoy;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+                case AIPersonalityArchetype.BomberKamikaze:
+                    movementPattern = AIMovementPattern.StraightMovement;
+                    hitReaction = AIHitReaction.Jiggle;
+                    deathReaction = AIDeathReaction.ExplodeOnDeath;
+                    break;
+                case AIPersonalityArchetype.BossTactical:
+                    movementPattern = AIMovementPattern.BossTactical;
+                    hitReaction = AIHitReaction.Jiggle;
+                    deathReaction = AIDeathReaction.NormalFade;
+                    break;
+            }
+        }
+
+        private void OnValidate()
+        {
+            // Aplica sincronização se os padrões estiverem em branco ou atualizados
+            if (personalityArchetype != AIPersonalityArchetype.CommonWanderer && movementPattern == AIMovementPattern.Wander && hitReaction == AIHitReaction.Jiggle)
+            {
+                ApplyArchetypeDefaults();
+            }
+        }
     }
 }

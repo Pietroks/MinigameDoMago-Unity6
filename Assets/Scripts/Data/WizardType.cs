@@ -13,6 +13,10 @@ namespace WizardGame.Data
         Chefe2,
         Chefe3,
         Chefe4,
-        ChefeFinal
+        ChefeFinal,
+        Escudo,       // ShieldWizard (Protect)
+        Curandeiro,   // HealerWizard (HealNearby)
+        Ilusionista,  // IllusionWizard (CreateDecoys)
+        Bombardeiro   // BomberWizard (ExplodeOnDeath)
     }
 }
