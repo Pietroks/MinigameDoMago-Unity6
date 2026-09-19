@@ -49,6 +49,10 @@ namespace WizardGame.Entities
         private static readonly List<WizardController> activeGoblins = new List<WizardController>();
         public static IReadOnlyList<WizardController> ActiveGoblins => activeGoblins;
         public bool IsFrozen => isFrozen;
+        public int CurrentHealth => currentHealth;
+        public bool IsTeleporting { get; private set; }
+        public bool DiedWhileTeleporting { get; private set; }
+        public bool WasLastDamageNormalShot { get; private set; }
 
         public event Action<WizardController, int> OnDefeated;
         public event Action<WizardController, int> OnEscaped;
@@ -108,6 +112,9 @@ namespace WizardGame.Entities
             isDeadOrEscaping = false;
             isEnraged = false;
             isInvulnerable = false;
+            IsTeleporting = false;
+            DiedWhileTeleporting = false;
+            WasLastDamageNormalShot = false;
 
             transform.position = spawnPosition;
             transform.rotation = Quaternion.identity;
@@ -308,6 +315,7 @@ namespace WizardGame.Entities
             if (escapeCoroutine != null) { StopCoroutine(escapeCoroutine); escapeCoroutine = null; }
             if (deathCoroutine != null) { StopCoroutine(deathCoroutine); deathCoroutine = null; }
             isFrozen = false;
+            IsTeleporting = false;
         }
 
         private IEnumerator SpawnScaleInRoutine()
@@ -367,10 +375,11 @@ namespace WizardGame.Entities
             }
         }
 
-        public void TakeDamage(int damage)
+        public void TakeDamage(int damage, bool isNormalShot = false)
         {
             if (isDeadOrEscaping || isInvulnerable) return;
 
+            WasLastDamageNormalShot = isNormalShot;
             currentHealth -= damage;
             UpdateHealthBar();
             StartCoroutine(FlashDamageRoutine());
@@ -467,6 +476,8 @@ namespace WizardGame.Entities
 
         private void Die()
         {
+            DiedWhileTeleporting = IsTeleporting;
+            IsTeleporting = false;
             isDeadOrEscaping = true;
             activeGoblins.Remove(this);
             hitCollider.enabled = false;
@@ -788,6 +799,7 @@ namespace WizardGame.Entities
         {
             if (movementCoroutine != null) StopCoroutine(movementCoroutine);
 
+            IsTeleporting = true;
             Vector3 oldPos = transform.position;
             Vector3 newPos = GetRandomPointInBounds();
 
@@ -830,6 +842,7 @@ namespace WizardGame.Entities
                 transform.localScale = normalizedScale;
             }
 
+            IsTeleporting = false;
             StartBehavior();
         }
 
@@ -1034,6 +1047,7 @@ namespace WizardGame.Entities
                 if (roll < 0.28f && currentData.teleportFrames != null && currentData.teleportFrames.Length > 0)
                 {
                     // Habilidade: Teleporte Dimensional Instantâneo
+                    IsTeleporting = true;
                     frameAnimator.PlayOneShot(AnimationState.Teleport, AnimationState.Idle);
                     SpawnBossBurstFX(transform.position, new Color(0.7f, 0.2f, 1f, 0.85f), 1.5f);
                     yield return new WaitForSeconds(0.3f);
@@ -1043,6 +1057,7 @@ namespace WizardGame.Entities
                     SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
                     SpawnBossBurstFX(newPos, new Color(0.7f, 0.2f, 1f, 0.85f), 1.5f);
                     yield return new WaitForSeconds(0.3f);
+                    IsTeleporting = false;
                 }
                 else if (roll < 0.52f)
                 {

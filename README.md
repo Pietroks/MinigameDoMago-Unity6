@@ -40,14 +40,24 @@ A cada marca de 10 goblins abatidos surge um Chefe com barra de vida colorida, t
 - 🛡️ **Goblin Dourado**: 3 HP | 5 Pontos. Rápido e agressivo com investidas (*Dash*) e postura defensiva com escudo impenetrável temporário.
 - 🌀 **Goblin Fantasma**: 4 HP | 3 Pontos. Levitação mágica e teleporte instantâneo através de portais dimensionais ao sofrer impacto.
 
-### 6. Sistema de Combos & Headshot
+### 6. Sistema de Combos, Headshot & Bônus de Habilidade
 - **Multiplicador Dinâmico**:
   - 1 a 4 abates: **x1**
   - 5 a 9 abates: **x2**
   - 10 a 19 abates: **x3**
   - 20+ abates: **x4**
-- **🎯 Headshot / Acerto Perfeito**: Acertos no topo da cabeça do goblin concedem **+1 ponto imediato** e acionam som e popup exclusivos.
 - **Quebra de Combo**: Errar um disparo ou deixar um goblin escapar reseta imediatamente o multiplicador.
+
+#### 🎯 Bônus de Habilidade (Skill Shots / Trick Plays)
+Recompensas dinâmicas com popups coloridos animados e sons temáticos para jogadas estratégicas e de reflexo:
+| Bônus | Pontos | Condição de Acionamento | Notificação HUD |
+| :--- | :---: | :--- | :--- |
+| **Primeiro Tiro** | **+5 pts** | Primeiro disparo da partida que acerta um goblin sem errar | `✨ PRIMEIRO TIRO! +5` (Dourado) |
+| **Headshot** | **+2 pts** | Acerto no topo da cabeça do goblin (ponto fraco superior) | `🎯 HEADSHOT! +2` (Verde Esmeralda) |
+| **Matar 3 Rapidamente** | **+5 pts** | 3 abates confirmados em uma janela de até 2.0 segundos | `🔥 TRIPLO ABATE RÁPIDO! +5` (Fogo Laranja) |
+| **Interrupção de Teleporte** | **+10 pts** | Abater um Fantasma ou Chefe 3 durante o deslocamento dimensional | `🌀 INTERRUPÇÃO DIMENSIONAL! +10` (Púrpura) |
+| **Desafio Dourado** | **+3 pts** | Superar o escudo do Goblin Dourado (3 HP) com o tiro normal de mana | `🛡️ DESAFIO DOURADO! +3` (Ouro) |
+| **Feitiço Duplo** | **+10 pts** | Eliminar 2 ou mais goblins na mesma conjuração de feitiço (Raio ou Área) | `⚡ FEITIÇO DUPLO! +10` (Ciano Elétrico) |
 
 ### 7. Sistema de Telemetria e Rank da Partida (S / A / B / C / D)
 Ao final da partida, o jogo calcula uma nota de desempenho baseada em **6 fatores ponderados**:

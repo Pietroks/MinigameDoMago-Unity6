@@ -542,12 +542,12 @@ namespace WizardGame.EditorTools
             // Aviso de quebra de combo
             var comboBreakText = CreateUIText(hudGo.transform, "ComboBreakText", "COMBO QUEBRADO!", 24, Color.red, new Vector2(0f, -155f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
 
-            // --- POPUP DE HEADSHOT ---
+            // --- POPUP DE HEADSHOT / BÔNUS DE HABILIDADE ---
             GameObject headshotContainer = CreatePanel(hudGo.transform, "HeadshotPopup", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0, 0, 0, 0));
             var hsRect = headshotContainer.GetComponent<RectTransform>();
-            hsRect.sizeDelta = new Vector2(500f, 60f);
-            hsRect.anchoredPosition = new Vector2(0f, 140f);
-            var headshotText = CreateUIText(headshotContainer.transform, "HeadshotText", "🎯 HEADSHOT! +1 PONTO", 32, new Color(0.2f, 1f, 0.3f), Vector2.zero, new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            hsRect.sizeDelta = new Vector2(700f, 70f);
+            hsRect.anchoredPosition = new Vector2(0f, 130f);
+            var headshotText = CreateUIText(headshotContainer.transform, "HeadshotText", "🎯 HEADSHOT! +2", 34, new Color(0.25f, 1f, 0.35f), Vector2.zero, new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             // --- BANNER DE ANÚNCIO E CONCLUSÃO DE ONDA ---
             GameObject waveBannerContainer = CreatePanel(hudGo.transform, "WaveBanner", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.04f, 0.05f, 0.12f, 0.94f));
@@ -657,17 +657,19 @@ namespace WizardGame.EditorTools
                                "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido com escudo impenetravel temporario.\n" +
                                "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta atraves de portais misticos ao tomar dano.\n\n" +
                                "OS 5 GRANDES CHEFES (A CADA 10 GOBLINS):\n" +
-                               "  • 👑 10º: GRANDE GOBLIN: 15 HP | +25 Pts | Golpe sismico e investida brutal.\n" +
-                               "  • 🔥 20º: XAMÃ DO CAOS: 25 HP | +50 Pts | Projeteis de fogo e erupcoes em area.\n" +
-                               "  • 🔮 30º: FEITICEIRO ESPECTRAL: 35 HP | +100 Pts | Teleporte, invisibilidade e servos.\n" +
-                               "  • 🩸 40º: LORDE CARMESIM: 50 HP | +150 Pts | Cetro sismico, orbe de sangue e rito carmesim.\n" +
-                               "  • ⚔️ 50º: GOBLIN REI SUPREMO: 80 HP | +500 Pts | Abalo colossal, magma triplo! DERROTAR = VITORIA!\n\n" +
-                               "ARSENAL MAGICO & COMBOS:\n" +
+                               "  • 👑 10º: GRANDE GOBLIN: 15 HP (+25 Pts)  • 🔥 20º: XAMÃ DO CAOS: 25 HP (+50 Pts)\n" +
+                               "  • 🔮 30º: FEITICEIRO ESPECTRAL: 35 HP (+100 Pts)  • 🩸 40º: LORDE CARMESIM: 50 HP (+150 Pts)\n" +
+                               "  • ⚔️ 50º: GOBLIN REI SUPREMO: 80 HP (+500 Pts)! DERROTAR = VITORIA!\n\n" +
+                               "ARSENAL MÁGICO & COMBOS:\n" +
                                "  • 🔥 [LMB] NORMAL: 1 Dano | 💥 [1/Q] ARCANO: 3 Dano | ❄️ [2/E] GELO: Congela 2.5s\n" +
-                               "  • ⚡ [3/F] RELAMPAGO: Corrente eletrica | 🌀 [4/C] AREA: Explosao 2.5m (2 Dano)\n" +
-                               "  • 🎯 HEADSHOT: +1 Ponto! | 🔥 COMBOS: Multiplicadores x1..x4!\n\n" +
+                               "  • ⚡ [3/F] RELÂMPAGO: Corrente eletrica | 🌀 [4/C] ÁREA: Explosão 2.5m (2 Dano)\n" +
+                               "  • 🔥 COMBOS: Multiplicadores progressivos de pontuação de x1 até x4!\n\n" +
+                               "BÔNUS DE HABILIDADE (SKILL SHOTS):\n" +
+                               "  • ✨ PRIMEIRO TIRO: +5 Pts (acertar o 1º disparo da partida) | 🎯 HEADSHOT: +2 Pts (topo do crânio)\n" +
+                               "  • 🔥 TRIPLO ABATE RÁPIDO: +5 Pts (3 mortes em < 2.0s) | 🌀 INTERRUPÇÃO TELEPORTE: +10 Pts\n" +
+                               "  • 🛡️ DESAFIO DOURADO: +3 Pts (abater Dourado c/ tiro normal) | ⚡ FEITIÇO DUPLO: +10 Pts (2 mortes no feitiço)\n\n" +
                                "SISTEMA DE RANK (S / A / B / C / D):\n" +
-                               "  • Calculado por: Mortes, Precisão, Tempo, Escapados, Maior Combo e Feitiços Fortes!";
+                               "  • Calculado por: Mortes, Precisão %, Tempo, Escapados, Maior Combo e Feitiços Fortes!";
             CreateUIText(instrPanel.transform, "InstrBody", instrBody, 13, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
 
             var closeInstrBtnObj = CreateButton(instrPanel.transform, "CloseInstrBtn", "ENTENDIDO! VOLTAR", new Vector2(0f, -305f), new Vector2(0.5f, 0.5f), new Vector2(260f, 48f), defaultFont, new Color(0.2f, 0.5f, 0.2f));

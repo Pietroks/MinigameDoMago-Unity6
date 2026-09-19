@@ -22,14 +22,23 @@ Este documento contém o Game Design Document Técnico (GDD), a arquitetura de s
 
 ### 2.1 Core Loop
 1. **Spawn**: Magos surgem dentro dos limites visíveis da câmera ortográfica 2D com animação de escala de 0 a 1.
-2. **Combate**:
-   - **Tiro Normal**: Clique com o botão esquerdo (ou toque rápido < 350ms). Causa **1 de dano**. Sem recarga.
-   - **Tiro Forte**: Clique com o botão direito (ou toque mantido >= 350ms). Causa **3 de dano**. Possui **cooldown de 3.0 segundos**.
+2. **Combate & Arsenal**:
+   - **Tiro Normal**: Clique esquerdo (LMB). Causa **1 de dano** (gasta 1 mana).
+   - **Feitiços Especiais**: Tiro Arcano (3 dano), Gelo (congela 2.5s), Raio (dano 2 + saltos em cadeia) e Área (explosão 2.5m de dano 2).
 3. **Temporizador de Fuga (Escape)**:
    - Se o mago não for derrotado antes do seu tempo limite (`escapeTime`), ele escapa com animação ascendente e risada cômica, somando pontos na barra de fuga (`escaped += escapePenalty`).
 4. **Condições de Fim de Jogo**:
-   - **Vitória**: Atingir **50 pontos** abatidos.
+   - **Vitória**: Concluir as 5 ondas derrotando os 5 Grandes Chefes (10º, 20º, 30º, 40º e o 50º Boss Final Supremo).
    - **Derrota**: Permitir que **15 magos** escapem.
+
+### 2.2 Bônus de Habilidade & Precisão (Skill Shots / Trick Bonuses)
+Recompensas com feedback audiovisual imediato (popups coloridos com punch scale vertical e efeitos sonoros dedicados):
+- **✨ Primeiro Tiro (+5 pts)**: O primeiro disparo da partida atinge um alvo sem errar.
+- **🎯 Headshot (+2 pts)**: Acerto de alta precisão no topo da cabeça do goblin (y > 22% da altura).
+- **🔥 Triplo Abate Rápido (+5 pts)**: Eliminar 3 goblins em uma janela de até 2.0 segundos.
+- **🌀 Interrupção de Teleporte (+10 pts)**: Eliminar um Goblin Fantasma ou Feiticeiro Espectral durante o portal dimensional.
+- **🛡️ Desafio Dourado (+3 pts)**: Superar a couraça e o escudo do Goblin Dourado utilizando apenas o disparo normal de mana.
+- **⚡ Feitiço Duplo (+10 pts)**: Eliminar 2 ou mais inimigos na mesma conjuração de feitiço (Raio ou Área).
 
 ---
 

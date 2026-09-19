@@ -30,6 +30,8 @@ namespace WizardGame.Core
         public int totalDamageDealt;     // Dano causado
         public int maxStreak;            // Melhor combo
         public int headshotsCount;       // Tiros perfeitos
+        public int skillBonusesCount;    // Jogadas de habilidade conquistadas
+        public int skillBonusTotalPoints;// Total de pontos obtidos via bônus especiais
         public float matchDuration;      // Duração da partida em segundos
         public string rankGrade;         // "S", "A", "B", "C", "D"
         public int rankScore;            // Pontuação combinada do Rank
@@ -94,6 +96,27 @@ namespace WizardGame.Core
         private int strongShotsCount;
         private int totalDamageDealt;
         private float matchDuration;
+
+        // --- SISTEMA DE BÔNUS DE HABILIDADE (SKILL SHOTS / TRICK BONUSES) ---
+        private bool isFirstShotAttempt = true;
+        private int skillBonusesCount;
+        private int skillBonusTotalPoints;
+        private readonly List<float> recentKillTimestamps = new List<float>(16);
+
+        private void AwardBonus(int points, string bonusName, Color color, AudioClip customSound = null)
+        {
+            currentScore += points;
+            skillBonusesCount++;
+            skillBonusTotalPoints += points;
+
+            uiManager?.ShowSkillBonusPopup(bonusName, color);
+            uiManager?.UpdateScore(currentScore);
+
+            if (customSound != null)
+            {
+                SoundManager.Instance?.PlaySFX(customSound);
+            }
+        }
 
         private void Start()
         {
@@ -219,6 +242,12 @@ namespace WizardGame.Core
             totalDamageDealt = 0;
             matchDuration = 0f;
 
+            // Reset bônus de habilidade
+            isFirstShotAttempt = true;
+            skillBonusesCount = 0;
+            skillBonusTotalPoints = 0;
+            recentKillTimestamps.Clear();
+
             if (waveTransitionCoroutine != null)
             {
                 StopCoroutine(waveTransitionCoroutine);
@@ -310,17 +339,28 @@ namespace WizardGame.Core
                 totalHits++;
                 totalDamageDealt += 1;
 
-                // Bônus de Precisão: Headshot / Acerto Perfeito
-                if (hitInfo.isHeadshot)
+                // Bônus 1: Primeiro Tiro (+5)
+                if (isFirstShotAttempt)
                 {
-                    currentScore += 1;
-                    headshotsCount++;
-                    SoundManager.Instance?.PlayHeadshotSound();
-                    uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                    uiManager?.UpdateScore(currentScore);
+                    isFirstShotAttempt = false;
+                    AwardBonus(5, "✨ PRIMEIRO TIRO! +5", new Color(1f, 0.85f, 0.2f), SoundManager.Instance?.headshotSound);
                 }
 
-                hitInfo.target.TakeDamage(1);
+                // Bônus 2: Headshot (+2)
+                if (hitInfo.isHeadshot)
+                {
+                    headshotsCount++;
+                    AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
+                }
+
+                hitInfo.target.TakeDamage(1, isNormalShot: true);
+            }
+            else
+            {
+                if (isFirstShotAttempt)
+                {
+                    isFirstShotAttempt = false;
+                }
             }
         }
 
@@ -337,6 +377,16 @@ namespace WizardGame.Core
         private void HandleSpecialShot(SpellType spell, ShotHitInfo hitInfo)
         {
             if (currentState != GameState.Playing) return;
+
+            // Bônus 1: Primeiro Tiro (+5)
+            if (isFirstShotAttempt)
+            {
+                if (hitInfo.isHit && hitInfo.target != null)
+                {
+                    AwardBonus(5, "✨ PRIMEIRO TIRO! +5", new Color(1f, 0.85f, 0.2f), SoundManager.Instance?.headshotSound);
+                }
+                isFirstShotAttempt = false;
+            }
 
             switch (spell)
             {
@@ -356,11 +406,8 @@ namespace WizardGame.Core
                         totalDamageDealt += 3;
                         if (hitInfo.isHeadshot)
                         {
-                            currentScore += 1;
                             headshotsCount++;
-                            SoundManager.Instance?.PlayHeadshotSound();
-                            uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                            uiManager?.UpdateScore(currentScore);
+                            AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
                         }
                         hitInfo.target.TakeDamage(3);
                     }
@@ -382,11 +429,8 @@ namespace WizardGame.Core
                         totalDamageDealt += 1;
                         if (hitInfo.isHeadshot)
                         {
-                            currentScore += 1;
                             headshotsCount++;
-                            SoundManager.Instance?.PlayHeadshotSound();
-                            uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                            uiManager?.UpdateScore(currentScore);
+                            AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
                         }
                         hitInfo.target.TakeDamage(1);
                         hitInfo.target.Freeze(2.5f);
@@ -408,6 +452,7 @@ namespace WizardGame.Core
                     strikePos.z = 0f;
 
                     var lightningChainPoints = new List<Vector3>();
+                    int lightningLethalHits = 0;
 
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
@@ -415,12 +460,10 @@ namespace WizardGame.Core
                         totalDamageDealt += 2;
                         if (hitInfo.isHeadshot)
                         {
-                            currentScore += 1;
                             headshotsCount++;
-                            SoundManager.Instance?.PlayHeadshotSound();
-                            uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                            uiManager?.UpdateScore(currentScore);
+                            AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
                         }
+                        if (hitInfo.target.CurrentHealth <= 2) lightningLethalHits++;
                         hitInfo.target.TakeDamage(2);
                         lightningChainPoints.Add(hitInfo.target.transform.position);
                     }
@@ -436,6 +479,7 @@ namespace WizardGame.Core
                         if (goblin == null || goblin == hitInfo.target) continue;
                         if (Vector2.Distance(strikePos, goblin.transform.position) <= 3.5f)
                         {
+                            if (goblin.CurrentHealth <= 1) lightningLethalHits++;
                             goblin.TakeDamage(1);
                             totalDamageDealt += 1;
                             totalHits++;
@@ -443,6 +487,12 @@ namespace WizardGame.Core
                             chainCount++;
                             if (chainCount >= 2) break;
                         }
+                    }
+
+                    // Bônus 6: Matar dois com um feitiço (+10)
+                    if (lightningLethalHits >= 2)
+                    {
+                        AwardBonus(10, "⚡ FEITIÇO DUPLO! +10", new Color(0.2f, 0.92f, 1f), SoundManager.Instance?.lightningCastSound);
                     }
 
                     SpellEffectsManager.Instance?.SpawnLightningChain(strikePos, lightningChainPoints);
@@ -466,11 +516,8 @@ namespace WizardGame.Core
 
                     if (hitInfo.isHeadshot)
                     {
-                        currentScore += 1;
                         headshotsCount++;
-                        SoundManager.Instance?.PlayHeadshotSound();
-                        uiManager?.ShowHeadshotPopup(hitInfo.hitPoint);
-                        uiManager?.UpdateScore(currentScore);
+                        AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
                     }
 
                     // Feitiço de Área: Explosão radial de 2.5m de raio causando 2 de dano a todos os goblins no raio
@@ -488,9 +535,17 @@ namespace WizardGame.Core
                         totalHits += affectedGoblins.Count;
                         totalDamageDealt += affectedGoblins.Count * 2;
                     }
+                    int areaLethalHits = 0;
                     foreach (var goblin in affectedGoblins)
                     {
+                        if (goblin.CurrentHealth <= 2) areaLethalHits++;
                         goblin.TakeDamage(2);
+                    }
+
+                    // Bônus 6: Matar dois com um feitiço (+10)
+                    if (areaLethalHits >= 2)
+                    {
+                        AwardBonus(10, "⚡ FEITIÇO DUPLO! +10", new Color(0.2f, 0.92f, 1f), SoundManager.Instance?.lightningCastSound);
                     }
                     break;
             }
@@ -499,6 +554,8 @@ namespace WizardGame.Core
         private void HandleShotMissed()
         {
             if (currentState != GameState.Playing) return;
+
+            isFirstShotAttempt = false;
 
             // Errar o disparo quebra a sequência de combo!
             if (currentStreak > 0)
@@ -537,6 +594,34 @@ namespace WizardGame.Core
 
             WizardDataSO data = wizard.GetData();
             bool isBoss = data != null && WaveConfig.IsBossType(data.wizardType);
+
+            // Bônus 3: Matar 3 rapidamente (dentro de 2.0s) (+5)
+            float now = Time.time;
+            for (int i = recentKillTimestamps.Count - 1; i >= 0; i--)
+            {
+                if (now - recentKillTimestamps[i] > 2.0f)
+                {
+                    recentKillTimestamps.RemoveAt(i);
+                }
+            }
+            recentKillTimestamps.Add(now);
+            if (recentKillTimestamps.Count >= 3)
+            {
+                recentKillTimestamps.Clear();
+                AwardBonus(5, "🔥 TRIPLO ABATE RÁPIDO! +5", new Color(1f, 0.45f, 0.1f), SoundManager.Instance?.strongShotSound);
+            }
+
+            // Bônus 4: Matar durante teleporte (+10)
+            if (wizard != null && (wizard.DiedWhileTeleporting || wizard.IsTeleporting))
+            {
+                AwardBonus(10, "🌀 INTERRUPÇÃO DIMENSIONAL! +10", new Color(0.75f, 0.35f, 1f), SoundManager.Instance?.strongShotSound);
+            }
+
+            // Bônus 5: Matar Dourado com tiro normal (+3)
+            if (data != null && data.wizardType == WizardType.Dourado && wizard != null && wizard.WasLastDamageNormalShot)
+            {
+                AwardBonus(3, "🛡️ DESAFIO DOURADO! +3", new Color(1f, 0.88f, 0.15f), SoundManager.Instance?.headshotSound);
+            }
 
             if (isBoss)
             {
@@ -755,6 +840,8 @@ namespace WizardGame.Core
                 totalDamageDealt = totalDamageDealt,
                 maxStreak = maxStreak,
                 headshotsCount = headshotsCount,
+                skillBonusesCount = skillBonusesCount,
+                skillBonusTotalPoints = skillBonusTotalPoints,
                 matchDuration = matchDuration,
                 rankGrade = rank.grade,
                 rankScore = rank.rankScore,

@@ -198,8 +198,8 @@ namespace WizardGame.UI
                     $"<size=24><b>{stats.accuracy:F0}% PRECISÃO</b></size>\n" +
                     $"<size=24><b>COMBO x{stats.maxStreak}</b></size>\n\n" +
                     $"<size=30><color=#{colorHex}><b>{stats.finalScore} PONTOS</b></color></size>\n\n" +
-                    $"<size=15><color=#A8B2C0>Tempo: {timeFormatted}   •   Tiros Fortes: {stats.strongShotsCount}   •   Fugitivos: {stats.escapedCount}/15\n" +
-                    $"Disparos: {stats.totalShotsFired}   |   Acertos: {stats.totalHits}   |   Dano: {stats.totalDamageDealt}</color></size>";
+                    $"<size=15><color=#A8B2C0>Tempo: {timeFormatted}   •   Tiros Fortes: {stats.strongShotsCount}   •   Bônus de Habilidade: {stats.skillBonusesCount} (+{stats.skillBonusTotalPoints} pts)\n" +
+                    $"Disparos: {stats.totalShotsFired}   |   Acertos: {stats.totalHits}   |   Dano: {stats.totalDamageDealt}   |   Fugitivos: {stats.escapedCount}/15</color></size>";
             }
         }
 
@@ -220,6 +220,8 @@ namespace WizardGame.UI
                 totalDamageDealt = score,
                 maxStreak = maxStreak,
                 headshotsCount = headshots,
+                skillBonusesCount = 0,
+                skillBonusTotalPoints = 0,
                 matchDuration = 90f,
                 rankGrade = rank.grade,
                 rankScore = rank.rankScore,
@@ -401,36 +403,49 @@ namespace WizardGame.UI
 
         #endregion
 
-        #region Efeito de Headshot
+        #region Efeito de Headshot e Bônus de Habilidade
 
         public void ShowHeadshotPopup(Vector3 worldPoint)
+        {
+            ShowSkillBonusPopup("🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f));
+        }
+
+        public void ShowSkillBonusPopup(string text, Color color)
         {
             if (headshotPopupContainer == null) return;
 
             if (headshotCoroutine != null) StopCoroutine(headshotCoroutine);
-            headshotCoroutine = StartCoroutine(HeadshotPopupRoutine());
+            headshotCoroutine = StartCoroutine(SkillBonusPopupRoutine(text, color));
         }
 
-        private IEnumerator HeadshotPopupRoutine()
+        private IEnumerator SkillBonusPopupRoutine(string text, Color color)
         {
             headshotPopupContainer.SetActive(true);
             if (headshotPopupText != null)
             {
-                headshotPopupText.text = "HEADSHOT! +1 PONTO";
-                headshotPopupText.color = new Color(0.2f, 1f, 0.3f);
+                headshotPopupText.text = text;
+                headshotPopupText.color = color;
             }
 
             RectTransform rect = headshotPopupContainer.GetComponent<RectTransform>();
-            Vector2 initialPos = new Vector2(0f, 140f);
-            if (rect != null) rect.anchoredPosition = initialPos;
+            Vector2 initialPos = new Vector2(0f, 130f);
+            if (rect != null)
+            {
+                rect.anchoredPosition = initialPos;
+                rect.localScale = new Vector3(1.25f, 1.25f, 1f);
+            }
 
             float elapsed = 0f;
-            float dur = 0.85f;
+            float dur = 0.95f;
             while (elapsed < dur)
             {
                 elapsed += Time.unscaledDeltaTime;
                 float t = elapsed / dur;
-                if (rect != null) rect.anchoredPosition = initialPos + new Vector2(0f, 40f * t);
+                if (rect != null)
+                {
+                    rect.anchoredPosition = initialPos + new Vector2(0f, 45f * t);
+                    rect.localScale = Vector3.Lerp(new Vector3(1.25f, 1.25f, 1f), Vector3.one, Mathf.Clamp01(t * 3f));
+                }
                 yield return null;
             }
 
