@@ -60,6 +60,7 @@ namespace WizardGame.UI
 
         [Header("Elementos de Fim de Jogo")]
         [SerializeField] private Text endTitleText;
+        [SerializeField] private Text endRankGradeText;
         [SerializeField] private Text endScoreText;
         [SerializeField] private Text endStatsText;
         [SerializeField] private Button restartButton;
@@ -156,36 +157,56 @@ namespace WizardGame.UI
             if (inGameHUD != null) inGameHUD.SetActive(false);
             Cursor.visible = true;
 
+            string colorHex = ColorUtility.ToHtmlStringRGB(stats.rankColor);
+
             if (endTitleText != null)
             {
-                endTitleText.text = stats.won ? "RESULTADO  -  VITÓRIA!" : "RESULTADO  -  FIM DE JOGO";
+                endTitleText.text = stats.won ? "VITÓRIA" : "DERROTA";
                 endTitleText.color = stats.won ? new Color(1f, 0.88f, 0.2f) : new Color(1f, 0.35f, 0.35f);
+            }
+
+            if (endRankGradeText != null)
+            {
+                endRankGradeText.text = stats.rankGrade;
+                endRankGradeText.color = stats.rankColor;
             }
 
             if (endScoreText != null)
             {
-                endScoreText.text = $"CLASSIFICAÇÃO:  {stats.rankBadge} {stats.rankTitle.ToUpper()}  ({stats.accuracy:F0}%)\n" +
-                                    $"<size=17><color=#E0E0E0>Pontos: {stats.finalScore}  |  Fugitivos: {stats.escapedCount} / 15</color></size>";
-                endScoreText.color = stats.rankColor;
+                if (endRankGradeText != null)
+                {
+                    endScoreText.text = $"<size=22><b>{stats.rankBadge} {stats.rankTitle.ToUpper()}</b></size>";
+                    endScoreText.color = stats.rankColor;
+                }
+                else
+                {
+                    // Fallback visual caso endRankGradeText não tenha sido associado no Inspector
+                    endScoreText.text = $"<size=74><b>{stats.rankGrade}</b></size>\n" +
+                                        $"<size=20><b>{stats.rankBadge} {stats.rankTitle.ToUpper()}</b></size>";
+                    endScoreText.color = stats.rankColor;
+                }
             }
 
             if (endStatsText != null)
             {
+                int minutes = Mathf.FloorToInt(stats.matchDuration / 60f);
+                int seconds = Mathf.FloorToInt(stats.matchDuration % 60f);
+                string timeFormatted = $"{minutes:00}:{seconds:00}";
+
                 endStatsText.text =
-                    $"Magos abatidos        <b>{stats.wizardsDefeated}</b>\n" +
-                    $"Tiros disparados      <b>{stats.totalShotsFired}</b>\n" +
-                    $"Acertos               <b>{stats.totalHits}</b>\n" +
-                    $"Precisão              <b>{stats.accuracy:F0}%</b>\n\n" +
-                    $"Tiros fortes          <b>{stats.strongShotsCount}</b>\n" +
-                    $"Dano causado          <b>{stats.totalDamageDealt}</b>\n\n" +
-                    $"Melhor combo          <b>x{stats.maxStreak}</b>";
+                    $"<size=24><b>{stats.wizardsDefeated} MAGOS</b></size>\n" +
+                    $"<size=24><b>{stats.accuracy:F0}% PRECISÃO</b></size>\n" +
+                    $"<size=24><b>COMBO x{stats.maxStreak}</b></size>\n\n" +
+                    $"<size=30><color=#{colorHex}><b>{stats.finalScore} PONTOS</b></color></size>\n\n" +
+                    $"<size=15><color=#A8B2C0>Tempo: {timeFormatted}   •   Tiros Fortes: {stats.strongShotsCount}   •   Fugitivos: {stats.escapedCount}/15\n" +
+                    $"Disparos: {stats.totalShotsFired}   |   Acertos: {stats.totalHits}   |   Dano: {stats.totalDamageDealt}</color></size>";
             }
         }
 
         public void ShowGameOver(bool won, int score, int escaped, int maxStreak, int headshots)
         {
             float fallbackAcc = 100f;
-            var rank = GameManager.CalculateRank(fallbackAcc);
+            var rank = GameManager.CalculateMatchRank(score, fallbackAcc, 90f, escaped, maxStreak, 0);
             var stats = new GamePerformanceStats
             {
                 won = won,
@@ -199,6 +220,9 @@ namespace WizardGame.UI
                 totalDamageDealt = score,
                 maxStreak = maxStreak,
                 headshotsCount = headshots,
+                matchDuration = 90f,
+                rankGrade = rank.grade,
+                rankScore = rank.rankScore,
                 rankTitle = rank.title,
                 rankBadge = rank.badge,
                 rankColor = rank.color

@@ -30,8 +30,11 @@ namespace WizardGame.Core
         public int totalDamageDealt;     // Dano causado
         public int maxStreak;            // Melhor combo
         public int headshotsCount;       // Tiros perfeitos
-        public string rankTitle;         // "Arquimago", "Feiticeiro", "Aprendiz", "Iniciante"
-        public string rankBadge;         // "👑", "🔮", "📜", "🔰"
+        public float matchDuration;      // Duração da partida em segundos
+        public string rankGrade;         // "S", "A", "B", "C", "D"
+        public int rankScore;            // Pontuação combinada do Rank
+        public string rankTitle;         // "Arquimago Supremo", "Feiticeiro", etc.
+        public string rankBadge;         // "👑", "🔮", "⚡", "📜", "🔰"
         public Color rankColor;
     }
 
@@ -90,6 +93,7 @@ namespace WizardGame.Core
         private int totalHits;
         private int strongShotsCount;
         private int totalDamageDealt;
+        private float matchDuration;
 
         private void Start()
         {
@@ -134,6 +138,7 @@ namespace WizardGame.Core
         {
             if (currentState == GameState.Playing)
             {
+                matchDuration += Time.deltaTime;
                 UpdateCooldown(ref arcaneTimer, ref isArcaneReady, SpellType.Arcane);
                 UpdateCooldown(ref iceTimer, ref isIceReady, SpellType.Ice);
                 UpdateCooldown(ref lightningTimer, ref isLightningReady, SpellType.Lightning);
@@ -212,6 +217,7 @@ namespace WizardGame.Core
             totalHits = 0;
             strongShotsCount = 0;
             totalDamageDealt = 0;
+            matchDuration = 0f;
 
             if (waveTransitionCoroutine != null)
             {
@@ -618,15 +624,98 @@ namespace WizardGame.Core
             return 1;
         }
 
+        /// <summary>
+        /// Algoritmo de Rank composto da partida (S / A / B / C / D) calculado a partir de 6 fatores:
+        /// 1. Quantidade de mortes (magos abatidos)
+        /// 2. Precisão (% acertos)
+        /// 3. Tempo de partida (duração)
+        /// 4. Magos escapados (penalidade e bônus sem fugas)
+        /// 5. Maior combo sequencial mantido
+        /// 6. Uso tático de feitiços fortes (tiros fortes)
+        /// </summary>
+        public static (string grade, string title, string badge, Color color, int rankScore) CalculateMatchRank(
+            int kills,
+            float accuracy,
+            float durationSeconds,
+            int escapes,
+            int maxStreak,
+            int strongShots)
+        {
+            // 1. Fator Mortes (Magos Abatidos): até 500 pts (10 pts por mago)
+            int killsScore = kills * 10;
+
+            // 2. Fator Precisão (% de acertos): até 250 pts
+            int accuracyScore = Mathf.RoundToInt((Mathf.Clamp(accuracy, 0f, 100f) / 100f) * 250f);
+
+            // 3. Fator Tempo: até 200 pts de bônus por rapidez e eficiência
+            // <= 60s dá 200 pts; decai gradativamente até 240s; multiplicado pelo progresso de abates
+            float timeFactor = Mathf.Clamp01(1f - (Mathf.Max(0f, durationSeconds - 60f) / 180f));
+            float progressRatio = Mathf.Clamp01(kills / 40f);
+            int timeScore = Mathf.RoundToInt(timeFactor * 200f * progressRatio);
+
+            // 4. Fator Magos Escapados:
+            // Bônus de 150 pts se nenhum mago escapou (flawless)
+            // Penalidade de -30 pts por cada mago escapado
+            int escapeScore = (escapes == 0 && kills > 0) ? 150 : -(escapes * 30);
+
+            // 5. Fator Combo (Maior sequência): até 240 pts
+            int comboScore = Mathf.Min(maxStreak * 12, 240);
+
+            // 6. Fator Feitiços Fortes: até 150 pts (15 pts por magia especial usada)
+            int strongShotsScore = Mathf.Min(strongShots * 15, 150);
+
+            // Pontuação combinada do Rank
+            int totalRankScore = killsScore + accuracyScore + timeScore + escapeScore + comboScore + strongShotsScore;
+            if (totalRankScore < 0) totalRankScore = 0;
+
+            string grade;
+            string title;
+            string badge;
+            Color color;
+
+            if (totalRankScore >= 1100)
+            {
+                grade = "S";
+                title = "Arquimago Supremo";
+                badge = "👑";
+                color = new Color(1f, 0.84f, 0.0f); // Dourado Radiante
+            }
+            else if (totalRankScore >= 850)
+            {
+                grade = "A";
+                title = "Mago Mestre";
+                badge = "🔮";
+                color = new Color(0.78f, 0.35f, 1f); // Púrpura Arcano
+            }
+            else if (totalRankScore >= 650)
+            {
+                grade = "B";
+                title = "Feiticeiro Adepto";
+                badge = "⚡";
+                color = new Color(0.15f, 0.82f, 1f); // Ciano Brilhante
+            }
+            else if (totalRankScore >= 450)
+            {
+                grade = "C";
+                title = "Mago Aprendiz";
+                badge = "📜";
+                color = new Color(0.4f, 0.95f, 0.4f); // Verde Esmeralda
+            }
+            else
+            {
+                grade = "D";
+                title = "Iniciante Novato";
+                badge = "🔰";
+                color = new Color(0.7f, 0.7f, 0.75f); // Cinza Prateado
+            }
+
+            return (grade, title, badge, color, totalRankScore);
+        }
+
         public static (string title, string badge, Color color) CalculateRank(float accuracy)
         {
-            if (accuracy >= 90f)
-                return ("Arquimago", "👑", new Color(1f, 0.85f, 0.2f)); // Ouro
-            if (accuracy >= 70f)
-                return ("Feiticeiro", "🔮", new Color(0.85f, 0.45f, 1f)); // Púrpura Mágico
-            if (accuracy >= 50f)
-                return ("Aprendiz", "📜", new Color(0.35f, 0.85f, 1f)); // Ciano / Azul Claro
-            return ("Iniciante", "🔰", new Color(0.75f, 0.75f, 0.75f)); // Prata / Cinza
+            var rank = CalculateMatchRank(50, accuracy, 100f, 0, 10, 5);
+            return (rank.title, rank.badge, rank.color);
         }
 
         private void EndGame(bool won)
@@ -651,7 +740,7 @@ namespace WizardGame.Core
             }
 
             float accuracy = totalShotsFired > 0 ? ((float)totalHits / totalShotsFired) * 100f : 0f;
-            var rank = CalculateRank(accuracy);
+            var rank = CalculateMatchRank(wizardsDefeated, accuracy, matchDuration, currentEscaped, maxStreak, strongShotsCount);
 
             var stats = new GamePerformanceStats
             {
@@ -666,6 +755,9 @@ namespace WizardGame.Core
                 totalDamageDealt = totalDamageDealt,
                 maxStreak = maxStreak,
                 headshotsCount = headshotsCount,
+                matchDuration = matchDuration,
+                rankGrade = rank.grade,
+                rankScore = rank.rankScore,
                 rankTitle = rank.title,
                 rankBadge = rank.badge,
                 rankColor = rank.color
