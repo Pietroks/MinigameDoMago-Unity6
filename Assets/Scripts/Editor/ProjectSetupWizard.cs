@@ -697,17 +697,17 @@ namespace WizardGame.EditorTools
             // --- MENU DE FIM DE JOGO ---
             GameObject endPanel = CreatePanel(canvasGo.transform, "GameOverPanel", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Color(0.04f, 0.04f, 0.08f, 0.96f));
             var endRect = endPanel.GetComponent<RectTransform>();
-            endRect.sizeDelta = new Vector2(650f, 460f);
+            endRect.sizeDelta = new Vector2(680f, 560f);
             endRect.anchoredPosition = Vector2.zero;
 
-            var endTitleText = CreateUIText(endPanel.transform, "EndTitle", "VITORIA!", 46, Color.yellow, new Vector2(0f, 160f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
-            var endScoreText = CreateUIText(endPanel.transform, "EndScore", "Pontos Totais: 50", 24, Color.white, new Vector2(0f, 95f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
-            var endStatsText = CreateUIText(endPanel.transform, "EndStats", "Maior Combo: 12  |  Headshots: 5", 20, Color.cyan, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            var endTitleText = CreateUIText(endPanel.transform, "EndTitle", "RESULTADO", 38, Color.yellow, new Vector2(0f, 230f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            var endScoreText = CreateUIText(endPanel.transform, "EndScore", "CLASSIFICAÇÃO", 21, Color.white, new Vector2(0f, 175f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
+            var endStatsText = CreateUIText(endPanel.transform, "EndStats", "Estatísticas de Desempenho", 19, Color.cyan, new Vector2(0f, 15f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
-            var endRestartBtnObj = CreateButton(endPanel.transform, "EndRestartBtn", "JOGAR NOVAMENTE", new Vector2(0f, -65f), new Vector2(0.5f, 0.5f), new Vector2(300f, 55f), defaultFont, new Color(0.5f, 0.1f, 0.8f));
+            var endRestartBtnObj = CreateButton(endPanel.transform, "EndRestartBtn", "JOGAR NOVAMENTE", new Vector2(0f, -185f), new Vector2(0.5f, 0.5f), new Vector2(300f, 50f), defaultFont, new Color(0.5f, 0.1f, 0.8f));
             var endRestartBtn = endRestartBtnObj.GetComponent<Button>();
 
-            var endMenuBtnObj = CreateButton(endPanel.transform, "EndMenuBtn", "MENU PRINCIPAL", new Vector2(0f, -135f), new Vector2(0.5f, 0.5f), new Vector2(300f, 50f), defaultFont, new Color(0.25f, 0.25f, 0.35f));
+            var endMenuBtnObj = CreateButton(endPanel.transform, "EndMenuBtn", "MENU PRINCIPAL", new Vector2(0f, -245f), new Vector2(0.5f, 0.5f), new Vector2(300f, 45f), defaultFont, new Color(0.25f, 0.25f, 0.35f));
             var endMenuBtn = endMenuBtnObj.GetComponent<Button>();
             endPanel.SetActive(false);
 

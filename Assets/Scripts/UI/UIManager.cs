@@ -150,7 +150,7 @@ namespace WizardGame.UI
             if (instructionsPanel != null) instructionsPanel.SetActive(show);
         }
 
-        public void ShowGameOver(bool won, int score, int escaped, int maxStreak, int headshots)
+        public void ShowGameOver(GamePerformanceStats stats)
         {
             if (gameOverPanel != null) gameOverPanel.SetActive(true);
             if (inGameHUD != null) inGameHUD.SetActive(false);
@@ -158,23 +158,52 @@ namespace WizardGame.UI
 
             if (endTitleText != null)
             {
-                endTitleText.text = won ? "VITORIA! TODOS OS GOBLINS FORAM DERROTADOS!" : "DERROTA! OS GOBLINS ESCAPARAM!";
-                endTitleText.color = won ? Color.yellow : Color.red;
+                endTitleText.text = stats.won ? "RESULTADO  -  VITÓRIA!" : "RESULTADO  -  FIM DE JOGO";
+                endTitleText.color = stats.won ? new Color(1f, 0.88f, 0.2f) : new Color(1f, 0.35f, 0.35f);
             }
 
             if (endScoreText != null)
             {
-                endScoreText.text = won
-                    ? $"Pontos Totais: {score}  |  Goblins Abatidos com Maestria!"
-                    : $"Pontos Totais: {score}  |  Goblins Fugitivos: {escaped} / 15";
+                endScoreText.text = $"CLASSIFICAÇÃO:  {stats.rankBadge} {stats.rankTitle.ToUpper()}  ({stats.accuracy:F0}%)\n" +
+                                    $"<size=17><color=#E0E0E0>Pontos: {stats.finalScore}  |  Fugitivos: {stats.escapedCount} / 15</color></size>";
+                endScoreText.color = stats.rankColor;
             }
 
             if (endStatsText != null)
             {
-                endStatsText.text = $"Estatisticas de Desempenho:\n" +
-                                    $"  - Maior Combo Sequencial: {maxStreak} abates\n" +
-                                    $"  - Tiros Perfeitos (Headshots): {headshots}";
+                endStatsText.text =
+                    $"Magos abatidos        <b>{stats.wizardsDefeated}</b>\n" +
+                    $"Tiros disparados      <b>{stats.totalShotsFired}</b>\n" +
+                    $"Acertos               <b>{stats.totalHits}</b>\n" +
+                    $"Precisão              <b>{stats.accuracy:F0}%</b>\n\n" +
+                    $"Tiros fortes          <b>{stats.strongShotsCount}</b>\n" +
+                    $"Dano causado          <b>{stats.totalDamageDealt}</b>\n\n" +
+                    $"Melhor combo          <b>x{stats.maxStreak}</b>";
             }
+        }
+
+        public void ShowGameOver(bool won, int score, int escaped, int maxStreak, int headshots)
+        {
+            float fallbackAcc = 100f;
+            var rank = GameManager.CalculateRank(fallbackAcc);
+            var stats = new GamePerformanceStats
+            {
+                won = won,
+                finalScore = score,
+                escapedCount = escaped,
+                wizardsDefeated = score,
+                totalShotsFired = Math.Max(1, score),
+                totalHits = score,
+                accuracy = fallbackAcc,
+                strongShotsCount = 0,
+                totalDamageDealt = score,
+                maxStreak = maxStreak,
+                headshotsCount = headshots,
+                rankTitle = rank.title,
+                rankBadge = rank.badge,
+                rankColor = rank.color
+            };
+            ShowGameOver(stats);
         }
 
         public void UpdateScore(int score, int target = -1)

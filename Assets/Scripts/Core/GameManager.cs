@@ -16,6 +16,25 @@ namespace WizardGame.Core
         GameOver
     }
 
+    [System.Serializable]
+    public struct GamePerformanceStats
+    {
+        public bool won;
+        public int finalScore;
+        public int escapedCount;
+        public int wizardsDefeated;      // Magos abatidos
+        public int totalShotsFired;      // Tiros disparados
+        public int totalHits;            // Acertos
+        public float accuracy;           // Precisão % (ex: 83.5f)
+        public int strongShotsCount;     // Tiros fortes
+        public int totalDamageDealt;     // Dano causado
+        public int maxStreak;            // Melhor combo
+        public int headshotsCount;       // Tiros perfeitos
+        public string rankTitle;         // "Arquimago", "Feiticeiro", "Aprendiz", "Iniciante"
+        public string rankBadge;         // "👑", "🔮", "📜", "🔰"
+        public Color rankColor;
+    }
+
     /// <summary>
     /// Orquestrador principal com Arsenal Mágico (Tiro Normal, Arcano, Gelo, Relâmpago e Área),
     /// Sistema de Combos, Multiplicadores Dinâmicos e Bônus de Precisão por Headshot.
@@ -64,6 +83,13 @@ namespace WizardGame.Core
         private int currentMultiplier;
         private int maxStreak;
         private int headshotsCount;
+
+        // --- TELEMETRIA E SISTEMA DE PRECISÃO ---
+        private int wizardsDefeated;
+        private int totalShotsFired;
+        private int totalHits;
+        private int strongShotsCount;
+        private int totalDamageDealt;
 
         private void Start()
         {
@@ -180,6 +206,13 @@ namespace WizardGame.Core
             headshotsCount = 0;
             currentWaveIndex = 0;
 
+            // Reset telemetria e precisão
+            wizardsDefeated = 0;
+            totalShotsFired = 0;
+            totalHits = 0;
+            strongShotsCount = 0;
+            totalDamageDealt = 0;
+
             if (waveTransitionCoroutine != null)
             {
                 StopCoroutine(waveTransitionCoroutine);
@@ -263,10 +296,14 @@ namespace WizardGame.Core
         {
             if (currentState != GameState.Playing) return;
 
+            totalShotsFired++;
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.normalShotSound);
 
             if (hitInfo.isHit && hitInfo.target != null)
             {
+                totalHits++;
+                totalDamageDealt += 1;
+
                 // Bônus de Precisão: Headshot / Acerto Perfeito
                 if (hitInfo.isHeadshot)
                 {
@@ -299,6 +336,8 @@ namespace WizardGame.Core
             {
                 case SpellType.Arcane:
                     if (!isArcaneReady) return;
+                    totalShotsFired++;
+                    strongShotsCount++;
                     isArcaneReady = false;
                     arcaneTimer = arcaneCooldownDuration;
                     uiManager?.UpdateSpellCooldown(SpellType.Arcane, false, arcaneCooldownDuration);
@@ -307,6 +346,8 @@ namespace WizardGame.Core
 
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
+                        totalHits++;
+                        totalDamageDealt += 3;
                         if (hitInfo.isHeadshot)
                         {
                             currentScore += 1;
@@ -321,6 +362,8 @@ namespace WizardGame.Core
 
                 case SpellType.Ice:
                     if (!isIceReady) return;
+                    totalShotsFired++;
+                    strongShotsCount++;
                     isIceReady = false;
                     iceTimer = iceCooldownDuration;
                     uiManager?.UpdateSpellCooldown(SpellType.Ice, false, iceCooldownDuration);
@@ -329,6 +372,8 @@ namespace WizardGame.Core
 
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
+                        totalHits++;
+                        totalDamageDealt += 1;
                         if (hitInfo.isHeadshot)
                         {
                             currentScore += 1;
@@ -345,6 +390,8 @@ namespace WizardGame.Core
 
                 case SpellType.Lightning:
                     if (!isLightningReady) return;
+                    totalShotsFired++;
+                    strongShotsCount++;
                     isLightningReady = false;
                     lightningTimer = lightningCooldownDuration;
                     uiManager?.UpdateSpellCooldown(SpellType.Lightning, false, lightningCooldownDuration);
@@ -358,6 +405,8 @@ namespace WizardGame.Core
 
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
+                        totalHits++;
+                        totalDamageDealt += 2;
                         if (hitInfo.isHeadshot)
                         {
                             currentScore += 1;
@@ -382,6 +431,8 @@ namespace WizardGame.Core
                         if (Vector2.Distance(strikePos, goblin.transform.position) <= 3.5f)
                         {
                             goblin.TakeDamage(1);
+                            totalDamageDealt += 1;
+                            totalHits++;
                             lightningChainPoints.Add(goblin.transform.position);
                             chainCount++;
                             if (chainCount >= 2) break;
@@ -393,6 +444,8 @@ namespace WizardGame.Core
 
                 case SpellType.Area:
                     if (!isAreaReady) return;
+                    totalShotsFired++;
+                    strongShotsCount++;
                     isAreaReady = false;
                     areaTimer = areaCooldownDuration;
                     uiManager?.UpdateSpellCooldown(SpellType.Area, false, areaCooldownDuration);
@@ -423,6 +476,11 @@ namespace WizardGame.Core
                         {
                             affectedGoblins.Add(goblin);
                         }
+                    }
+                    if (affectedGoblins.Count > 0)
+                    {
+                        totalHits += affectedGoblins.Count;
+                        totalDamageDealt += affectedGoblins.Count * 2;
                     }
                     foreach (var goblin in affectedGoblins)
                     {
@@ -455,6 +513,8 @@ namespace WizardGame.Core
         private void HandleWizardDefeated(WizardController wizard, int basePoints)
         {
             if (currentState != GameState.Playing) return;
+
+            wizardsDefeated++;
 
             // Incrementa sequência de combo
             currentStreak++;
@@ -558,6 +618,17 @@ namespace WizardGame.Core
             return 1;
         }
 
+        public static (string title, string badge, Color color) CalculateRank(float accuracy)
+        {
+            if (accuracy >= 90f)
+                return ("Arquimago", "👑", new Color(1f, 0.85f, 0.2f)); // Ouro
+            if (accuracy >= 70f)
+                return ("Feiticeiro", "🔮", new Color(0.85f, 0.45f, 1f)); // Púrpura Mágico
+            if (accuracy >= 50f)
+                return ("Aprendiz", "📜", new Color(0.35f, 0.85f, 1f)); // Ciano / Azul Claro
+            return ("Iniciante", "🔰", new Color(0.75f, 0.75f, 0.75f)); // Prata / Cinza
+        }
+
         private void EndGame(bool won)
         {
             SetState(GameState.GameOver);
@@ -579,7 +650,28 @@ namespace WizardGame.Core
                 SoundManager.Instance?.PlaySFX(SoundManager.Instance.defeatSound);
             }
 
-            uiManager?.ShowGameOver(won, currentScore, currentEscaped, maxStreak, headshotsCount);
+            float accuracy = totalShotsFired > 0 ? ((float)totalHits / totalShotsFired) * 100f : 0f;
+            var rank = CalculateRank(accuracy);
+
+            var stats = new GamePerformanceStats
+            {
+                won = won,
+                finalScore = currentScore,
+                escapedCount = currentEscaped,
+                wizardsDefeated = wizardsDefeated,
+                totalShotsFired = totalShotsFired,
+                totalHits = totalHits,
+                accuracy = accuracy,
+                strongShotsCount = strongShotsCount,
+                totalDamageDealt = totalDamageDealt,
+                maxStreak = maxStreak,
+                headshotsCount = headshotsCount,
+                rankTitle = rank.title,
+                rankBadge = rank.badge,
+                rankColor = rank.color
+            };
+
+            uiManager?.ShowGameOver(stats);
         }
 
         #region Wave System Progression
