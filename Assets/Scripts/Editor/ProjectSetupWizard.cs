@@ -520,6 +520,7 @@ namespace WizardGame.EditorTools
 
             var scoreText = CreateUIText(topBar.transform, "ScoreText", "Pontos: 0", 25, Color.white, new Vector2(25f, -22f), new Vector2(0f, 1f), defaultFont);
             var escapeText = CreateUIText(topBar.transform, "EscapeText", "Escaparam: 0 / 15", 21, new Color(1f, 0.6f, 0.6f), new Vector2(25f, -54f), new Vector2(0f, 1f), defaultFont);
+            var playerHealthText = CreateUIText(topBar.transform, "PlayerHealthText", "VIDA: ❤️❤️❤️❤️❤️ (5/5)", 21, new Color(0.4f, 1f, 0.4f), new Vector2(240f, -22f), new Vector2(0f, 1f), defaultFont);
 
             var waveText = CreateUIText(topBar.transform, "WaveText", "⚔️ ONDA 1 / 5  •  Restam: 5 / 5", 20, new Color(1f, 0.88f, 0.35f), new Vector2(0f, -20f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
             var ammoText = CreateUIText(topBar.transform, "AmmoText", "MANA: 8 / 8  [R]", 22, Color.cyan, new Vector2(0f, -52f), new Vector2(0.5f, 1f), defaultFont, TextAnchor.MiddleCenter);
@@ -624,6 +625,12 @@ namespace WizardGame.EditorTools
             SetPrivateField(weaponSystem, "crosshairImage", crossImg);
             SetPrivateField(weaponSystem, "crystalGlowImage", glowImg);
 
+            // --- DAMAGE FLASH OVERLAY (VINHETA VERMELHA DE DANO) ---
+            GameObject flashGo = CreatePanel(canvasGo.transform, "DamageFlashOverlay", Vector2.zero, Vector2.one, new Color(0.9f, 0.08f, 0.08f, 0f));
+            var flashImg = flashGo.GetComponent<Image>();
+            flashImg.raycastTarget = false;
+            flashGo.SetActive(false);
+
             // --- MENU INICIAL ---
             GameObject startMenu = CreatePanel(canvasGo.transform, "StartMenuPanel", new Vector2(0f, 0f), new Vector2(1f, 1f), new Color(0.04f, 0.04f, 0.08f, 0.95f));
 
@@ -652,22 +659,25 @@ namespace WizardGame.EditorTools
             CreateUIText(instrPanel.transform, "InstrTitle", "MANUAL DOS GOBLINS & ARSENAL MÁGICO", 28, Color.yellow, new Vector2(0f, 320f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleCenter);
 
             string instrBody = "INIMIGOS (GUIA OFICIAL DOS GOBLINS):\n" +
-                               "  • GOBLIN COMUM: 1 HP | 1 Ponto | Move-se atacando com facas.\n" +
-                               "  • GOBLIN FUGITIVO: 2 HP | 2 Pontos | Ao sofrer dano, salta em disparada veloz!\n" +
-                               "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Mais rapido com escudo impenetravel temporario.\n" +
-                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta atraves de portais misticos ao tomar dano.\n\n" +
+                               "  • GOBLIN COMUM: 1 HP | 1 Ponto | Não ataca o jogador ao escapar.\n" +
+                               "  • GOBLIN FUGITIVO: 2 HP | 2 Pontos | Causa 1 de Dano à sua Vida ao escapar!\n" +
+                               "  • GOBLIN DOURADO: 3 HP | 5 Pontos | Escudo impenetrável; Causa 2 de Dano ao escapar!\n" +
+                               "  • GOBLIN FANTASMA: 4 HP | 3 Pontos | Teleporta através de portais místicos ao tomar dano.\n\n" +
                                "OS 5 GRANDES CHEFES (A CADA 10 GOBLINS):\n" +
-                               "  • 👑 10º: GRANDE GOBLIN: 15 HP (+25 Pts)  • 🔥 20º: XAMÃ DO CAOS: 25 HP (+50 Pts)\n" +
-                               "  • 🔮 30º: FEITICEIRO ESPECTRAL: 35 HP (+100 Pts)  • 🩸 40º: LORDE CARMESIM: 50 HP (+150 Pts)\n" +
-                               "  • ⚔️ 50º: GOBLIN REI SUPREMO: 80 HP (+500 Pts)! DERROTAR = VITORIA!\n\n" +
+                               "  • 👑 10º: GRANDE GOBLIN: 15 HP  • 🔥 20º: XAMÃ DO CAOS: 25 HP\n" +
+                               "  • 🔮 30º: FEITICEIRO ESPECTRAL: 35 HP  • 🩸 40º: LORDE CARMESIM: 50 HP\n" +
+                               "  • ⚔️ 50º: GOBLIN REI SUPREMO: 80 HP! DERROTAR = VITÓRIA!\n" +
+                               "  • ⚠️ CUIDADO: Ataques de impacto e projéteis arcanos dos Chefes causam 1 a 2 de Dano!\n\n" +
+                               "🧙 VIDA DO JOGADOR & CONDIÇÕES DE DERROTA:\n" +
+                               "  • Você possui 5 Pontos de Vida (❤️❤️❤️❤️❤️). Se zerar, VOCÊ CAI EM COMBATE!\n" +
+                               "  • Deixar 15 Goblins escaparem também resulta em invasão e Derrota.\n\n" +
                                "ARSENAL MÁGICO & COMBOS:\n" +
                                "  • 🔥 [LMB] NORMAL: 1 Dano | 💥 [1/Q] ARCANO: 3 Dano | ❄️ [2/E] GELO: Congela 2.5s\n" +
-                               "  • ⚡ [3/F] RELÂMPAGO: Corrente eletrica | 🌀 [4/C] ÁREA: Explosão 2.5m (2 Dano)\n" +
+                               "  • ⚡ [3/F] RELÂMPAGO: Corrente elétrica | 🌀 [4/C] ÁREA: Explosão 2.5m (2 Dano)\n" +
                                "  • 🔥 COMBOS: Multiplicadores progressivos de pontuação de x1 até x4!\n\n" +
                                "BÔNUS DE HABILIDADE (SKILL SHOTS):\n" +
-                               "  • ✨ PRIMEIRO TIRO: +5 Pts (acertar o 1º disparo da partida) | 🎯 HEADSHOT: +2 Pts (topo do crânio)\n" +
-                               "  • 🔥 TRIPLO ABATE RÁPIDO: +5 Pts (3 mortes em < 2.0s) | 🌀 INTERRUPÇÃO TELEPORTE: +10 Pts\n" +
-                               "  • 🛡️ DESAFIO DOURADO: +3 Pts (abater Dourado c/ tiro normal) | ⚡ FEITIÇO DUPLO: +10 Pts (2 mortes no feitiço)\n\n" +
+                               "  • ✨ PRIMEIRO TIRO: +5 Pts | 🎯 HEADSHOT: +2 Pts | 🔥 TRIPLO ABATE RÁPIDO: +5 Pts\n" +
+                               "  • 🌀 INTERRUPÇÃO TELEPORTE: +10 Pts | 🛡️ DESAFIO DOURADO: +3 Pts | ⚡ FEITIÇO DUPLO: +10 Pts\n\n" +
                                "SISTEMA DE RANK (S / A / B / C / D):\n" +
                                "  • Calculado por: Mortes, Precisão %, Tempo, Escapados, Maior Combo e Feitiços Fortes!";
             CreateUIText(instrPanel.transform, "InstrBody", instrBody, 13, Color.white, new Vector2(0f, 25f), new Vector2(0.5f, 0.5f), defaultFont, TextAnchor.MiddleLeft);
@@ -733,6 +743,8 @@ namespace WizardGame.EditorTools
 
             SetPrivateField(uiMgr, "scoreText", scoreText);
             SetPrivateField(uiMgr, "escapeText", escapeText);
+            SetPrivateField(uiMgr, "playerHealthText", playerHealthText);
+            SetPrivateField(uiMgr, "damageFlashOverlay", flashImg);
             SetPrivateField(uiMgr, "ammoText", ammoText);
             SetPrivateField(uiMgr, "strongShotText", strongText);
             SetPrivateField(uiMgr, "activeSpellNoticeText", strongText);
@@ -796,6 +808,7 @@ namespace WizardGame.EditorTools
             SetPrivateField(gm, "inputHandler", inputHandler);
             SetPrivateField(gm, "weaponSystem", weaponSystem);
             SetPrivateField(gm, "uiManager", uiMgr);
+            SetPrivateField(gm, "maxPlayerHealth", 5);
 
             // 11. SpellEffectsManager (VFX de Gelo, Raio e Explosão de Área)
             GameObject vfxGo = new GameObject("SpellEffectsManager");

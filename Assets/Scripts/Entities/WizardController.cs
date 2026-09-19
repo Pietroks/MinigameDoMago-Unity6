@@ -56,6 +56,7 @@ namespace WizardGame.Entities
 
         public event Action<WizardController, int> OnDefeated;
         public event Action<WizardController, int> OnEscaped;
+        public event Action<WizardController, int, string> OnAttackPlayer;
 
         private void Awake()
         {
@@ -470,6 +471,21 @@ namespace WizardGame.Entities
             }
 
             escapeCoroutine = null;
+
+            // Retaliação seletiva ao escapar:
+            // Rápido (Fugitivo) causa 1 dano ao escapar; Dourado causa 2 dano ao escapar; Comum não ataca.
+            if (currentData != null)
+            {
+                if (currentData.wizardType == WizardType.Fugitivo)
+                {
+                    OnAttackPlayer?.Invoke(this, 1, "Goblin Fugitivo");
+                }
+                else if (currentData.wizardType == WizardType.Dourado)
+                {
+                    OnAttackPlayer?.Invoke(this, 2, "Goblin Dourado");
+                }
+            }
+
             OnEscaped?.Invoke(this, currentData.escapePenalty);
             gameObject.SetActive(false);
         }
@@ -938,6 +954,7 @@ namespace WizardGame.Entities
 
                     transform.position = chargeTarget;
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.12f, 0.12f);
+                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 1, "Investida do Grande Goblin");
                 }
                 else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
@@ -946,6 +963,7 @@ namespace WizardGame.Entities
                     // No meio do golpe (~0.35s do ataque a 10fps), gera tremor de terra
                     yield return new WaitForSeconds(0.35f);
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.16f, 0.18f);
+                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 1, "Golpe Sísmico do Grande Goblin");
                     yield return new WaitForSeconds(0.35f);
                 }
 
@@ -1015,6 +1033,7 @@ namespace WizardGame.Entities
                     yield return new WaitForSeconds(0.35f);
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.18f, 0.16f);
                     SpawnBossBurstFX(transform.position, new Color(1f, 0.45f, 0.1f, 0.9f), 1.8f);
+                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 1, "Labareda do Xamã do Caos");
                     yield return new WaitForSeconds(0.4f);
                 }
                 else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
@@ -1175,6 +1194,7 @@ namespace WizardGame.Entities
                     yield return new WaitForSeconds(0.35f);
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.2f, 0.2f);
                     SpawnBossBurstFX(transform.position + Vector3.down * 0.2f, new Color(0.9f, 0.1f, 0.1f, 0.9f), 1.6f);
+                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 2, "Golpe de Cetro do Lorde Carmesim");
                     yield return new WaitForSeconds(0.35f);
                 }
                 else if (actionRoll < 0.70f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
@@ -1244,6 +1264,7 @@ namespace WizardGame.Entities
                     yield return new WaitForSeconds(0.35f);
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.25f, 0.28f);
                     SpawnBossBurstFX(transform.position + Vector3.down * 0.3f, new Color(1f, 0.3f, 0.05f, 0.95f), 2.2f);
+                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 2, "Terremoto Colossal do Rei");
                     yield return new WaitForSeconds(0.35f);
                 }
                 else if (roll < 0.55f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
@@ -1253,6 +1274,7 @@ namespace WizardGame.Entities
                     yield return new WaitForSeconds(0.4f);
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.22f, 0.24f);
                     SpawnBossBurstFX(transform.position, new Color(1f, 0.55f, 0.1f, 0.95f), 2.8f);
+                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 2, "Choque de Magma do Rei");
                     yield return new WaitForSeconds(0.35f);
                 }
                 else if (roll < 0.80f && currentData.attack3Frames != null && currentData.attack3Frames.Length > 0)

@@ -41,6 +41,7 @@ namespace WizardGame.Entities
 
         public event Action<WizardController, int> OnWizardDefeated;
         public event Action<WizardController, int> OnWizardEscaped;
+        public event Action<WizardController, int, string> OnPlayerDamaged;
         public event Action<WizardController, WizardDataSO> OnBossSpawned;
         public event Action<int, int> OnWaveProgressChanged; // (restantes, total)
         public event Action<int> OnWaveCompleted; // (numeroDaOnda)
@@ -203,6 +204,7 @@ namespace WizardGame.Entities
             wizard.Initialize(data, spawnPos, screenBounds, speedMultiplier);
             wizard.OnDefeated += HandleDefeated;
             wizard.OnEscaped += HandleEscaped;
+            wizard.OnAttackPlayer += HandleAttackPlayer;
 
             if (WaveConfig.IsBossType(data.wizardType))
             {
@@ -292,10 +294,16 @@ namespace WizardGame.Entities
             OnWizardEscaped?.Invoke(wizard, penalty);
         }
 
+        private void HandleAttackPlayer(WizardController wizard, int damage, string source)
+        {
+            OnPlayerDamaged?.Invoke(wizard, damage, source);
+        }
+
         private void UnregisterAndRelease(WizardController wizard)
         {
             wizard.OnDefeated -= HandleDefeated;
             wizard.OnEscaped -= HandleEscaped;
+            wizard.OnAttackPlayer -= HandleAttackPlayer;
             pool.Release(wizard);
         }
 

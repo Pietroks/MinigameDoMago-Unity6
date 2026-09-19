@@ -25,11 +25,13 @@ namespace WizardGame.UI
         [Header("Elementos do HUD")]
         [SerializeField] private Text scoreText;
         [SerializeField] private Text escapeText;
+        [SerializeField] private Text playerHealthText;
         [SerializeField] private Text ammoText;
         [SerializeField] private Text strongShotText;
         [SerializeField] private Text controlsHintText;
         [SerializeField] private Button muteButton;
         [SerializeField] private Text muteButtonText;
+        [SerializeField] private Image damageFlashOverlay;
 
         [Header("Arsenal Mágico (Feitiços Especiais)")]
         [SerializeField] private GameObject spellArsenalContainer;
@@ -98,6 +100,7 @@ namespace WizardGame.UI
         private Coroutine comboBreakCoroutine;
         private Coroutine headshotCoroutine;
         private Coroutine waveBannerCoroutine;
+        private Coroutine damageFlashCoroutine;
 
         private void Awake()
         {
@@ -117,6 +120,7 @@ namespace WizardGame.UI
             if (headshotPopupContainer != null) headshotPopupContainer.SetActive(false);
             if (comboBreakText != null) comboBreakText.gameObject.SetActive(false);
             if (waveBannerContainer != null) waveBannerContainer.SetActive(false);
+            if (damageFlashOverlay != null) damageFlashOverlay.gameObject.SetActive(false);
         }
 
         public void ShowStartMenu()
@@ -161,8 +165,17 @@ namespace WizardGame.UI
 
             if (endTitleText != null)
             {
-                endTitleText.text = stats.won ? "VITÓRIA" : "DERROTA";
-                endTitleText.color = stats.won ? new Color(1f, 0.88f, 0.2f) : new Color(1f, 0.35f, 0.35f);
+                if (stats.won)
+                {
+                    endTitleText.text = "VITÓRIA";
+                    endTitleText.color = new Color(1f, 0.88f, 0.2f);
+                }
+                else
+                {
+                    string reason = !string.IsNullOrEmpty(stats.defeatReason) ? $"\n<size=18><color=#FF7777>{stats.defeatReason}</color></size>" : "";
+                    endTitleText.text = $"DERROTA{reason}";
+                    endTitleText.color = new Color(1f, 0.35f, 0.35f);
+                }
             }
 
             if (endRankGradeText != null)
@@ -227,7 +240,8 @@ namespace WizardGame.UI
                 rankScore = rank.rankScore,
                 rankTitle = rank.title,
                 rankBadge = rank.badge,
-                rankColor = rank.color
+                rankColor = rank.color,
+                defeatReason = won ? "" : "MUITOS GOBLINS ESCAPARAM (15/15)!"
             };
             ShowGameOver(stats);
         }
@@ -246,6 +260,31 @@ namespace WizardGame.UI
             {
                 escapeText.text = $"Fugiram: {current} / {max}";
                 escapeText.color = current >= (max - 3) ? Color.red : new Color(1f, 0.6f, 0.6f);
+            }
+        }
+
+        public void UpdatePlayerHealth(int current, int max)
+        {
+            if (playerHealthText == null) return;
+
+            string hearts = "";
+            for (int i = 0; i < max; i++)
+            {
+                hearts += (i < current) ? "❤️" : "🖤";
+            }
+
+            playerHealthText.text = $"VIDA: {hearts} ({Mathf.Max(0, current)}/{max})";
+            if (current <= 1)
+            {
+                playerHealthText.color = new Color(1f, 0.25f, 0.25f);
+            }
+            else if (current <= 2)
+            {
+                playerHealthText.color = new Color(1f, 0.65f, 0.2f);
+            }
+            else
+            {
+                playerHealthText.color = new Color(0.4f, 1f, 0.4f);
             }
         }
 
@@ -650,6 +689,38 @@ namespace WizardGame.UI
             canvasGroup.alpha = 0f;
             waveBannerContainer.SetActive(false);
             waveBannerCoroutine = null;
+        }
+
+        public void TriggerDamageFlash()
+        {
+            if (damageFlashOverlay == null) return;
+            if (damageFlashCoroutine != null)
+            {
+                StopCoroutine(damageFlashCoroutine);
+            }
+            damageFlashCoroutine = StartCoroutine(DamageFlashRoutine());
+        }
+
+        private IEnumerator DamageFlashRoutine()
+        {
+            damageFlashOverlay.gameObject.SetActive(true);
+            Color baseColor = new Color(0.9f, 0.08f, 0.08f, 0.38f);
+            damageFlashOverlay.color = baseColor;
+
+            float elapsed = 0f;
+            float duration = 0.35f;
+
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = elapsed / duration;
+                damageFlashOverlay.color = new Color(baseColor.r, baseColor.g, baseColor.b, Mathf.Lerp(baseColor.a, 0f, t));
+                yield return null;
+            }
+
+            damageFlashOverlay.color = new Color(baseColor.r, baseColor.g, baseColor.b, 0f);
+            damageFlashOverlay.gameObject.SetActive(false);
+            damageFlashCoroutine = null;
         }
 
         #endregion

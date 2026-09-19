@@ -38,6 +38,7 @@ namespace WizardGame.Core
         public string rankTitle;         // "Arquimago Supremo", "Feiticeiro", etc.
         public string rankBadge;         // "👑", "🔮", "⚡", "📜", "🔰"
         public Color rankColor;
+        public string defeatReason;      // Motivo detalhado da derrota
     }
 
     /// <summary>
@@ -54,6 +55,7 @@ namespace WizardGame.Core
 
         [Header("Regras de Partida")]
         [SerializeField] private int maxEscapesAllowed = 15;
+        [SerializeField] private int maxPlayerHealth = 5;
 
         [Header("Configurações das Ondas (Wave System)")]
         [SerializeField] private List<WaveConfig> waves = new List<WaveConfig>();
@@ -69,6 +71,7 @@ namespace WizardGame.Core
         private GameState currentState;
         private int currentScore;
         private int currentEscaped;
+        private int currentPlayerHealth;
         private int currentWaveIndex = 0;
         private Coroutine waveTransitionCoroutine;
 
@@ -144,6 +147,7 @@ namespace WizardGame.Core
                 spawner.OnBossSpawned += HandleBossSpawned;
                 spawner.OnWaveProgressChanged += HandleWaveProgressChanged;
                 spawner.OnWaveCompleted += HandleWaveCompleted;
+                spawner.OnPlayerDamaged += (wizard, damage, source) => DamagePlayer(damage, source);
             }
 
             if (uiManager != null)
@@ -270,8 +274,10 @@ namespace WizardGame.Core
             lightningTimer = 0f;
             areaTimer = 0f;
 
+            currentPlayerHealth = maxPlayerHealth;
             uiManager?.UpdateScore(currentScore);
             uiManager?.UpdateEscapes(currentEscaped, maxEscapesAllowed);
+            uiManager?.UpdatePlayerHealth(currentPlayerHealth, maxPlayerHealth);
             uiManager?.UpdateCombo(currentStreak, currentMultiplier);
 
             uiManager?.UpdateSpellCooldown(SpellType.Arcane, true);
@@ -675,7 +681,28 @@ namespace WizardGame.Core
 
             if (currentEscaped >= maxEscapesAllowed)
             {
-                EndGame(won: false);
+                EndGame(won: false, defeatReason: $"MUITOS GOBLINS ESCAPARAM ({currentEscaped}/{maxEscapesAllowed})!");
+            }
+        }
+
+        public void DamagePlayer(int damage, string source = "")
+        {
+            if (currentState != GameState.Playing) return;
+            if (damage <= 0) return;
+
+            currentPlayerHealth = Mathf.Max(0, currentPlayerHealth - damage);
+            uiManager?.UpdatePlayerHealth(currentPlayerHealth, maxPlayerHealth);
+            uiManager?.TriggerDamageFlash();
+
+            SpellEffectsManager.Instance?.TriggerCameraShake(0.28f, 0.25f);
+            SoundManager.Instance?.PlaySFX(SoundManager.Instance.defeatSound);
+
+            if (currentPlayerHealth <= 0)
+            {
+                string reason = !string.IsNullOrEmpty(source)
+                    ? $"VOCÊ CAIU EM COMBATE ({source.ToUpper()})!"
+                    : "VOCÊ CAIU EM COMBATE (VIDA ESGOTADA)!";
+                EndGame(won: false, defeatReason: reason);
             }
         }
 
@@ -803,7 +830,7 @@ namespace WizardGame.Core
             return (rank.title, rank.badge, rank.color);
         }
 
-        private void EndGame(bool won)
+        private void EndGame(bool won, string defeatReason = "")
         {
             SetState(GameState.GameOver);
 
@@ -847,7 +874,8 @@ namespace WizardGame.Core
                 rankScore = rank.rankScore,
                 rankTitle = rank.title,
                 rankBadge = rank.badge,
-                rankColor = rank.color
+                rankColor = rank.color,
+                defeatReason = defeatReason
             };
 
             uiManager?.ShowGameOver(stats);
