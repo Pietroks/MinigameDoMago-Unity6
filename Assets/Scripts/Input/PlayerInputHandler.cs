@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+using WizardGame.Core;
 using WizardGame.Data;
 using WizardGame.Entities;
 
@@ -9,6 +13,7 @@ namespace WizardGame.Input
     {
         public WizardController target;
         public PowerUpItem powerUpTarget;
+        public BossProjectileInstance bossProjectileTarget;
         public bool isHit;
         public bool isHeadshot;
         public Vector3 hitPoint;
@@ -23,6 +28,8 @@ namespace WizardGame.Input
         [Header("Configurações")]
         [Tooltip("Raio de tolerância do clique em unidades de mundo.")]
         [SerializeField] private float clickToleranceRadius = 0.55f;
+        [Tooltip("Intervalo mínimo entre disparos normais (cadência em segundos).")]
+        [SerializeField] private float normalFireCooldown = 0.11f;
 
         [Header("Referências")]
         [SerializeField] private WeaponSystem weaponSystem;
@@ -30,6 +37,7 @@ namespace WizardGame.Input
         private Camera mainCamera;
         private bool isInputBlocked;
         private SpellType currentSpecialSpell = SpellType.Arcane;
+        private float lastNormalShotTime = -10f;
 
         public SpellType CurrentSpecialSpell => currentSpecialSpell;
 
@@ -71,6 +79,12 @@ namespace WizardGame.Input
                 return;
             }
 
+            // Mute rápido de áudio
+            if (UnityEngine.Input.GetKeyDown(KeyCode.M))
+            {
+                SoundManager.Instance?.ToggleMute();
+            }
+
             // Recarga manual da varinha
             if (UnityEngine.Input.GetKeyDown(KeyCode.R))
             {
@@ -110,14 +124,20 @@ namespace WizardGame.Input
             // Disparo do feitiço especial ativo via Botão Direito (RMB)
             if (UnityEngine.Input.GetMouseButtonDown(1))
             {
-                TriggerSpecialShot(currentSpecialSpell, UnityEngine.Input.mousePosition);
+                if (!IsPointerOverInteractiveUI(UnityEngine.Input.mousePosition))
+                {
+                    TriggerSpecialShot(currentSpecialSpell, UnityEngine.Input.mousePosition);
+                }
                 return;
             }
 
             // Tiro Normal via Botão Esquerdo (LMB)
             if (UnityEngine.Input.GetMouseButtonDown(0))
             {
-                TriggerNormalShot(UnityEngine.Input.mousePosition);
+                if (!IsPointerOverInteractiveUI(UnityEngine.Input.mousePosition))
+                {
+                    TriggerNormalShot(UnityEngine.Input.mousePosition);
+                }
             }
         }
 
@@ -146,10 +166,18 @@ namespace WizardGame.Input
 
         private void TriggerNormalShot(Vector2 screenPosition)
         {
-            if (weaponSystem != null && !weaponSystem.TryConsumeAmmo())
+            if (Time.unscaledTime - lastNormalShotTime < normalFireCooldown)
             {
                 return;
             }
+
+            if (weaponSystem != null && !weaponSystem.TryConsumeAmmo())
+            {
+                SoundManager.Instance?.PlayDryFireSound();
+                return;
+            }
+
+            lastNormalShotTime = Time.unscaledTime;
 
             ShotHitInfo hitInfo = CalculateHitInfo(screenPosition);
             if (!hitInfo.isHit)
@@ -159,18 +187,17 @@ namespace WizardGame.Input
             else
             {
                 weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
+                if (hitInfo.bossProjectileTarget != null)
+                {
+                    hitInfo.bossProjectileTarget.Intercept();
+                }
             }
             OnNormalShot?.Invoke(hitInfo);
         }
 
         private void TriggerSpecialShot(SpellType spell, Vector2 screenPosition)
         {
-            weaponSystem?.TriggerRecoil();
             ShotHitInfo hitInfo = CalculateHitInfo(screenPosition);
-            if (hitInfo.isHit)
-            {
-                weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
-            }
             OnSpecialShot?.Invoke(spell, hitInfo);
         }
 
@@ -186,6 +213,7 @@ namespace WizardGame.Input
 
             WizardController hitWizard = FindWizardAtPosition(worldPos);
             PowerUpItem hitPowerUp = (hitWizard == null) ? FindPowerUpAtPosition(worldPos) : null;
+            BossProjectileInstance hitBossProj = (hitWizard == null && hitPowerUp == null) ? FindBossProjectileAtPosition(worldPos) : null;
             bool isHeadshot = false;
 
             if (hitWizard != null)
@@ -202,18 +230,54 @@ namespace WizardGame.Input
             {
                 target = hitWizard,
                 powerUpTarget = hitPowerUp,
-                isHit = (hitWizard != null || hitPowerUp != null),
+                bossProjectileTarget = hitBossProj,
+                isHit = (hitWizard != null || hitPowerUp != null || hitBossProj != null),
                 isHeadshot = isHeadshot,
                 hitPoint = worldPos
             };
         }
 
         private static readonly Collider2D[] hitBuffer = new Collider2D[24];
+        private static readonly ContactFilter2D noFilter = ContactFilter2D.noFilter;
+        private readonly List<RaycastResult> uiRaycastBuffer = new List<RaycastResult>(8);
+
+        private bool IsPointerOverInteractiveUI(Vector2 screenPosition)
+        {
+            if (EventSystem.current == null) return false;
+            var eventData = new PointerEventData(EventSystem.current) { position = screenPosition };
+            uiRaycastBuffer.Clear();
+            EventSystem.current.RaycastAll(eventData, uiRaycastBuffer);
+            for (int i = 0; i < uiRaycastBuffer.Count; i++)
+            {
+                GameObject go = uiRaycastBuffer[i].gameObject;
+                if (go == null) continue;
+                var selectable = go.GetComponentInParent<Selectable>();
+                if (selectable != null && selectable.IsInteractable())
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private BossProjectileInstance FindBossProjectileAtPosition(Vector3 worldPos)
+        {
+            int count = Physics2D.OverlapCircle(worldPos, clickToleranceRadius + 0.15f, noFilter, hitBuffer);
+            for (int i = 0; i < count; i++)
+            {
+                var col = hitBuffer[i];
+                if (col != null && col.TryGetComponent<BossProjectileInstance>(out var proj))
+                {
+                    if (!proj.IsIntercepted) return proj;
+                }
+            }
+            return null;
+        }
 
         private WizardController FindWizardAtPosition(Vector3 worldPos)
         {
-            // 1. Prioridade absoluta: Clique direto no colisor do goblin (Zero-GC via NonAlloc)
-            int directCount = Physics2D.OverlapPointNonAlloc(worldPos, hitBuffer);
+            // 1. Prioridade absoluta: Clique direto no colisor do goblin (Zero-GC)
+            int directCount = Physics2D.OverlapPoint(worldPos, noFilter, hitBuffer);
             WizardController bestDirect = null;
             int highestDirectOrder = int.MinValue;
 
@@ -235,7 +299,7 @@ namespace WizardGame.Input
             if (bestDirect != null) return bestDirect;
 
             // 2. Fallback: Raio de tolerância (clickToleranceRadius), priorizando quem estiver na frente
-            int circleCount = Physics2D.OverlapCircleNonAlloc(worldPos, clickToleranceRadius, hitBuffer);
+            int circleCount = Physics2D.OverlapCircle(worldPos, clickToleranceRadius, noFilter, hitBuffer);
             WizardController bestTarget = null;
             float closestDist = float.MaxValue;
             int highestSortingOrder = int.MinValue;
@@ -263,7 +327,7 @@ namespace WizardGame.Input
 
         private PowerUpItem FindPowerUpAtPosition(Vector3 worldPos)
         {
-            int circleCount = Physics2D.OverlapCircleNonAlloc(worldPos, clickToleranceRadius * 1.35f, hitBuffer);
+            int circleCount = Physics2D.OverlapCircle(worldPos, clickToleranceRadius * 1.35f, noFilter, hitBuffer);
             for (int i = 0; i < circleCount; i++)
             {
                 var col = hitBuffer[i];

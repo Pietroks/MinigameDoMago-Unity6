@@ -26,23 +26,33 @@ namespace WizardGame.Entities
         private ObjectPool<WizardController> pool;
         private Camera mainCam;
         private Bounds screenBounds;
+        private int lastScreenWidth;
+        private int lastScreenHeight;
         private float spawnTimer;
         private bool isSpawning;
 
-        // Controle de Ondas
+        // Controle de Ondas e Progressão Dinâmica
         private readonly Dictionary<WizardType, WizardDataSO> typeLookup = new Dictionary<WizardType, WizardDataSO>();
         private readonly Queue<WizardDataSO> waveSpawnQueue = new Queue<WizardDataSO>();
+        private readonly HashSet<WizardController> bossSummonedGoblins = new HashSet<WizardController>();
         private WaveConfig currentWaveConfig;
         private int currentWaveNumber = 1;
         private int totalEnemiesInWave;
         private int activeGoblinsInWave;
         private float currentWaveSpeedMultiplier = 1.0f;
+        private float currentWaveFugitiveSpeedMultiplier = 0.62f;
+        private float currentWaveEscapeMultiplier = 1.0f;
+        private int currentMaxConcurrent = 5;
+        private float currentDoubleSpawnChance = 0f;
+        private float nextSpawnDelay = 1.0f;
         private bool isSpawningWave;
 
         public event Action<WizardController, int> OnWizardDefeated;
         public event Action<WizardController, int> OnWizardEscaped;
         public event Action<WizardController, int, string> OnPlayerDamaged;
         public event Action<WizardController, WizardDataSO> OnBossSpawned;
+        public event Action<WizardController, WizardDataSO> OnBossEnraged;
+        public event Action<WizardController, string> OnBossAttackInterrupted;
         public event Action<int, int> OnWaveProgressChanged; // (restantes, total)
         public event Action<int> OnWaveCompleted; // (numeroDaOnda)
 
@@ -91,8 +101,10 @@ namespace WizardGame.Entities
             if (mainCam == null) mainCam = Camera.main;
             if (mainCam == null) return;
 
+            lastScreenWidth = Screen.width;
+            lastScreenHeight = Screen.height;
             float vertExtent = mainCam.orthographicSize;
-            float horzExtent = vertExtent * (float)Screen.width / Screen.height;
+            float horzExtent = vertExtent * (float)Mathf.Max(1, Screen.width) / Mathf.Max(1, Screen.height);
             Vector3 camPos = mainCam.transform.position;
             screenBounds = new Bounds(new Vector3(camPos.x, camPos.y, 0f), new Vector3(horzExtent * 2f, vertExtent * 2f, 2f));
         }
@@ -108,9 +120,17 @@ namespace WizardGame.Entities
             currentWaveConfig = config;
             currentWaveNumber = waveNumber;
             currentWaveSpeedMultiplier = config != null ? Mathf.Max(0.5f, config.speedMultiplier) : 1.0f;
+            currentWaveFugitiveSpeedMultiplier = (config != null && config.fugitiveSpeedMultiplier > 0.01f)
+                ? config.fugitiveSpeedMultiplier
+                : WizardController.GetProgressiveFugitiveSpeedMultiplier(waveNumber);
+            currentWaveEscapeMultiplier = config != null && config.escapeTimerMultiplier > 0f ? config.escapeTimerMultiplier : 1.0f;
+            currentMaxConcurrent = config != null ? Mathf.Max(2, config.maxConcurrentEnemies) : 5;
+            currentDoubleSpawnChance = config != null ? Mathf.Clamp01(config.doubleSpawnChance) : 0f;
             spawnInterval = config != null ? Mathf.Max(0.2f, config.spawnInterval) : 1.5f;
+            nextSpawnDelay = 0.4f;
 
             waveSpawnQueue.Clear();
+            bossSummonedGoblins.Clear();
             if (config != null)
             {
                 List<WizardType> typesToSpawn = config.GenerateShuffledEnemyList();
@@ -131,7 +151,7 @@ namespace WizardGame.Entities
             activeGoblinsInWave = 0;
             isSpawningWave = true;
             isSpawning = true;
-            spawnTimer = 0.2f;
+            spawnTimer = 0f;
 
             OnWaveProgressChanged?.Invoke(totalEnemiesInWave, totalEnemiesInWave);
         }
@@ -158,11 +178,14 @@ namespace WizardGame.Entities
         public void ClearActiveGoblins()
         {
             StopSpawning();
+            WizardController.ClearAllBossProjectiles();
+            bossSummonedGoblins.Clear();
             var activeList = new List<WizardController>(WizardController.ActiveGoblins);
             foreach (var goblin in activeList)
             {
-                if (goblin != null && goblin.gameObject.activeSelf)
+                if (goblin != null)
                 {
+                    goblin.CancelAndDespawnImmediately();
                     UnregisterAndRelease(goblin);
                 }
             }
@@ -171,40 +194,103 @@ namespace WizardGame.Entities
 
         private void Update()
         {
+            if (Screen.width != lastScreenWidth || Screen.height != lastScreenHeight)
+            {
+                RecalculateBounds();
+            }
+
             if (!isSpawning) return;
 
-            spawnTimer += Time.deltaTime;
-            if (spawnTimer >= spawnInterval)
+            if (isSpawningWave)
             {
-                spawnTimer = 0f;
+                if (waveSpawnQueue.Count == 0) return;
 
-                if (isSpawningWave)
+                WizardDataSO nextData = waveSpawnQueue.Peek();
+                bool nextIsBoss = nextData != null && WaveConfig.IsBossType(nextData.wizardType);
+
+                // Chefe aguarda os lacaios da fase terminarem para fazer sua entrada triunfal!
+                if (nextIsBoss && activeGoblinsInWave > 0)
                 {
-                    if (waveSpawnQueue.Count > 0)
+                    return;
+                }
+
+                // Controle de superlotação + aceleração se a arena estiver vazia
+                if (!nextIsBoss && activeGoblinsInWave >= currentMaxConcurrent)
+                {
+                    return;
+                }
+
+                float timerRate = (!nextIsBoss && activeGoblinsInWave == 0) ? 1.85f : 1.0f;
+                spawnTimer += Time.deltaTime * timerRate;
+
+                if (spawnTimer >= nextSpawnDelay)
+                {
+                    spawnTimer = 0f;
+                    nextSpawnDelay = spawnInterval * UnityEngine.Random.Range(0.78f, 1.15f);
+
+                    WizardDataSO data = waveSpawnQueue.Dequeue();
+                    Vector3 firstPos = GetRandomWorldPoint();
+                    SpawnWizard(data, currentWaveSpeedMultiplier, currentWaveEscapeMultiplier, firstPos);
+                    activeGoblinsInWave++;
+
+                    // Surto dinâmico em ondas mais avançadas: chance de spawn duplo simultâneo de lacaios!
+                    if (!nextIsBoss &&
+                        waveSpawnQueue.Count > 0 &&
+                        !WaveConfig.IsBossType(waveSpawnQueue.Peek().wizardType) &&
+                        activeGoblinsInWave < currentMaxConcurrent &&
+                        UnityEngine.Random.value < currentDoubleSpawnChance)
                     {
-                        WizardDataSO data = waveSpawnQueue.Dequeue();
-                        SpawnWizard(data, currentWaveSpeedMultiplier);
+                        WizardDataSO secondData = waveSpawnQueue.Dequeue();
+                        Vector3 secondPos = GetRandomWorldPoint();
+                        // Separa horizontalmente do primeiro spawn para visual limpo
+                        if (Mathf.Abs(secondPos.x - firstPos.x) < 2.2f)
+                        {
+                            secondPos.x = (firstPos.x >= screenBounds.center.x)
+                                ? UnityEngine.Random.Range(screenBounds.min.x + 1.3f, screenBounds.center.x - 0.8f)
+                                : UnityEngine.Random.Range(screenBounds.center.x + 0.8f, screenBounds.max.x - 1.3f);
+                        }
+                        SpawnWizard(secondData, currentWaveSpeedMultiplier, currentWaveEscapeMultiplier, secondPos);
                         activeGoblinsInWave++;
                     }
                 }
-                else
+            }
+            else
+            {
+                spawnTimer += Time.deltaTime;
+                if (spawnTimer >= spawnInterval)
                 {
+                    spawnTimer = 0f;
                     SpawnRandomWizard();
                 }
             }
         }
 
-        private void SpawnWizard(WizardDataSO data, float speedMultiplier)
+        private void SpawnWizard(WizardDataSO data, float speedMultiplier, float escapeMult = 1.0f, Vector3? customPos = null, bool isBossSummon = false)
         {
             if (data == null) return;
 
-            Vector3 spawnPos = GetRandomWorldPoint();
+            Vector3 spawnPos = customPos ?? GetRandomWorldPoint();
             WizardController wizard = pool.Get();
 
-            wizard.Initialize(data, spawnPos, screenBounds, speedMultiplier);
+            wizard.Initialize(
+                data,
+                spawnPos,
+                screenBounds,
+                speedMultiplier,
+                escapeMult,
+                currentWaveNumber,
+                currentWaveFugitiveSpeedMultiplier);
             wizard.OnDefeated += HandleDefeated;
             wizard.OnEscaped += HandleEscaped;
             wizard.OnAttackPlayer += HandleAttackPlayer;
+            wizard.OnBossSummonRequested += HandleBossSummonRequested;
+            wizard.OnBossAttackInterrupted += HandleBossAttackInterrupted;
+            wizard.OnBossEnraged += HandleBossEnraged;
+
+            if (isBossSummon)
+            {
+                bossSummonedGoblins.Add(wizard);
+            }
 
             if (WaveConfig.IsBossType(data.wizardType))
             {
@@ -258,40 +344,108 @@ namespace WizardGame.Entities
 
         private void HandleDefeated(WizardController wizard, int points)
         {
+            bool wasBossSummon = bossSummonedGoblins.Remove(wizard);
+            bool isBoss = wizard != null && wizard.GetData() != null && WaveConfig.IsBossType(wizard.GetData().wizardType);
+
             UnregisterAndRelease(wizard);
-            if (isSpawningWave)
+            OnWizardDefeated?.Invoke(wizard, points);
+
+            if (isSpawningWave && !wasBossSummon)
             {
                 activeGoblinsInWave = Mathf.Max(0, activeGoblinsInWave - 1);
-                int remaining = waveSpawnQueue.Count + activeGoblinsInWave;
-                OnWaveProgressChanged?.Invoke(remaining, totalEnemiesInWave);
+                bool stageCleared = isBoss || (waveSpawnQueue.Count == 0 && activeGoblinsInWave == 0);
 
-                if (waveSpawnQueue.Count == 0 && activeGoblinsInWave == 0)
+                if (stageCleared)
                 {
+                    if (isBoss)
+                    {
+                        ClearBossSummonedReinforcements();
+                        WizardController.ClearAllBossProjectiles();
+                        waveSpawnQueue.Clear();
+                        activeGoblinsInWave = 0;
+                    }
+
                     isSpawning = false;
                     isSpawningWave = false;
+                    OnWaveProgressChanged?.Invoke(0, totalEnemiesInWave);
                     OnWaveCompleted?.Invoke(currentWaveNumber);
                 }
+                else
+                {
+                    int remaining = waveSpawnQueue.Count + activeGoblinsInWave;
+                    OnWaveProgressChanged?.Invoke(remaining, totalEnemiesInWave);
+                }
             }
-            OnWizardDefeated?.Invoke(wizard, points);
         }
 
         private void HandleEscaped(WizardController wizard, int penalty)
         {
+            bool wasBossSummon = bossSummonedGoblins.Remove(wizard);
             UnregisterAndRelease(wizard);
-            if (isSpawningWave)
+
+            bool waveStillActive = isSpawningWave;
+            if (waveStillActive && !wasBossSummon)
             {
                 activeGoblinsInWave = Mathf.Max(0, activeGoblinsInWave - 1);
                 int remaining = waveSpawnQueue.Count + activeGoblinsInWave;
                 OnWaveProgressChanged?.Invoke(remaining, totalEnemiesInWave);
+            }
 
-                if (waveSpawnQueue.Count == 0 && activeGoblinsInWave == 0)
+            // Dispara fuga antes de concluir a onda: se esta fuga causar Game Over (15/15 ou dano letal),
+            // ClearActiveGoblins() zera isSpawningWave e impede transição falsa de fase.
+            OnWizardEscaped?.Invoke(wizard, penalty);
+
+            if (isSpawningWave && waveStillActive && !wasBossSummon && waveSpawnQueue.Count == 0 && activeGoblinsInWave == 0)
+            {
+                isSpawning = false;
+                isSpawningWave = false;
+                OnWaveCompleted?.Invoke(currentWaveNumber);
+            }
+        }
+
+        private void ClearBossSummonedReinforcements()
+        {
+            if (bossSummonedGoblins.Count == 0) return;
+            var toClear = new List<WizardController>(bossSummonedGoblins);
+            bossSummonedGoblins.Clear();
+            foreach (var summoned in toClear)
+            {
+                if (summoned != null && summoned.gameObject.activeInHierarchy)
                 {
-                    isSpawning = false;
-                    isSpawningWave = false;
-                    OnWaveCompleted?.Invoke(currentWaveNumber);
+                    summoned.CancelAndDespawnImmediately();
+                    UnregisterAndRelease(summoned);
                 }
             }
-            OnWizardEscaped?.Invoke(wizard, penalty);
+        }
+
+        private void HandleBossSummonRequested(WizardController boss, WizardType summonType)
+        {
+            if (!isSpawningWave || boss == null || bossSummonedGoblins.Count >= 2) return;
+
+            if (!typeLookup.TryGetValue(summonType, out var data))
+            {
+                if (wizardTypes != null && wizardTypes.Count > 0) data = wizardTypes[0];
+            }
+            if (data == null) return;
+
+            Vector3 offset = (Vector3)(UnityEngine.Random.insideUnitCircle.normalized * 1.45f);
+            Vector3 summonPos = new Vector3(
+                Mathf.Clamp(boss.transform.position.x + offset.x, screenBounds.min.x + 1.2f, screenBounds.max.x - 1.2f),
+                Mathf.Clamp(boss.transform.position.y + offset.y, screenBounds.min.y + 1.5f, screenBounds.max.y - 1.5f),
+                0f
+            );
+
+            SpawnWizard(data, currentWaveSpeedMultiplier, currentWaveEscapeMultiplier, summonPos, isBossSummon: true);
+        }
+
+        private void HandleBossAttackInterrupted(WizardController boss, string bossName)
+        {
+            OnBossAttackInterrupted?.Invoke(boss, bossName);
+        }
+
+        private void HandleBossEnraged(WizardController boss, WizardDataSO data)
+        {
+            OnBossEnraged?.Invoke(boss, data);
         }
 
         private void HandleAttackPlayer(WizardController wizard, int damage, string source)
@@ -301,9 +455,13 @@ namespace WizardGame.Entities
 
         private void UnregisterAndRelease(WizardController wizard)
         {
+            if (wizard == null) return;
             wizard.OnDefeated -= HandleDefeated;
             wizard.OnEscaped -= HandleEscaped;
             wizard.OnAttackPlayer -= HandleAttackPlayer;
+            wizard.OnBossSummonRequested -= HandleBossSummonRequested;
+            wizard.OnBossAttackInterrupted -= HandleBossAttackInterrupted;
+            wizard.OnBossEnraged -= HandleBossEnraged;
             pool.Release(wizard);
         }
 

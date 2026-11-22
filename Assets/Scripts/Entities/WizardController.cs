@@ -8,6 +8,82 @@ using WizardGame.Data;
 namespace WizardGame.Entities
 {
     /// <summary>
+    /// Representa um projétil disparado por chefes que viaja pela tela e pode ser interceptado com tiros do jogador.
+    /// Gerencia seu próprio voo em Update para nunca congelar no ar caso o chefe seja derrotado durante o trajeto.
+    /// </summary>
+    public class BossProjectileInstance : MonoBehaviour
+    {
+        public WizardController Owner { get; set; }
+        public int Damage { get; set; } = 1;
+        public string AttackName { get; set; } = "Magia do Chefe";
+        public Color Color { get; set; } = Color.red;
+        public bool IsIntercepted { get; private set; } = false;
+
+        private Vector3 startPos;
+        private Vector3 targetPos;
+        private float flightDuration = 1.6f;
+        private float elapsed = 0f;
+        private bool isInitialized = false;
+        private Action<WizardController, int, string> onReachedPlayerCallback;
+
+        public void Launch(
+            WizardController owner,
+            Vector3 start,
+            Vector3 target,
+            Color color,
+            float duration,
+            int damage,
+            string attackName,
+            Action<WizardController, int, string> onReachedPlayer)
+        {
+            Owner = owner;
+            startPos = start;
+            targetPos = target;
+            Color = color;
+            flightDuration = Mathf.Max(0.25f, duration);
+            Damage = damage;
+            AttackName = attackName;
+            onReachedPlayerCallback = onReachedPlayer;
+            elapsed = 0f;
+            isInitialized = true;
+            transform.position = startPos;
+            transform.localScale = Vector3.one * 0.35f;
+        }
+
+        private void Update()
+        {
+            if (!isInitialized || IsIntercepted) return;
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / flightDuration);
+            float ease = t * t * 0.45f + t * 0.55f;
+            transform.position = Vector3.Lerp(startPos, targetPos, ease);
+            transform.localScale = Vector3.one * Mathf.Lerp(0.35f, 1.15f, ease);
+
+            if (elapsed >= flightDuration)
+            {
+                IsIntercepted = true;
+                SpellEffectsManager.Instance?.SpawnAreaExplosion(transform.position, 0.9f);
+                if (Owner != null && !Owner.IsDeadOrEscaping && Owner.gameObject.activeInHierarchy)
+                {
+                    onReachedPlayerCallback?.Invoke(Owner, Damage, AttackName);
+                }
+                WizardController.UnregisterBossProjectile(gameObject);
+                Destroy(gameObject);
+            }
+        }
+
+        public void Intercept()
+        {
+            if (IsIntercepted) return;
+            IsIntercepted = true;
+            SpellEffectsManager.Instance?.SpawnIceShatter(transform.position);
+            WizardController.UnregisterBossProjectile(gameObject);
+            Destroy(gameObject);
+        }
+    }
+
+    /// <summary>
     /// Controlador completo de Goblin. Gerencia ciclo de vida, maquina de estados de animacao
     /// por spritesheet (FrameAnimator), comportamentos especializados por tipo (Comum, Fugitivo, Dourado, Fantasma),
     /// barra de vida e eventos de combate sem travamentos.
@@ -32,12 +108,19 @@ namespace WizardGame.Entities
         private int currentHealth;
         private bool isDeadOrEscaping;
         private bool isEnraged; // Para o Goblin Fugitivo ao tomar dano
+        private bool isBossEnraged; // Fase 2 de fúria dos Chefes (< 50% HP)
         private bool isFrozen;
         private bool isInvulnerable;
+        private bool isScaleInFinished;
+        private bool isChargingBossAttack;
+        private bool wasBossChargeInterrupted;
+        private int bossChargeHitsReceived;
         private float remainingEscapeTime;
         private Bounds screenWorldBounds;
         private Vector3 normalizedScale = Vector3.one;
         private float currentSpeedMultiplier = 1.0f;
+        private int currentStageNumber = 1;
+        private int hitStaggerExtensionsUsed = 0;
         private Coroutine movementCoroutine;
         private Coroutine pulseCoroutine;
         private Coroutine escapeCoroutine;
@@ -45,9 +128,46 @@ namespace WizardGame.Entities
         private Coroutine hitReactionCoroutine;
         private Coroutine attackRoutine;
         private Coroutine freezeCoroutine;
+        private Coroutine scaleInCoroutine;
+        private Coroutine flashCoroutine;
+        private GameObject activeTelegraphRing;
+        private TextMesh escapeWarningText;
 
         private static readonly List<WizardController> activeGoblins = new List<WizardController>();
         public static IReadOnlyList<WizardController> ActiveGoblins => activeGoblins;
+
+        private static readonly List<GameObject> activeBossProjectiles = new List<GameObject>();
+        public static IReadOnlyList<GameObject> ActiveBossProjectiles => activeBossProjectiles;
+
+        public static void RegisterBossProjectile(GameObject proj)
+        {
+            if (proj != null && !activeBossProjectiles.Contains(proj))
+            {
+                activeBossProjectiles.Add(proj);
+            }
+        }
+
+        public static void UnregisterBossProjectile(GameObject proj)
+        {
+            if (proj != null)
+            {
+                activeBossProjectiles.Remove(proj);
+            }
+        }
+
+        public static void ClearAllBossProjectiles()
+        {
+            for (int i = activeBossProjectiles.Count - 1; i >= 0; i--)
+            {
+                if (activeBossProjectiles[i] != null)
+                {
+                    Destroy(activeBossProjectiles[i]);
+                }
+            }
+            activeBossProjectiles.Clear();
+        }
+
+        public bool IsDeadOrEscaping => isDeadOrEscaping;
         public bool IsFrozen => isFrozen;
         public int CurrentHealth => currentHealth;
         public bool IsTeleporting { get; private set; }
@@ -57,6 +177,9 @@ namespace WizardGame.Entities
         public event Action<WizardController, int> OnDefeated;
         public event Action<WizardController, int> OnEscaped;
         public event Action<WizardController, int, string> OnAttackPlayer;
+        public event Action<WizardController, WizardType> OnBossSummonRequested;
+        public event Action<WizardController, string> OnBossAttackInterrupted;
+        public event Action<WizardController, WizardDataSO> OnBossEnraged;
 
         private void Awake()
         {
@@ -66,6 +189,28 @@ namespace WizardGame.Entities
             if (frameAnimator == null) frameAnimator = gameObject.AddComponent<FrameAnimator>();
 
             CreateHealthBarIfMissing();
+            CreateEscapeWarningIfMissing();
+        }
+
+        private void CreateEscapeWarningIfMissing()
+        {
+            if (escapeWarningText != null) return;
+
+            GameObject warnGo = new GameObject("EscapeWarning");
+            warnGo.transform.SetParent(transform, false);
+            warnGo.transform.localPosition = new Vector3(0f, 1.05f, 0f);
+            escapeWarningText = warnGo.AddComponent<TextMesh>();
+            escapeWarningText.text = "!";
+            escapeWarningText.fontSize = 36;
+            escapeWarningText.characterSize = 0.08f;
+            escapeWarningText.fontStyle = FontStyle.Bold;
+            escapeWarningText.alignment = TextAlignment.Center;
+            escapeWarningText.anchor = TextAnchor.MiddleCenter;
+            escapeWarningText.color = new Color(1f, 0.3f, 0.15f, 1f);
+
+            var mr = warnGo.GetComponent<MeshRenderer>();
+            if (mr != null) mr.sortingOrder = 22;
+            warnGo.SetActive(false);
         }
 
         private void CreateHealthBarIfMissing()
@@ -104,15 +249,52 @@ namespace WizardGame.Entities
             return cachedWhiteSprite;
         }
 
-        public void Initialize(WizardDataSO data, Vector3 spawnPosition, Bounds bounds, float speedMultiplier = 1.0f)
+        public static float GetProgressiveFugitiveSpeedMultiplier(int stageNumber)
+        {
+            return stageNumber switch
+            {
+                <= 1 => 0.62f,
+                2 => 0.78f,
+                3 => 0.96f,
+                4 => 1.15f,
+                _ => 1.35f + (stageNumber - 5) * 0.12f
+            };
+        }
+
+        public void Initialize(
+            WizardDataSO data,
+            Vector3 spawnPosition,
+            Bounds bounds,
+            float speedMultiplier = 1.0f,
+            float escapeTimeMultiplier = 1.0f,
+            int stageNumber = 1,
+            float fugitiveSpeedMult = -1f)
         {
             currentData = data;
             currentHealth = data.maxHealth;
             screenWorldBounds = bounds;
-            currentSpeedMultiplier = Mathf.Max(0.5f, speedMultiplier);
+            currentStageNumber = Mathf.Max(1, stageNumber);
+            hitStaggerExtensionsUsed = 0;
+
+            if (data.wizardType == WizardType.Fugitivo)
+            {
+                float stageFugitiveMult = fugitiveSpeedMult > 0f
+                    ? fugitiveSpeedMult
+                    : GetProgressiveFugitiveSpeedMultiplier(currentStageNumber);
+                currentSpeedMultiplier = Mathf.Clamp(stageFugitiveMult, 0.5f, 2.2f);
+            }
+            else
+            {
+                currentSpeedMultiplier = Mathf.Max(0.5f, speedMultiplier);
+            }
             isDeadOrEscaping = false;
             isEnraged = false;
+            isBossEnraged = false;
             isInvulnerable = false;
+            isScaleInFinished = false;
+            isChargingBossAttack = false;
+            wasBossChargeInterrupted = false;
+            bossChargeHitsReceived = 0;
             IsTeleporting = false;
             DiedWhileTeleporting = false;
             WasLastDamageNormalShot = false;
@@ -156,19 +338,28 @@ namespace WizardGame.Entities
                 bool isBoss = WaveConfig.IsBossType(data.wizardType);
                 float barYOffset = isBoss ? (spriteHeight * 0.70f) : (spriteHeight * 0.62f);
                 healthBarRoot.transform.localPosition = new Vector3(0f, barYOffset, 0f);
+                if (escapeWarningText != null)
+                {
+                    escapeWarningText.transform.localPosition = new Vector3(0f, barYOffset + (isBoss ? 0.35f : 0.28f), 0f);
+                    escapeWarningText.gameObject.SetActive(false);
+                }
             }
 
-            SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+            ApplyDepthSortingAndScale();
             UpdateHealthBar();
             StopAllActiveCoroutines();
 
             if (!activeGoblins.Contains(this)) activeGoblins.Add(this);
             isFrozen = false;
 
-            StartCoroutine(SpawnScaleInRoutine());
+            scaleInCoroutine = StartCoroutine(SpawnScaleInRoutine());
             StartBehavior();
 
-            float escapeTime = Mathf.Max(2.5f, data.escapeTimeSeconds / Mathf.Sqrt(currentSpeedMultiplier));
+            bool isBossUnit = WaveConfig.IsBossType(data.wizardType);
+            float baseEscape = data.escapeTimeSeconds * (isBossUnit ? 1.0f : Mathf.Max(0.65f, escapeTimeMultiplier));
+            float escapeTime = isBossUnit
+                ? Mathf.Max(20f, baseEscape)
+                : Mathf.Max(2.5f, baseEscape / Mathf.Sqrt(currentSpeedMultiplier));
             escapeCoroutine = StartCoroutine(EscapeTimerRoutine(escapeTime));
         }
 
@@ -191,14 +382,21 @@ namespace WizardGame.Entities
             // Walk / Levitation
             if (data.walkFrames != null && data.walkFrames.Length > 0)
             {
-                float fps = (data.wizardType == WizardType.Dourado) ? 12f : 8f;
+                float stageT = Mathf.Clamp01((currentStageNumber - 1) / 4f);
+                float fps = data.wizardType == WizardType.Dourado
+                    ? 12f
+                    : (data.wizardType == WizardType.Fugitivo ? Mathf.Lerp(7.5f, 12.5f, stageT) : 8f);
                 frameAnimator.RegisterState(AnimationState.Walk, data.walkFrames, fps, true);
             }
 
             // Run / Dash
             if (data.runFrames != null && data.runFrames.Length > 0)
             {
-                frameAnimator.RegisterState(AnimationState.Run, data.runFrames, 12f, true);
+                float stageT = Mathf.Clamp01((currentStageNumber - 1) / 4f);
+                float runFps = (data.wizardType == WizardType.Fugitivo)
+                    ? Mathf.Lerp(9.5f, 15.5f, stageT)
+                    : 12f;
+                frameAnimator.RegisterState(AnimationState.Run, data.runFrames, runFps, true);
             }
 
             // Attack / Golpe Forte
@@ -299,6 +497,36 @@ namespace WizardGame.Entities
             if (spriteRenderer != null) spriteRenderer.sortingOrder = order;
             if (healthBarBg != null) healthBarBg.sortingOrder = order + 2;
             if (healthBarFill != null) healthBarFill.sortingOrder = order + 3;
+            if (escapeWarningText != null)
+            {
+                var mr = escapeWarningText.GetComponent<MeshRenderer>();
+                if (mr != null) mr.sortingOrder = order + 4;
+            }
+        }
+
+        private void ApplyDepthSortingAndScale()
+        {
+            SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+
+            if (isScaleInFinished && !IsTeleporting && !isDeadOrEscaping)
+            {
+                float minY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.min.y : -4.5f;
+                float maxY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.max.y : 4.5f;
+                float yNorm = Mathf.InverseLerp(minY, maxY, transform.position.y);
+                // Efeito sutil de profundidade 2.5D: maior próximo à câmera (baixo), menor ao fundo (alto)
+                float depthScale = Mathf.Lerp(1.07f, 0.89f, yNorm);
+                transform.localScale = normalizedScale * depthScale;
+            }
+        }
+
+        private void CleanupTelegraphRing()
+        {
+            if (activeTelegraphRing != null)
+            {
+                Destroy(activeTelegraphRing);
+                activeTelegraphRing = null;
+            }
+            isChargingBossAttack = false;
         }
 
         private void StopMovementAndCombatCoroutines()
@@ -308,15 +536,35 @@ namespace WizardGame.Entities
             if (hitReactionCoroutine != null) { StopCoroutine(hitReactionCoroutine); hitReactionCoroutine = null; }
             if (attackRoutine != null) { StopCoroutine(attackRoutine); attackRoutine = null; }
             if (freezeCoroutine != null) { StopCoroutine(freezeCoroutine); freezeCoroutine = null; }
+            isInvulnerable = false;
+            CleanupTelegraphRing();
         }
 
         private void StopAllActiveCoroutines()
         {
             StopMovementAndCombatCoroutines();
+            if (scaleInCoroutine != null) { StopCoroutine(scaleInCoroutine); scaleInCoroutine = null; }
+            if (flashCoroutine != null) { StopCoroutine(flashCoroutine); flashCoroutine = null; }
             if (escapeCoroutine != null) { StopCoroutine(escapeCoroutine); escapeCoroutine = null; }
             if (deathCoroutine != null) { StopCoroutine(deathCoroutine); deathCoroutine = null; }
+            if (escapeWarningText != null) escapeWarningText.gameObject.SetActive(false);
             isFrozen = false;
             IsTeleporting = false;
+            isInvulnerable = false;
+            if (currentData != null && spriteRenderer != null)
+            {
+                spriteRenderer.color = currentData.baseTint;
+            }
+        }
+
+        public void CancelAndDespawnImmediately()
+        {
+            StopAllActiveCoroutines();
+            isDeadOrEscaping = true;
+            if (hitCollider != null) hitCollider.enabled = false;
+            if (healthBarRoot != null) healthBarRoot.SetActive(false);
+            if (escapeWarningText != null) escapeWarningText.gameObject.SetActive(false);
+            gameObject.SetActive(false);
         }
 
         private IEnumerator SpawnScaleInRoutine()
@@ -324,15 +572,21 @@ namespace WizardGame.Entities
             float elapsed = 0f;
             float duration = 0.2f;
 
+            float minY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.min.y : -4.5f;
+            float maxY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.max.y : 4.5f;
+            float yNorm = Mathf.InverseLerp(minY, maxY, transform.position.y);
+            Vector3 targetScale = normalizedScale * Mathf.Lerp(1.07f, 0.89f, yNorm);
+
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / duration;
                 float ease = Mathf.Sin(t * Mathf.PI * 0.5f);
-                transform.localScale = Vector3.LerpUnclamped(Vector3.zero, normalizedScale, ease);
+                transform.localScale = Vector3.LerpUnclamped(Vector3.zero, targetScale, ease);
                 yield return null;
             }
-            transform.localScale = normalizedScale;
+            transform.localScale = targetScale;
+            isScaleInFinished = true;
         }
 
         private void StartBehavior()
@@ -413,14 +667,46 @@ namespace WizardGame.Entities
             }
         }
 
-        public void TakeDamage(int damage, bool isNormalShot = false)
+        public void TakeDamage(int damage, bool isNormalShot = false, bool isSpecialSpell = false)
         {
-            if (isDeadOrEscaping || isInvulnerable) return;
+            if (isDeadOrEscaping) return;
+
+            if (isInvulnerable)
+            {
+                // Feedback visual e sonoro claro de que o alvo está momentaneamente furtivo/intangível
+                SpawnBossBurstFX(transform.position, new Color(0.7f, 0.55f, 1f, 0.7f), 0.9f);
+                SoundManager.Instance?.PlayDryFireSound();
+                return;
+            }
 
             WasLastDamageNormalShot = isNormalShot;
             currentHealth -= damage;
             UpdateHealthBar();
-            StartCoroutine(FlashDamageRoutine());
+
+            if (flashCoroutine != null) StopCoroutine(flashCoroutine);
+            flashCoroutine = StartCoroutine(FlashDamageRoutine());
+
+            // Interrupção de ataque carregado do Chefe
+            if (isChargingBossAttack && !wasBossChargeInterrupted)
+            {
+                bossChargeHitsReceived++;
+                if (isSpecialSpell || bossChargeHitsReceived >= 2)
+                {
+                    wasBossChargeInterrupted = true;
+                    CleanupTelegraphRing();
+                    SpawnBossBurstFX(transform.position, new Color(0.25f, 1f, 0.85f, 0.9f), 1.5f);
+                    OnBossAttackInterrupted?.Invoke(this, currentData != null ? currentData.displayName : "Chefe");
+                }
+            }
+
+            // Fase 2 de Fúria do Chefe aos 50% de Vida
+            if (currentHealth > 0 && currentData != null && WaveConfig.IsBossType(currentData.wizardType))
+            {
+                if (!isBossEnraged && currentHealth <= Mathf.CeilToInt(currentData.maxHealth * 0.5f))
+                {
+                    TriggerBossEnrage(spawnReinforcements: true);
+                }
+            }
 
             if (currentHealth <= 0)
             {
@@ -428,19 +714,65 @@ namespace WizardGame.Entities
             }
             else
             {
+                // Micro-stagger tático: acertar um goblin prestes a escapar dá breve janela extra para finalizá-lo
+                if (currentData != null && !WaveConfig.IsBossType(currentData.wizardType) &&
+                    remainingEscapeTime > 0f && remainingEscapeTime < 1.35f && hitStaggerExtensionsUsed < 2)
+                {
+                    remainingEscapeTime += 0.48f;
+                    hitStaggerExtensionsUsed++;
+                }
+
+                if (currentData != null && currentData.customDamageSound != null)
+                {
+                    SoundManager.Instance?.PlaySFX(currentData.customDamageSound, 0.85f);
+                }
                 TriggerHitReaction();
+            }
+        }
+
+        private void TriggerBossEnrage(bool spawnReinforcements)
+        {
+            if (isBossEnraged) return;
+            isBossEnraged = true;
+            currentSpeedMultiplier *= 1.24f;
+            SpawnBossBurstFX(transform.position, new Color(1f, 0.25f, 0.05f, 0.95f), 2.5f);
+            SpellEffectsManager.Instance?.SpawnFloatingText(transform.position + Vector3.up * 0.8f, "FÚRIA!", new Color(1f, 0.35f, 0.1f), 1.35f);
+            SpellEffectsManager.Instance?.TriggerCameraShake(0.20f, 0.18f);
+            OnBossEnraged?.Invoke(this, currentData);
+
+            if (spawnReinforcements && currentData != null)
+            {
+                if (currentData.wizardType == WizardType.Chefe2)
+                {
+                    OnBossSummonRequested?.Invoke(this, WizardType.Fugitivo);
+                }
+                else if (currentData.wizardType == WizardType.Chefe3)
+                {
+                    OnBossSummonRequested?.Invoke(this, WizardType.Fantasma);
+                }
+                else if (currentData.wizardType == WizardType.Chefe4)
+                {
+                    OnBossSummonRequested?.Invoke(this, WizardType.Dourado);
+                    OnBossSummonRequested?.Invoke(this, WizardType.Fugitivo);
+                }
+                else if (currentData.wizardType == WizardType.ChefeFinal)
+                {
+                    OnBossSummonRequested?.Invoke(this, WizardType.Dourado);
+                    OnBossSummonRequested?.Invoke(this, WizardType.Fantasma);
+                }
             }
         }
 
         private IEnumerator FlashDamageRoutine()
         {
-            Color original = currentData.baseTint;
-            spriteRenderer.color = Color.red;
+            Color targetAfterFlash = isFrozen ? new Color(0.35f, 0.85f, 1f, 1f) : (currentData != null ? currentData.baseTint : Color.white);
+            if (spriteRenderer != null) spriteRenderer.color = Color.red;
             yield return new WaitForSeconds(0.08f);
-            if (!isDeadOrEscaping)
+            if (!isDeadOrEscaping && spriteRenderer != null)
             {
-                spriteRenderer.color = original;
+                spriteRenderer.color = isFrozen ? new Color(0.35f, 0.85f, 1f, 1f) : targetAfterFlash;
             }
+            flashCoroutine = null;
         }
 
         private void TriggerHitReaction()
@@ -478,17 +810,56 @@ namespace WizardGame.Entities
 
         private IEnumerator EscapeTimerRoutine(float delaySeconds)
         {
+            bool isBoss = currentData != null && WaveConfig.IsBossType(currentData.wizardType);
             remainingEscapeTime = delaySeconds;
+
             while (remainingEscapeTime > 0f)
             {
                 if (!isFrozen)
                 {
                     remainingEscapeTime -= Time.deltaTime;
                 }
+
+                if (!isBoss && escapeWarningText != null)
+                {
+                    bool showWarn = !isDeadOrEscaping && !isFrozen && remainingEscapeTime <= 1.85f;
+                    if (escapeWarningText.gameObject.activeSelf != showWarn)
+                    {
+                        escapeWarningText.gameObject.SetActive(showWarn);
+                    }
+                    if (showWarn)
+                    {
+                        float pulse = 0.55f + Mathf.PingPong(Time.unscaledTime * 8f, 0.45f);
+                        escapeWarningText.color = new Color(1f, 0.28f, 0.12f, pulse);
+                        escapeWarningText.text = (currentData != null && (currentData.wizardType == WizardType.Fugitivo || currentData.wizardType == WizardType.Dourado))
+                            ? "! DANO !"
+                            : "!";
+                    }
+                }
+
                 yield return null;
             }
 
+            if (escapeWarningText != null) escapeWarningText.gameObject.SetActive(false);
             if (isDeadOrEscaping) yield break;
+
+            // Chefes lutam até serem derrotados para garantir progressão de fase:
+            // Se demorarem demais, entram em Fúria e atacam com pressão extra em vez de sumir da fase!
+            if (isBoss)
+            {
+                if (!isBossEnraged)
+                {
+                    TriggerBossEnrage(spawnReinforcements: true);
+                }
+                else
+                {
+                    currentSpeedMultiplier = Mathf.Min(2.4f, currentSpeedMultiplier * 1.15f);
+                }
+                SpawnBossBurstFX(transform.position, new Color(1f, 0.2f, 0.1f, 0.9f), 2.0f);
+                remainingEscapeTime = 16.0f;
+                escapeCoroutine = StartCoroutine(EscapeTimerRoutine(16.0f));
+                yield break;
+            }
 
             isDeadOrEscaping = true;
             activeGoblins.Remove(this);
@@ -537,9 +908,10 @@ namespace WizardGame.Entities
             DiedWhileTeleporting = IsTeleporting;
             IsTeleporting = false;
             isDeadOrEscaping = true;
-            activeGoblins.Remove(this);
             hitCollider.enabled = false;
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
+            if (escapeWarningText != null) escapeWarningText.gameObject.SetActive(false);
+            if (flashCoroutine != null) { StopCoroutine(flashCoroutine); flashCoroutine = null; }
 
             if (isFrozen)
             {
@@ -552,6 +924,11 @@ namespace WizardGame.Entities
             {
                 StopCoroutine(escapeCoroutine);
                 escapeCoroutine = null;
+            }
+
+            if (spriteRenderer != null && currentData != null)
+            {
+                spriteRenderer.color = currentData.baseTint;
             }
 
             if (currentData != null && currentData.deathReaction == AIDeathReaction.ExplodeOnDeath)
@@ -575,11 +952,19 @@ namespace WizardGame.Entities
         private IEnumerator FreezeRoutine(float duration)
         {
             isFrozen = true;
+            isInvulnerable = false;
+            IsTeleporting = false;
+            CleanupTelegraphRing();
 
-            // Interrompe rotinas ativas de movimento e ataque
-            if (movementCoroutine != null) StopCoroutine(movementCoroutine);
-            if (attackRoutine != null) StopCoroutine(attackRoutine);
-            if (hitReactionCoroutine != null) StopCoroutine(hitReactionCoroutine);
+            // Interrompe rotinas ativas de movimento, pulso cromático e ataque
+            if (movementCoroutine != null) { StopCoroutine(movementCoroutine); movementCoroutine = null; }
+            if (pulseCoroutine != null) { StopCoroutine(pulseCoroutine); pulseCoroutine = null; }
+            if (attackRoutine != null) { StopCoroutine(attackRoutine); attackRoutine = null; }
+            if (hitReactionCoroutine != null) { StopCoroutine(hitReactionCoroutine); hitReactionCoroutine = null; }
+            if (flashCoroutine != null) { StopCoroutine(flashCoroutine); flashCoroutine = null; }
+            if (escapeWarningText != null) escapeWarningText.gameObject.SetActive(false);
+
+            ApplyDepthSortingAndScale();
 
             // Tonalidade azul-gelo
             spriteRenderer.color = new Color(0.35f, 0.85f, 1f, 1f);
@@ -589,9 +974,10 @@ namespace WizardGame.Entities
             if (isDeadOrEscaping) yield break;
 
             isFrozen = false;
+            isInvulnerable = false;
             spriteRenderer.color = currentData.baseTint;
-            StartBehavior();
             freezeCoroutine = null;
+            StartBehavior();
         }
 
         private IEnumerator DeathAnimationRoutine()
@@ -654,7 +1040,7 @@ namespace WizardGame.Entities
                     elapsed += Time.deltaTime;
                     float t = elapsed / duration;
                     transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     yield return null;
                 }
 
@@ -724,9 +1110,13 @@ namespace WizardGame.Entities
             }
             transform.position = startPos;
 
-            // Corrida frenética (Flee)
-            float fleeTimer = Mathf.Max(1.5f, currentData.fleeDuration);
-            float fleeSpeed = currentData.moveSpeed * currentSpeedMultiplier * Mathf.Max(1.6f, currentData.fleeSpeedMultiplier);
+            // Corrida frenética (Flee) com progressão de agilidade conforme a fase atual
+            float stageProgress = Mathf.Clamp01((currentStageNumber - 1) / 4f);
+            float fleeTimer = Mathf.Max(1.3f, currentData.fleeDuration * Mathf.Lerp(0.85f, 1.12f, stageProgress));
+            float progressiveFleeMult = (currentData.wizardType == WizardType.Fugitivo)
+                ? Mathf.Lerp(1.45f, Mathf.Max(2.18f, currentData.fleeSpeedMultiplier), stageProgress)
+                : Mathf.Max(1.6f, currentData.fleeSpeedMultiplier);
+            float fleeSpeed = currentData.moveSpeed * currentSpeedMultiplier * progressiveFleeMult;
 
             frameAnimator.Play(AnimationState.Run);
 
@@ -773,7 +1163,7 @@ namespace WizardGame.Entities
                 );
 
                 frameAnimator.SetFacingDirection(fleeDir.x);
-                SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                ApplyDepthSortingAndScale();
                 yield return null;
             }
 
@@ -829,7 +1219,7 @@ namespace WizardGame.Entities
                 }
 
                 transform.position = nextPos;
-                SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                ApplyDepthSortingAndScale();
 
                 if (hitBoundary)
                 {
@@ -847,8 +1237,11 @@ namespace WizardGame.Entities
         {
             while (true)
             {
-                float factor = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;
-                spriteRenderer.color = Color.Lerp(new Color(1f, 0.95f, 0.5f), new Color(1f, 0.75f, 0.1f), factor);
+                if (flashCoroutine == null && !isFrozen && !isDeadOrEscaping)
+                {
+                    float factor = (Mathf.Sin(Time.time * 6f) + 1f) * 0.5f;
+                    spriteRenderer.color = Color.Lerp(new Color(1f, 0.95f, 0.5f), new Color(1f, 0.75f, 0.1f), factor);
+                }
                 yield return null;
             }
         }
@@ -860,10 +1253,16 @@ namespace WizardGame.Entities
                 spriteRenderer.sprite = currentData.specialActionSprite; // Postura erguendo escudo
             }
 
-            // Recuo defensivo absorvendo impacto
+            // Recuo defensivo absorvendo impacto (respeitando os limites da arena)
             Vector3 start = transform.position;
             Vector3 recoilDir = (UnityEngine.Random.insideUnitCircle.normalized);
-            Vector3 recoilTarget = start + (recoilDir * 0.45f);
+            Vector3 rawTarget = start + (recoilDir * 0.45f);
+            float margin = 1.0f;
+            Vector3 recoilTarget = new Vector3(
+                Mathf.Clamp(rawTarget.x, screenWorldBounds.min.x + margin, screenWorldBounds.max.x - margin),
+                Mathf.Clamp(rawTarget.y, screenWorldBounds.min.y + margin, screenWorldBounds.max.y - margin),
+                0f
+            );
 
             float elapsed = 0f;
             float dur = 0.14f / currentSpeedMultiplier;
@@ -871,7 +1270,7 @@ namespace WizardGame.Entities
             {
                 elapsed += Time.deltaTime;
                 transform.position = Vector3.Lerp(start, recoilTarget, elapsed / dur);
-                SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                ApplyDepthSortingAndScale();
                 yield return null;
             }
 
@@ -884,9 +1283,12 @@ namespace WizardGame.Entities
         {
             while (true)
             {
-                float alpha = Mathf.PingPong(Time.time * 1.2f, 0.45f) + 0.55f;
-                Color c = spriteRenderer.color;
-                spriteRenderer.color = new Color(c.r, c.g, c.b, alpha);
+                if (flashCoroutine == null && !isFrozen && !isDeadOrEscaping)
+                {
+                    float alpha = Mathf.PingPong(Time.time * 1.2f, 0.45f) + 0.55f;
+                    Color c = spriteRenderer.color;
+                    spriteRenderer.color = new Color(c.r, c.g, c.b, alpha);
+                }
                 yield return null;
             }
         }
@@ -913,7 +1315,7 @@ namespace WizardGame.Entities
                     float ox = Mathf.Cos(Time.time * 1.6f * currentSpeedMultiplier) * 0.18f;
 
                     transform.position = new Vector3(basePos.x + ox, basePos.y + oy, basePos.z);
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     yield return null;
                 }
 
@@ -957,7 +1359,7 @@ namespace WizardGame.Entities
                     {
                         elapsed += Time.deltaTime;
                         transform.position = Vector3.Lerp(start, protectPos, elapsed / duration);
-                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                        ApplyDepthSortingAndScale();
                         yield return null;
                     }
 
@@ -966,7 +1368,24 @@ namespace WizardGame.Entities
                 }
                 else
                 {
-                    yield return StartCoroutine(WanderRoutine());
+                    Vector3 patrolPoint = GetRandomPointInBounds();
+                    Vector3 start = transform.position;
+                    float dist = Vector3.Distance(start, patrolPoint);
+                    float dur = dist / Mathf.Max(0.5f, currentData.moveSpeed * currentSpeedMultiplier);
+                    float elapsed = 0f;
+
+                    frameAnimator.SetFacingDirection(patrolPoint.x - start.x);
+                    frameAnimator.Play(AnimationState.Walk);
+                    while (elapsed < dur)
+                    {
+                        elapsed += Time.deltaTime;
+                        transform.position = Vector3.Lerp(start, patrolPoint, Mathf.SmoothStep(0f, 1f, elapsed / dur));
+                        ApplyDepthSortingAndScale();
+                        yield return null;
+                    }
+                    transform.position = patrolPoint;
+                    frameAnimator.Play(AnimationState.Idle);
+                    yield return new WaitForSeconds(0.4f);
                 }
 
                 yield return null;
@@ -989,7 +1408,7 @@ namespace WizardGame.Entities
                 {
                     elapsed += Time.deltaTime;
                     transform.position = Vector3.Lerp(start, retreatPoint, elapsed / duration);
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     yield return null;
                 }
 
@@ -1112,6 +1531,7 @@ namespace WizardGame.Entities
             }
 
             IsTeleporting = false;
+            ApplyDepthSortingAndScale();
             StartBehavior();
         }
 
@@ -1128,35 +1548,110 @@ namespace WizardGame.Entities
             sr.sortingOrder = 8;
             sr.color = new Color(0.3f, 0.8f, 1f, 0.9f);
 
-            StartCoroutine(PortalFadeRoutine(portalGo));
+            MonoBehaviour host = SpellEffectsManager.Instance != null ? (MonoBehaviour)SpellEffectsManager.Instance : this;
+            host.StartCoroutine(PortalFadeRoutine(portalGo));
         }
 
         private IEnumerator PortalFadeRoutine(GameObject portalGo)
         {
             float dur = 0.35f;
             float elapsed = 0f;
-            SpriteRenderer sr = portalGo.GetComponent<SpriteRenderer>();
+            SpriteRenderer sr = portalGo != null ? portalGo.GetComponent<SpriteRenderer>() : null;
 
-            while (elapsed < dur)
+            while (elapsed < dur && portalGo != null)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / dur;
                 portalGo.transform.Rotate(0f, 0f, 180f * Time.deltaTime);
-                sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, Mathf.Lerp(0.9f, 0f, t));
+                if (sr != null) sr.color = new Color(sr.color.r, sr.color.g, sr.color.b, Mathf.Lerp(0.9f, 0f, t));
                 yield return null;
             }
 
-            Destroy(portalGo);
+            if (portalGo != null) Destroy(portalGo);
         }
 
-        // 5. GOBLIN CHEFE (BOSS): Passos pesados, Golpe Forte sísmico (Ataque 1) e Investidas Brutais (Ataque 2)
+        private IEnumerator ExecuteTelegraphedSlamRoutine(float windupDuration, AnimationState attackAnim, Color warningColor, float burstScale, int damage, string attackName)
+        {
+            isChargingBossAttack = true;
+            wasBossChargeInterrupted = false;
+            bossChargeHitsReceived = 0;
+
+            float effectiveWindup = isBossEnraged ? windupDuration * 0.82f : windupDuration;
+
+            // Anel visual de aviso (Telegrafo interrompível)
+            CleanupTelegraphRing();
+            isChargingBossAttack = true;
+            activeTelegraphRing = new GameObject("BossTelegraphRing");
+            activeTelegraphRing.transform.SetParent(transform, false);
+            activeTelegraphRing.transform.localPosition = Vector3.zero;
+
+            var lr = activeTelegraphRing.AddComponent<LineRenderer>();
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Unlit/Transparent");
+            lr.material = new Material(shader);
+            lr.useWorldSpace = false;
+            lr.loop = true;
+            int segs = 28;
+            lr.positionCount = segs;
+            lr.sortingOrder = (spriteRenderer != null ? spriteRenderer.sortingOrder : 20) + 5;
+            lr.startWidth = 0.08f;
+            lr.endWidth = 0.08f;
+            lr.startColor = warningColor;
+            lr.endColor = Color.white;
+
+            Color prevTint = spriteRenderer != null ? spriteRenderer.color : Color.white;
+            float elapsed = 0f;
+
+            while (elapsed < effectiveWindup)
+            {
+                if (isDeadOrEscaping || isFrozen || wasBossChargeInterrupted)
+                {
+                    CleanupTelegraphRing();
+                    if (!isDeadOrEscaping && !isFrozen && spriteRenderer != null) spriteRenderer.color = currentData.baseTint;
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                float t = Mathf.Clamp01(elapsed / effectiveWindup);
+                float radius = Mathf.Lerp(1.65f, 0.35f, t);
+
+                for (int i = 0; i < segs; i++)
+                {
+                    float ang = (i / (float)segs) * Mathf.PI * 2f;
+                    lr.SetPosition(i, new Vector3(Mathf.Cos(ang) * radius, Mathf.Sin(ang) * radius, 0f));
+                }
+
+                if (spriteRenderer != null)
+                {
+                    float flash = Mathf.PingPong(elapsed * 10f, 1f);
+                    spriteRenderer.color = Color.Lerp(currentData.baseTint, warningColor, 0.45f + flash * 0.45f);
+                }
+
+                yield return null;
+            }
+
+            CleanupTelegraphRing();
+            if (!isDeadOrEscaping && spriteRenderer != null) spriteRenderer.color = currentData.baseTint;
+
+            if (isDeadOrEscaping || isFrozen || wasBossChargeInterrupted) yield break;
+
+            frameAnimator.PlayOneShot(attackAnim, AnimationState.Idle);
+            yield return new WaitForSeconds(0.22f);
+
+            if (isDeadOrEscaping || isFrozen || wasBossChargeInterrupted) yield break;
+
+            SpellEffectsManager.Instance?.TriggerCameraShake(0.18f, 0.20f);
+            SpawnBossBurstFX(transform.position, warningColor, burstScale);
+            OnAttackPlayer?.Invoke(this, damage, attackName);
+        }
+
+        // 5. GOBLIN CHEFE (BOSS 1): Grande Goblin (Marcha, Investida e Golpe Sísmico Telegrafado)
         private IEnumerator BossBehaviorRoutine()
         {
             float speed = currentData.moveSpeed * currentSpeedMultiplier;
 
             while (true)
             {
-                // Fase 1: Marcha Pesada até uma posição do cenário
                 Vector3 target = GetRandomPointInBounds();
                 Vector3 start = transform.position;
                 float dist = Vector3.Distance(start, target);
@@ -1171,29 +1666,28 @@ namespace WizardGame.Entities
                     elapsed += Time.deltaTime;
                     float t = elapsed / walkDuration;
                     transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     yield return null;
                 }
 
                 transform.position = target;
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.65f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.55f) / currentSpeedMultiplier);
 
                 if (isDeadOrEscaping) yield break;
 
-                // Alterna entre Golpe Forte (Attack 1) e Investida Brutal (Attack 2)
                 bool doInvestida = (currentData.attack2Frames != null && currentData.attack2Frames.Length > 0) && (UnityEngine.Random.value > 0.45f);
 
                 if (doInvestida)
                 {
-                    // Ataque 2: Investida Brutal com Dash Acelerado
+                    // Investida Rápida: arremessa onda de choque sísmica interceptável ao chegar
                     Vector3 chargeTarget = GetRandomPointInBounds();
                     frameAnimator.SetFacingDirection(chargeTarget.x - transform.position.x);
                     frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
 
                     Vector3 chargeStart = transform.position;
                     float chargeDist = Vector3.Distance(chargeStart, chargeTarget);
-                    float chargeDuration = chargeDist / Mathf.Max(1.0f, speed * 2.2f);
+                    float chargeDuration = chargeDist / Mathf.Max(1.0f, speed * 2.1f);
                     float chargeElapsed = 0f;
 
                     while (chargeElapsed < chargeDuration)
@@ -1201,27 +1695,22 @@ namespace WizardGame.Entities
                         chargeElapsed += Time.deltaTime;
                         float t = chargeElapsed / chargeDuration;
                         transform.position = Vector3.Lerp(chargeStart, chargeTarget, t);
-                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                        ApplyDepthSortingAndScale();
                         yield return null;
                     }
 
                     transform.position = chargeTarget;
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.12f, 0.12f);
-                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 1, "Investida do Grande Goblin");
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.10f, 0.10f);
+                    SpawnApproachingBossProjectile(transform.position, new Color(1f, 0.6f, 0.15f), 1.85f, 1, "Onda de Choque do Grande Goblin");
                 }
                 else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
-                    // Ataque 1: Golpe Forte com Clava
-                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
-                    // No meio do golpe (~0.35s do ataque a 10fps), gera tremor de terra
-                    yield return new WaitForSeconds(0.35f);
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.16f, 0.18f);
-                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 1, "Golpe Sísmico do Grande Goblin");
-                    yield return new WaitForSeconds(0.35f);
+                    // Ataque 1: Golpe Sísmico Telegrafado (pode ser interrompido!)
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.30f, AnimationState.Attack, new Color(1f, 0.55f, 0.1f, 0.95f), 1.7f, 1, "Golpe Sísmico do Grande Goblin"));
                 }
 
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.7f) / currentSpeedMultiplier);
             }
         }
 
@@ -1233,7 +1722,6 @@ namespace WizardGame.Entities
             }
 
             Vector3 start = transform.position;
-            // Estremece de dor momentaneamente
             for (int i = 0; i < 3; i++)
             {
                 transform.position = start + (Vector3)(UnityEngine.Random.insideUnitCircle * 0.08f);
@@ -1242,11 +1730,7 @@ namespace WizardGame.Entities
             transform.position = start;
         }
 
-        // =========================================================================
-        // COMPORTAMENTOS DOS 4 NOVOS CHEFES (FASE 2, 3, 4 E FINAL)
-        // =========================================================================
-
-        // --- CHEFE 2: XAMÃ DO CAOS (Fogo, Projéteis e Labaredas) ---
+        // --- CHEFE 2: XAMÃ DO CAOS (Orbes de Fogo 2.5D e Labareda Telegrafada) ---
         private IEnumerator Boss2BehaviorRoutine()
         {
             float speed = currentData.moveSpeed * currentSpeedMultiplier;
@@ -1267,81 +1751,78 @@ namespace WizardGame.Entities
                     elapsed += Time.deltaTime;
                     float t = elapsed / walkDuration;
                     transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     yield return null;
                 }
 
                 transform.position = target;
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.6f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.28f, 0.52f) / currentSpeedMultiplier);
                 if (isDeadOrEscaping) yield break;
 
-                // Alterna entre Projétil de Fogo (Ataque 1) e Labareda em Área (Ataque 2)
-                bool doFlameBurst = UnityEngine.Random.value > 0.5f;
+                bool doFlameBurst = UnityEngine.Random.value > 0.55f;
 
                 if (doFlameBurst && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
                 {
-                    // Ataque 2: Labareda em Área
-                    frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.35f);
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.18f, 0.16f);
-                    SpawnBossBurstFX(transform.position, new Color(1f, 0.45f, 0.1f, 0.9f), 1.8f);
-                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 1, "Labareda do Xamã do Caos");
-                    yield return new WaitForSeconds(0.4f);
+                    // Labareda em Área (Telegrafo interrompível!)
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.22f, AnimationState.Attack2, new Color(1f, 0.42f, 0.08f, 0.95f), 2.0f, 1, "Labareda do Xamã do Caos"));
                 }
                 else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
-                    // Ataque 1: Disparo de Projétil de Fogo
-                    Vector3 aimTarget = GetRandomPointInBounds();
-                    frameAnimator.SetFacingDirection(aimTarget.x - transform.position.x);
+                    // Disparo de Projétil de Fogo vindo em direção à câmera
                     frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.35f);
-                    Vector3 dir = (aimTarget - transform.position).normalized;
-                    StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.5f, dir, new Color(1f, 0.5f, 0.1f), 8f));
-                    yield return new WaitForSeconds(0.35f);
+                    yield return new WaitForSeconds(0.28f);
+                    SpawnApproachingBossProjectile(transform.position + Vector3.down * 0.1f, new Color(1f, 0.48f, 0.1f), isBossEnraged ? 1.45f : 1.75f, 1, "Bola de Fogo do Xamã");
+                    if (isBossEnraged)
+                    {
+                        yield return new WaitForSeconds(0.2f);
+                        SpawnApproachingBossProjectile(transform.position + Vector3.right * 0.3f, new Color(1f, 0.65f, 0.15f), 1.55f, 1, "Centelha Extra do Xamã");
+                    }
+                    yield return new WaitForSeconds(0.3f);
                 }
 
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.4f, 0.8f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.68f) / currentSpeedMultiplier);
             }
         }
 
-        // --- CHEFE 3: FEITICEIRO ESPECTRAL (Teleporte, Invisibilidade e Invocações) ---
+        // --- CHEFE 3: FEITICEIRO ESPECTRAL (Teleporte, Furtividade Breve, Invocação e Orbes) ---
         private IEnumerator Boss3BehaviorRoutine()
         {
             float speed = currentData.moveSpeed * currentSpeedMultiplier;
+            bool usedStealthLastTurn = false;
 
             while (true)
             {
-                // Escolha de ação mística: Teleporte, Invisibilidade, Invocação ou Ataque Púrpura
                 float roll = UnityEngine.Random.value;
 
                 if (roll < 0.28f && currentData.teleportFrames != null && currentData.teleportFrames.Length > 0)
                 {
-                    // Habilidade: Teleporte Dimensional Instantâneo
+                    usedStealthLastTurn = false;
                     IsTeleporting = true;
                     frameAnimator.PlayOneShot(AnimationState.Teleport, AnimationState.Idle);
                     SpawnBossBurstFX(transform.position, new Color(0.7f, 0.2f, 1f, 0.85f), 1.5f);
-                    yield return new WaitForSeconds(0.3f);
+                    yield return new WaitForSeconds(0.28f);
 
                     Vector3 newPos = GetRandomPointInBounds();
                     transform.position = newPos;
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     SpawnBossBurstFX(newPos, new Color(0.7f, 0.2f, 1f, 0.85f), 1.5f);
-                    yield return new WaitForSeconds(0.3f);
+                    yield return new WaitForSeconds(0.25f);
                     IsTeleporting = false;
                 }
-                else if (roll < 0.52f)
+                else if (roll < 0.48f && !usedStealthLastTurn)
                 {
-                    // Habilidade: Invisibilidade Temporária & Deslocamento Furtivo (Invulnerável por 2s)
+                    // Furtividade breve e ágil (nunca fica preso invulnerável)
+                    usedStealthLastTurn = true;
                     isInvulnerable = true;
-                    Color normalColor = spriteRenderer.color;
-                    spriteRenderer.color = new Color(normalColor.r, normalColor.g, normalColor.b, 0.18f);
+                    Color normalColor = currentData.baseTint;
+                    spriteRenderer.color = new Color(normalColor.r, normalColor.g, normalColor.b, 0.22f);
 
                     Vector3 stealthTarget = GetRandomPointInBounds();
                     Vector3 stealthStart = transform.position;
                     float stealthDist = Vector3.Distance(stealthStart, stealthTarget);
-                    float stealthDur = stealthDist / Mathf.Max(1f, speed * 1.5f);
+                    float stealthDur = Mathf.Min(1.1f, stealthDist / Mathf.Max(1.5f, speed * 1.8f));
                     float stealthElapsed = 0f;
 
                     frameAnimator.SetFacingDirection(stealthTarget.x - stealthStart.x);
@@ -1350,65 +1831,43 @@ namespace WizardGame.Entities
                     while (stealthElapsed < stealthDur)
                     {
                         stealthElapsed += Time.deltaTime;
-                        transform.position = Vector3.Lerp(stealthStart, stealthTarget, stealthElapsed / stealthDur);
-                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                        transform.position = Vector3.Lerp(stealthStart, stealthTarget, stealthElapsed / Mathf.Max(0.01f, stealthDur));
+                        ApplyDepthSortingAndScale();
                         yield return null;
                     }
 
                     transform.position = stealthTarget;
-                    yield return new WaitForSeconds(0.4f);
+                    yield return new WaitForSeconds(0.22f);
 
-                    // Reaparece e cancela invulnerabilidade
                     spriteRenderer.color = normalColor;
                     isInvulnerable = false;
-                    SpawnBossBurstFX(transform.position, new Color(0.5f, 0.1f, 0.9f, 0.8f), 1.4f);
+                    SpawnBossBurstFX(transform.position, new Color(0.55f, 0.15f, 0.95f, 0.85f), 1.4f);
                 }
-                else if (roll < 0.76f && currentData.summonFrames != null && currentData.summonFrames.Length > 0)
+                else if (roll < 0.72f && currentData.summonFrames != null && currentData.summonFrames.Length > 0)
                 {
-                    // Habilidade: Invocação de Servos Espectrais
+                    usedStealthLastTurn = false;
                     frameAnimator.PlayOneShot(AnimationState.Summon, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.4f);
+                    yield return new WaitForSeconds(0.35f);
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.12f, 0.12f);
                     SpawnBossBurstFX(transform.position + Vector3.up * 0.4f, new Color(0.8f, 0.2f, 1f, 0.9f), 2.2f);
-                    yield return new WaitForSeconds(0.4f);
+                    OnBossSummonRequested?.Invoke(this, WizardType.Fantasma);
+                    yield return new WaitForSeconds(0.35f);
                 }
                 else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
-                    // Ataque 1: Orbe Púrpura de Energia Sombria
-                    Vector3 aimTarget = GetRandomPointInBounds();
-                    frameAnimator.SetFacingDirection(aimTarget.x - transform.position.x);
+                    usedStealthLastTurn = false;
                     frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.35f);
-                    Vector3 dir = (aimTarget - transform.position).normalized;
-                    StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.5f, dir, new Color(0.7f, 0.15f, 0.95f), 7.5f));
-                    yield return new WaitForSeconds(0.35f);
-                }
-                else
-                {
-                    // Deslocamento padrão
-                    Vector3 target = GetRandomPointInBounds();
-                    Vector3 start = transform.position;
-                    float dist = Vector3.Distance(start, target);
-                    float dur = dist / Mathf.Max(0.5f, speed);
-                    float el = 0f;
-                    frameAnimator.SetFacingDirection(target.x - start.x);
-                    frameAnimator.Play(AnimationState.Walk);
-                    while (el < dur)
-                    {
-                        el += Time.deltaTime;
-                        transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, el / dur));
-                        SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
-                        yield return null;
-                    }
-                    transform.position = target;
+                    yield return new WaitForSeconds(0.28f);
+                    SpawnApproachingBossProjectile(transform.position, new Color(0.75f, 0.2f, 1f), isBossEnraged ? 1.40f : 1.65f, 1, "Orbe Espectral do Feiticeiro");
+                    yield return new WaitForSeconds(0.3f);
                 }
 
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.75f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.65f) / currentSpeedMultiplier);
             }
         }
 
-        // --- CHEFE 4: LORDE CARMESIM (Golpe de Cetro, Orbe Carmesim e Caveiras) ---
+        // --- CHEFE 4: LORDE CARMESIM (Cetro Telegrafado, Orbes Duplos e Invocação) ---
         private IEnumerator Boss4BehaviorRoutine()
         {
             float speed = currentData.moveSpeed * currentSpeedMultiplier;
@@ -1429,50 +1888,45 @@ namespace WizardGame.Entities
                     elapsed += Time.deltaTime;
                     float t = elapsed / walkDuration;
                     transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     yield return null;
                 }
 
                 transform.position = target;
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.6f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.25f, 0.5f) / currentSpeedMultiplier);
                 if (isDeadOrEscaping) yield break;
 
                 float actionRoll = UnityEngine.Random.value;
 
                 if (actionRoll < 0.35f && currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
-                    // Ataque 1: Golpe Brutal de Cetro com Tremor
-                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.35f);
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.2f, 0.2f);
-                    SpawnBossBurstFX(transform.position + Vector3.down * 0.2f, new Color(0.9f, 0.1f, 0.1f, 0.9f), 1.6f);
-                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 2, "Golpe de Cetro do Lorde Carmesim");
-                    yield return new WaitForSeconds(0.35f);
+                    // Golpe de Cetro Telegrafado (2 Dano se não interrompido!)
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.15f, AnimationState.Attack, new Color(0.95f, 0.12f, 0.18f, 0.95f), 1.9f, 2, "Golpe de Cetro do Lorde Carmesim"));
                 }
-                else if (actionRoll < 0.70f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
+                else if (actionRoll < 0.78f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
                 {
-                    // Ataque 2: Disparo de Orbe Carmesim
-                    Vector3 aimTarget = GetRandomPointInBounds();
-                    frameAnimator.SetFacingDirection(aimTarget.x - transform.position.x);
+                    // Ataque 2: Rajada Dupla de Orbes Carmesins interceptáveis
                     frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.35f);
-                    Vector3 dir = (aimTarget - transform.position).normalized;
-                    StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.5f, dir, new Color(0.95f, 0.05f, 0.15f), 9f));
-                    yield return new WaitForSeconds(0.35f);
+                    yield return new WaitForSeconds(0.28f);
+                    float flightDur = isBossEnraged ? 1.40f : 1.65f;
+                    SpawnApproachingBossProjectile(transform.position + Vector3.left * 0.35f, new Color(0.95f, 0.08f, 0.2f), flightDur, 1, "Orbe Carmesim do Lorde", -2.2f);
+                    yield return new WaitForSeconds(0.18f);
+                    SpawnApproachingBossProjectile(transform.position + Vector3.right * 0.35f, new Color(0.95f, 0.08f, 0.2f), flightDur, 1, "Orbe Carmesim do Lorde", 2.2f);
+                    yield return new WaitForSeconds(0.25f);
                 }
                 else if (currentData.summonFrames != null && currentData.summonFrames.Length > 0)
                 {
-                    // Summon: Rito de Sangue Carmesim
                     frameAnimator.PlayOneShot(AnimationState.Summon, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.4f);
+                    yield return new WaitForSeconds(0.35f);
                     SpellEffectsManager.Instance?.TriggerCameraShake(0.15f, 0.15f);
                     SpawnBossBurstFX(transform.position, new Color(0.85f, 0.05f, 0.2f, 0.95f), 2.4f);
-                    yield return new WaitForSeconds(0.4f);
+                    OnBossSummonRequested?.Invoke(this, UnityEngine.Random.value > 0.5f ? WizardType.Fugitivo : WizardType.Dourado);
+                    yield return new WaitForSeconds(0.35f);
                 }
 
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.7f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.3f, 0.6f) / currentSpeedMultiplier);
             }
         }
 
@@ -1483,7 +1937,6 @@ namespace WizardGame.Entities
 
             while (true)
             {
-                // Marcha Imponente
                 Vector3 target = GetRandomPointInBounds();
                 Vector3 start = transform.position;
                 float dist = Vector3.Distance(start, target);
@@ -1498,94 +1951,113 @@ namespace WizardGame.Entities
                     elapsed += Time.deltaTime;
                     float t = elapsed / walkDuration;
                     transform.position = Vector3.Lerp(start, target, Mathf.SmoothStep(0f, 1f, t));
-                    SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+                    ApplyDepthSortingAndScale();
                     yield return null;
                 }
 
                 transform.position = target;
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.25f, 0.5f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.22f, 0.45f) / currentSpeedMultiplier);
                 if (isDeadOrEscaping) yield break;
 
-                // Ciclo Supremo: Golpe Sísmico, Choque de Magma, Rajada em Leque ou Invocação Vulcânica
                 float roll = UnityEngine.Random.value;
 
-                if (roll < 0.28f && currentData.attackFrames != null && currentData.attackFrames.Length > 0)
+                if (roll < 0.25f && currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
-                    // Ataque 1: Maça Sísmica Colossal
-                    frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.35f);
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.25f, 0.28f);
-                    SpawnBossBurstFX(transform.position + Vector3.down * 0.3f, new Color(1f, 0.3f, 0.05f, 0.95f), 2.2f);
-                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 2, "Terremoto Colossal do Rei");
-                    yield return new WaitForSeconds(0.35f);
+                    // Maça Sísmica Telegrafada
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.10f, AnimationState.Attack, new Color(1f, 0.35f, 0.05f, 0.95f), 2.3f, 2, "Terremoto Colossal do Rei"));
                 }
-                else if (roll < 0.55f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
+                else if (roll < 0.50f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
                 {
-                    // Ataque 2: Choque de Magma com Abalo Sísmico
-                    frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.4f);
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.22f, 0.24f);
-                    SpawnBossBurstFX(transform.position, new Color(1f, 0.55f, 0.1f, 0.95f), 2.8f);
-                    if (!isDeadOrEscaping) OnAttackPlayer?.Invoke(this, 2, "Choque de Magma do Rei");
-                    yield return new WaitForSeconds(0.35f);
+                    // Choque de Magma Telegrafado
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.05f, AnimationState.Attack2, new Color(1f, 0.58f, 0.1f, 0.95f), 2.8f, 2, "Choque de Magma do Rei"));
                 }
-                else if (roll < 0.80f && currentData.attack3Frames != null && currentData.attack3Frames.Length > 0)
+                else if (roll < 0.82f && currentData.attack3Frames != null && currentData.attack3Frames.Length > 0)
                 {
-                    // Ataque 3: Projéteis Triplos de Magma em Leque
+                    // Ataque 3: Rajada Tripla de Orbes Solares 2.5D
                     frameAnimator.PlayOneShot(AnimationState.Attack3, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.35f);
+                    yield return new WaitForSeconds(0.28f);
 
-                    Vector3 centerAim = GetRandomPointInBounds();
-                    Vector3 baseDir = (centerAim - transform.position).normalized;
-                    float[] angles = new float[] { -22f, 0f, 22f };
-
-                    foreach (float ang in angles)
+                    float flightDur = isBossEnraged ? 1.40f : 1.70f;
+                    float[] xOffsets = new float[] { -3.2f, 0f, 3.2f };
+                    foreach (float xo in xOffsets)
                     {
-                        Vector3 dir = Quaternion.Euler(0f, 0f, ang) * baseDir;
-                        StartCoroutine(BossProjectileRoutine(transform.position + dir * 0.6f, dir, new Color(1f, 0.4f, 0.05f), 8.5f));
+                        SpawnApproachingBossProjectile(transform.position + Vector3.up * 0.15f, new Color(1f, 0.42f, 0.05f), flightDur, 1, "Magma Solar do Rei Goblin", xo);
                     }
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.15f, 0.15f);
-                    yield return new WaitForSeconds(0.35f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.14f, 0.14f);
+                    yield return new WaitForSeconds(0.32f);
                 }
                 else if (currentData.summonFrames != null && currentData.summonFrames.Length > 0)
                 {
-                    // Invocação: Ritual do Vulcão Ancestral
                     frameAnimator.PlayOneShot(AnimationState.Summon, AnimationState.Idle);
-                    yield return new WaitForSeconds(0.4f);
-                    SpellEffectsManager.Instance?.TriggerCameraShake(0.25f, 0.25f);
-                    SpawnBossBurstFX(transform.position, new Color(1f, 0.85f, 0.2f, 0.95f), 3.2f);
-                    yield return new WaitForSeconds(0.4f);
+                    yield return new WaitForSeconds(0.35f);
+                    SpellEffectsManager.Instance?.TriggerCameraShake(0.22f, 0.22f);
+                    SpawnBossBurstFX(transform.position, new Color(1f, 0.85f, 0.2f, 0.95f), 3.0f);
+                    OnBossSummonRequested?.Invoke(this, UnityEngine.Random.value > 0.45f ? WizardType.Dourado : WizardType.Fantasma);
+                    yield return new WaitForSeconds(0.35f);
                 }
 
                 frameAnimator.Play(AnimationState.Idle);
-                yield return new WaitForSeconds(UnityEngine.Random.Range(0.35f, 0.65f) / currentSpeedMultiplier);
+                yield return new WaitForSeconds(UnityEngine.Random.Range(0.28f, 0.55f) / currentSpeedMultiplier);
             }
         }
 
-        private IEnumerator BossProjectileRoutine(Vector3 startPos, Vector3 dir, Color color, float speed)
+        private void SpawnApproachingBossProjectile(Vector3 startPos, Color color, float flightDuration, int damage, string attackName, float targetXBias = 0f)
         {
+            float targetX = Mathf.Clamp(targetXBias + UnityEngine.Random.Range(-1.1f, 1.1f), screenWorldBounds.min.x + 1.2f, screenWorldBounds.max.x - 1.2f);
+            Vector3 targetPos = new Vector3(targetX, screenWorldBounds.min.y + 0.45f, 0f);
+
             GameObject proj = new GameObject("BossProjectile");
             proj.transform.position = startPos;
-            proj.transform.localScale = Vector3.one * 0.45f;
+            proj.transform.localScale = Vector3.one * 0.35f;
 
             SpriteRenderer sr = proj.AddComponent<SpriteRenderer>();
-            sr.sprite = CreateSolidWhiteSprite();
+            sr.sprite = CreateOrbSprite(64);
             sr.color = color;
-            sr.sortingOrder = 30;
+            sr.sortingOrder = 34;
 
-            float lifetime = 1.8f;
-            float elapsed = 0f;
+            // Núcleo interno brilhante branco-dourado para máxima visibilidade
+            GameObject core = new GameObject("Core");
+            core.transform.SetParent(proj.transform, false);
+            core.transform.localScale = Vector3.one * 0.52f;
+            var coreSr = core.AddComponent<SpriteRenderer>();
+            coreSr.sprite = sr.sprite;
+            coreSr.color = new Color(1f, 0.96f, 0.82f, 0.95f);
+            coreSr.sortingOrder = 35;
 
-            while (elapsed < lifetime)
+            CircleCollider2D col = proj.AddComponent<CircleCollider2D>();
+            col.radius = 0.62f;
+            col.isTrigger = true;
+
+            BossProjectileInstance item = proj.AddComponent<BossProjectileInstance>();
+            RegisterBossProjectile(proj);
+            item.Launch(this, startPos, targetPos, color, flightDuration, damage, attackName, (owner, dmg, atk) =>
             {
-                elapsed += Time.deltaTime;
-                proj.transform.position += dir * (speed * Time.deltaTime);
-                yield return null;
-            }
+                OnAttackPlayer?.Invoke(owner, dmg, atk);
+            });
+        }
 
-            SpawnBossBurstFX(proj.transform.position, color, 0.8f);
-            Destroy(proj);
+        private static Sprite cachedOrbSprite;
+        private static Sprite CreateOrbSprite(int resolution)
+        {
+            if (cachedOrbSprite != null) return cachedOrbSprite;
+            Texture2D tex = new Texture2D(resolution, resolution, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            float c = resolution * 0.5f;
+            float r = c - 1f;
+            for (int y = 0; y < resolution; y++)
+            {
+                for (int x = 0; x < resolution; x++)
+                {
+                    float d = Vector2.Distance(new Vector2(x, y), new Vector2(c, c));
+                    float norm = Mathf.Clamp01(d / r);
+                    float alpha = Mathf.SmoothStep(1f, 0f, norm * norm);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+            tex.Apply();
+            cachedOrbSprite = Sprite.Create(tex, new Rect(0, 0, resolution, resolution), new Vector2(0.5f, 0.5f), 100f);
+            return cachedOrbSprite;
         }
 
         private void SpawnBossBurstFX(Vector3 pos, Color color, float radius)
@@ -1599,16 +2071,17 @@ namespace WizardGame.Entities
             sr.color = color;
             sr.sortingOrder = 32;
 
-            StartCoroutine(BossBurstFadeRoutine(burst, color, radius));
+            MonoBehaviour host = SpellEffectsManager.Instance != null ? (MonoBehaviour)SpellEffectsManager.Instance : this;
+            host.StartCoroutine(BossBurstFadeRoutine(burst, color, radius));
         }
 
         private IEnumerator BossBurstFadeRoutine(GameObject burst, Color color, float maxScale)
         {
             float dur = 0.35f;
             float elapsed = 0f;
-            SpriteRenderer sr = burst.GetComponent<SpriteRenderer>();
+            SpriteRenderer sr = burst != null ? burst.GetComponent<SpriteRenderer>() : null;
 
-            while (elapsed < dur)
+            while (elapsed < dur && burst != null)
             {
                 elapsed += Time.deltaTime;
                 float t = elapsed / dur;
@@ -1620,7 +2093,7 @@ namespace WizardGame.Entities
                 yield return null;
             }
 
-            Destroy(burst);
+            if (burst != null) Destroy(burst);
         }
 
         private Vector3 GetRandomPointInBounds()

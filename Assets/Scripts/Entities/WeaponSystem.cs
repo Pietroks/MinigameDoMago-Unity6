@@ -30,8 +30,8 @@ namespace WizardGame.Entities
         [SerializeField] private SpriteRenderer muzzleFlash;
 
         [Header("Parâmetros de Munição (Mana)")]
-        [SerializeField] private int maxAmmo = 8;
-        [SerializeField] private float reloadDuration = 1.2f;
+        [SerializeField] private int maxAmmo = 10;
+        [SerializeField] private float reloadDuration = 1.0f;
 
         [Header("Parâmetros de Mira & Rastreamento")]
         [SerializeField] private float aimTrackingSpeed = 24f;
@@ -60,6 +60,7 @@ namespace WizardGame.Entities
 
         private int currentAmmo;
         private bool isReloading;
+        private Coroutine activeReloadCoroutine;
         private Vector2 currentRecoilOffset;
         private float currentRecoilAngle;
         private float crosshairRecoilScale = 1.0f;
@@ -67,6 +68,7 @@ namespace WizardGame.Entities
         private float currentCrosshairBaseScale = 1.0f;
         private float hitMarkerTimer = 0f;
         private Color currentHitMarkerColor = Color.white;
+        private bool isPrecisionActive = false;
 
         private Vector2 currentSwayOffset;
         private float currentSwayRotation;
@@ -105,6 +107,7 @@ namespace WizardGame.Entities
         private void UpdateCrosshairAndWand()
         {
             bool isCursorMenuVisible = Cursor.visible;
+            float dt = (Time.timeScale > 0.0001f) ? Time.unscaledDeltaTime : 0f;
 
             // 1. Atualiza Retículo de Mira
             if (crosshairRect != null)
@@ -117,9 +120,18 @@ namespace WizardGame.Entities
                 {
                     crosshairRect.gameObject.SetActive(true);
                     crosshairRect.position = UnityEngine.Input.mousePosition;
-                    currentCrosshairBaseScale = Mathf.Lerp(currentCrosshairBaseScale, targetCrosshairBaseScale, Time.deltaTime * 12f);
+                    currentCrosshairBaseScale = Mathf.Lerp(currentCrosshairBaseScale, targetCrosshairBaseScale, dt * 12f);
                     crosshairRect.localScale = Vector3.one * (crosshairRecoilScale * currentCrosshairBaseScale);
-                    crosshairRecoilScale = Mathf.Lerp(crosshairRecoilScale, 1.0f, Time.deltaTime * 18f);
+                    crosshairRecoilScale = Mathf.Lerp(crosshairRecoilScale, 1.0f, dt * 18f);
+
+                    if (isReloading)
+                    {
+                        crosshairRect.Rotate(0f, 0f, -260f * dt);
+                    }
+                    else
+                    {
+                        crosshairRect.localRotation = Quaternion.Lerp(crosshairRect.localRotation, Quaternion.identity, dt * 16f);
+                    }
 
                     if (crosshairImage == null)
                     {
@@ -130,8 +142,13 @@ namespace WizardGame.Entities
                     {
                         if (hitMarkerTimer > 0f)
                         {
-                            hitMarkerTimer -= Time.deltaTime;
+                            hitMarkerTimer -= dt;
                             crosshairImage.color = currentHitMarkerColor;
+                        }
+                        else if (isReloading)
+                        {
+                            Color reloadColor = new Color(1f, 0.78f, 0.28f, 0.78f);
+                            crosshairImage.color = Color.Lerp(crosshairImage.color, reloadColor, dt * 20f);
                         }
                         else
                         {
@@ -145,14 +162,15 @@ namespace WizardGame.Entities
                                 wPos.z = 0f;
 
                                 Collider2D hoverCol = Physics2D.OverlapPoint(wPos);
-                                if (hoverCol != null && hoverCol.TryGetComponent<WizardController>(out _))
+                                if (hoverCol != null && (hoverCol.TryGetComponent<WizardController>(out _) || hoverCol.TryGetComponent<BossProjectileInstance>(out _)))
                                 {
                                     isHovering = true;
                                 }
                             }
 
-                            Color targetColor = isHovering ? new Color(1f, 0.35f, 0.35f, 0.95f) : new Color(1f, 1f, 1f, 0.88f);
-                            crosshairImage.color = Color.Lerp(crosshairImage.color, targetColor, Time.deltaTime * 20f);
+                            Color idleColor = isPrecisionActive ? new Color(0.45f, 1f, 0.65f, 0.98f) : new Color(1f, 1f, 1f, 0.96f);
+                            Color targetColor = isHovering ? new Color(1f, 0.42f, 0.42f, 1f) : idleColor;
+                            crosshairImage.color = Color.Lerp(crosshairImage.color, targetColor, dt * 20f);
                         }
                     }
                 }
@@ -186,18 +204,18 @@ namespace WizardGame.Entities
                 Vector2 targetSway = new Vector2(-mouseX * swayAmount, -mouseY * swayAmount);
                 float targetSwayRot = -mouseX * swayRotationAmount;
 
-                currentSwayOffset = Vector2.Lerp(currentSwayOffset, targetSway, Time.deltaTime * swaySmoothSpeed);
-                currentSwayRotation = Mathf.Lerp(currentSwayRotation, targetSwayRot, Time.deltaTime * swaySmoothSpeed);
+                currentSwayOffset = Vector2.Lerp(currentSwayOffset, targetSway, dt * swaySmoothSpeed);
+                currentSwayRotation = Mathf.Lerp(currentSwayRotation, targetSwayRot, dt * swaySmoothSpeed);
 
                 // Idle Breathing Bobbing
-                float bobTime = Time.time * bobFrequency;
+                float bobTime = Time.unscaledTime * bobFrequency;
                 float bobX = Mathf.Sin(bobTime) * bobAmountX;
                 float bobY = Mathf.Cos(bobTime * 2f) * bobAmountY;
                 Vector2 bobOffset = new Vector2(bobX, bobY);
 
                 // Posição final ancorada combinando base, bobbing, sway e recoil
                 Vector2 targetPos = wandBaseAnchoredPos + bobOffset + currentSwayOffset + currentRecoilOffset;
-                wandRect.anchoredPosition = Vector2.Lerp(wandRect.anchoredPosition, targetPos, Time.deltaTime * 20f);
+                wandRect.anchoredPosition = Vector2.Lerp(wandRect.anchoredPosition, targetPos, dt * 20f);
 
                 // Rotação dinâmica acompanhando a mira do mouse
                 Vector2 wandScreenOrigin = wandRect.position;
@@ -210,12 +228,12 @@ namespace WizardGame.Entities
                     float totalAngle = rotDelta + currentRecoilAngle + currentSwayRotation;
 
                     Quaternion targetRot = Quaternion.Euler(0f, 0f, totalAngle);
-                    wandRect.localRotation = Quaternion.Slerp(wandRect.localRotation, targetRot, Time.deltaTime * aimTrackingSpeed);
+                    wandRect.localRotation = Quaternion.Slerp(wandRect.localRotation, targetRot, dt * aimTrackingSpeed);
                 }
 
                 // Recuperação elástica do recuo
-                currentRecoilOffset = Vector2.Lerp(currentRecoilOffset, Vector2.zero, Time.deltaTime * recoilRecoverySpeed);
-                currentRecoilAngle = Mathf.Lerp(currentRecoilAngle, 0f, Time.deltaTime * recoilRecoverySpeed);
+                currentRecoilOffset = Vector2.Lerp(currentRecoilOffset, Vector2.zero, dt * recoilRecoverySpeed);
+                currentRecoilAngle = Mathf.Lerp(currentRecoilAngle, 0f, dt * recoilRecoverySpeed);
             }
             else if (wandTransform != null)
             {
@@ -225,7 +243,7 @@ namespace WizardGame.Entities
                 {
                     Vector3 camPos = mainCam.transform.position;
                     Vector3 targetBasePos = camPos + new Vector3(wandBaseAnchoredPos.x * 0.01f, wandBaseAnchoredPos.y * 0.01f, 0f) + (Vector3)currentRecoilOffset;
-                    wandTransform.position = Vector3.Lerp(wandTransform.position, targetBasePos, Time.deltaTime * 15f);
+                    wandTransform.position = Vector3.Lerp(wandTransform.position, targetBasePos, dt * 15f);
 
                     Vector3 mousePos = UnityEngine.Input.mousePosition;
                     mousePos.z = 10f;
@@ -235,10 +253,10 @@ namespace WizardGame.Entities
                     Vector3 aimDir = (worldMousePos - wandTransform.position).normalized;
                     float angle = Mathf.Atan2(aimDir.y, aimDir.x) * Mathf.Rad2Deg;
                     Quaternion targetRot = Quaternion.Euler(0f, 0f, angle - 45f + currentRecoilAngle);
-                    wandTransform.rotation = Quaternion.Lerp(wandTransform.rotation, targetRot, Time.deltaTime * 20f);
+                    wandTransform.rotation = Quaternion.Lerp(wandTransform.rotation, targetRot, dt * 20f);
 
-                    currentRecoilOffset = Vector2.Lerp(currentRecoilOffset, Vector2.zero, Time.deltaTime * recoilRecoverySpeed);
-                    currentRecoilAngle = Mathf.Lerp(currentRecoilAngle, 0f, Time.deltaTime * recoilRecoverySpeed);
+                    currentRecoilOffset = Vector2.Lerp(currentRecoilOffset, Vector2.zero, dt * recoilRecoverySpeed);
+                    currentRecoilAngle = Mathf.Lerp(currentRecoilAngle, 0f, dt * recoilRecoverySpeed);
                 }
             }
         }
@@ -354,7 +372,8 @@ namespace WizardGame.Entities
         public void StartReload()
         {
             if (isReloading || currentAmmo == maxAmmo) return;
-            StartCoroutine(ReloadRoutine());
+            if (activeReloadCoroutine != null) StopCoroutine(activeReloadCoroutine);
+            activeReloadCoroutine = StartCoroutine(ReloadRoutine());
         }
 
         private IEnumerator ReloadRoutine()
@@ -365,12 +384,16 @@ namespace WizardGame.Entities
             float elapsed = 0f;
             while (elapsed < reloadDuration)
             {
-                elapsed += Time.deltaTime;
+                if (Time.timeScale > 0.0001f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                }
                 yield return null;
             }
 
             currentAmmo = maxAmmo;
             isReloading = false;
+            activeReloadCoroutine = null;
             OnAmmoChanged?.Invoke(currentAmmo, maxAmmo);
             OnReloadStateChanged?.Invoke(false);
         }
@@ -380,9 +403,10 @@ namespace WizardGame.Entities
         /// </summary>
         public void RefillAmmo()
         {
-            if (isReloading)
+            if (activeReloadCoroutine != null)
             {
-                StopCoroutine("ReloadRoutine");
+                StopCoroutine(activeReloadCoroutine);
+                activeReloadCoroutine = null;
                 isReloading = false;
                 OnReloadStateChanged?.Invoke(false);
             }
@@ -395,9 +419,10 @@ namespace WizardGame.Entities
         /// </summary>
         public void AddAmmo(int amount)
         {
-            if (isReloading)
+            if (activeReloadCoroutine != null)
             {
-                StopCoroutine("ReloadRoutine");
+                StopCoroutine(activeReloadCoroutine);
+                activeReloadCoroutine = null;
                 isReloading = false;
                 OnReloadStateChanged?.Invoke(false);
             }
@@ -410,6 +435,7 @@ namespace WizardGame.Entities
         /// </summary>
         public void SetPrecisionMode(bool enabled)
         {
+            isPrecisionActive = enabled;
             targetCrosshairBaseScale = enabled ? 0.60f : 1.0f;
         }
     }

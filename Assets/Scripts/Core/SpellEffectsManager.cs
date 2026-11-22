@@ -35,6 +35,8 @@ namespace WizardGame.Core
         private Material spriteMaterial;
         private Sprite circleSprite;
         private Sprite diamondSprite;
+        private Coroutine activeShakeCoroutine;
+        private Vector3 cameraAnchorPos = new Vector3(0f, 0f, -10f);
 
         private void Awake()
         {
@@ -47,6 +49,9 @@ namespace WizardGame.Core
                 Destroy(gameObject);
                 return;
             }
+
+            Camera cam = Camera.main;
+            if (cam != null) cameraAnchorPos = cam.transform.position;
 
             Shader shader = Shader.Find("Sprites/Default");
             if (shader == null) shader = Shader.Find("Unlit/Transparent");
@@ -390,7 +395,11 @@ namespace WizardGame.Core
 
         public void TriggerCameraShake(float duration = 0.15f, float magnitude = 0.15f)
         {
-            StartCoroutine(CameraShakeRoutine(duration, magnitude));
+            if (activeShakeCoroutine != null)
+            {
+                StopCoroutine(activeShakeCoroutine);
+            }
+            activeShakeCoroutine = StartCoroutine(CameraShakeRoutine(duration, magnitude));
         }
 
         private IEnumerator CameraShakeRoutine(float duration, float magnitude)
@@ -398,7 +407,6 @@ namespace WizardGame.Core
             Camera cam = Camera.main;
             if (cam == null) yield break;
 
-            Vector3 originalPos = cam.transform.position;
             float elapsed = 0f;
 
             while (elapsed < duration)
@@ -407,11 +415,131 @@ namespace WizardGame.Core
                 float damp = 1f - (elapsed / duration);
                 float x = UnityEngine.Random.Range(-1f, 1f) * magnitude * damp;
                 float y = UnityEngine.Random.Range(-1f, 1f) * magnitude * damp;
-                cam.transform.position = new Vector3(originalPos.x + x, originalPos.y + y, originalPos.z);
+                cam.transform.position = new Vector3(cameraAnchorPos.x + x, cameraAnchorPos.y + y, cameraAnchorPos.z);
                 yield return null;
             }
 
-            cam.transform.position = originalPos;
+            cam.transform.position = cameraAnchorPos;
+            activeShakeCoroutine = null;
+        }
+
+        #endregion
+
+        #region Feedback Tátil de Combate (Floating Text & Impactos)
+
+        public void SpawnFloatingText(Vector3 worldPos, string text, Color color, float scale = 1.0f, float riseDistance = 0.95f)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            StartCoroutine(FloatingTextRoutine(worldPos, text, color, scale, riseDistance));
+        }
+
+        private IEnumerator FloatingTextRoutine(Vector3 worldPos, string text, Color color, float scale, float riseDistance)
+        {
+            GameObject go = new GameObject("FloatingCombatText");
+            Vector3 startPos = new Vector3(
+                worldPos.x + UnityEngine.Random.Range(-0.18f, 0.18f),
+                worldPos.y + 0.35f,
+                0f
+            );
+            go.transform.position = startPos;
+
+            var tm = go.AddComponent<TextMesh>();
+            tm.text = text;
+            tm.fontSize = 36;
+            tm.characterSize = 0.068f * scale;
+            tm.fontStyle = FontStyle.Bold;
+            tm.alignment = TextAlignment.Center;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.color = color;
+            var mr = go.GetComponent<MeshRenderer>();
+            if (mr != null) mr.sortingOrder = 60;
+
+            // Sombra escura atrás do texto para leitura impecável em qualquer cenário
+            GameObject shadowGo = new GameObject("Shadow");
+            shadowGo.transform.SetParent(go.transform, false);
+            shadowGo.transform.localPosition = new Vector3(0.03f, -0.03f, 0f);
+            var shadowTm = shadowGo.AddComponent<TextMesh>();
+            shadowTm.text = text;
+            shadowTm.fontSize = 36;
+            shadowTm.characterSize = tm.characterSize;
+            shadowTm.fontStyle = FontStyle.Bold;
+            shadowTm.alignment = TextAlignment.Center;
+            shadowTm.anchor = TextAnchor.MiddleCenter;
+            shadowTm.color = new Color(0f, 0f, 0f, 0.85f);
+            var shadowMr = shadowGo.GetComponent<MeshRenderer>();
+            if (shadowMr != null) shadowMr.sortingOrder = 59;
+
+            float duration = 0.72f;
+            float elapsed = 0f;
+            Vector3 peakScale = Vector3.one * 1.25f;
+
+            while (elapsed < duration)
+            {
+                if (Time.timeScale > 0.0001f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / duration);
+                    float easeOut = 1f - Mathf.Pow(1f - t, 3f);
+
+                    go.transform.position = startPos + new Vector3(0f, riseDistance * easeOut, 0f);
+                    go.transform.localScale = Vector3.Lerp(peakScale, Vector3.one, Mathf.Clamp01(t * 4f));
+
+                    float alpha = t > 0.55f ? 1f - ((t - 0.55f) / 0.45f) : 1f;
+                    tm.color = new Color(color.r, color.g, color.b, alpha);
+                    shadowTm.color = new Color(0f, 0f, 0f, alpha * 0.85f);
+                }
+                yield return null;
+            }
+
+            Destroy(go);
+        }
+
+        public void SpawnImpactEffect(Vector3 worldPos, bool isHit, bool isHeadshot, Color? customColor = null)
+        {
+            worldPos.z = 0f;
+            Color fxColor = customColor ?? (isHeadshot
+                ? new Color(1f, 0.88f, 0.2f, 0.95f)
+                : (isHit ? new Color(0.45f, 0.95f, 1f, 0.9f) : new Color(0.85f, 0.88f, 0.95f, 0.45f)));
+
+            StartCoroutine(ImpactRingRoutine(worldPos, fxColor, isHeadshot ? 0.85f : (isHit ? 0.55f : 0.34f)));
+
+            int sparks = isHeadshot ? 10 : (isHit ? 5 : 2);
+            for (int i = 0; i < sparks; i++)
+            {
+                Vector2 dir = UnityEngine.Random.insideUnitCircle.normalized;
+                if (dir.sqrMagnitude < 0.01f) dir = Vector2.up;
+                float spd = isHeadshot ? UnityEngine.Random.Range(2.8f, 5.4f) : UnityEngine.Random.Range(1.5f, 3.4f);
+                StartCoroutine(SparkParticleRoutine(worldPos, dir * spd, fxColor));
+            }
+        }
+
+        private IEnumerator ImpactRingRoutine(Vector3 center, Color color, float maxScale)
+        {
+            GameObject ring = new GameObject("ImpactFlash");
+            ring.transform.position = center;
+            ring.transform.localScale = Vector3.one * 0.12f;
+
+            var sr = ring.AddComponent<SpriteRenderer>();
+            sr.sprite = circleSprite;
+            sr.material = spriteMaterial;
+            sr.color = color;
+            sr.sortingOrder = 46;
+
+            float dur = 0.16f;
+            float elapsed = 0f;
+            while (elapsed < dur)
+            {
+                if (Time.timeScale > 0.0001f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / dur);
+                    ring.transform.localScale = Vector3.one * Mathf.Lerp(0.12f, maxScale, Mathf.Sin(t * Mathf.PI * 0.5f));
+                    sr.color = new Color(color.r, color.g, color.b, Mathf.Lerp(color.a, 0f, t));
+                }
+                yield return null;
+            }
+
+            Destroy(ring);
         }
 
         #endregion

@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -19,9 +20,11 @@ namespace WizardGame.Core
         private const string PREF_BGM_VOL = "Minigame_BGM_Volume";
         private const string PREF_SFX_VOL = "Minigame_SFX_Volume";
         private const string PREF_MUTED = "Minigame_Audio_Muted";
+        private const string PREF_MIX_VERSION = "Minigame_Audio_MixVersion";
+        private const int CURRENT_MIX_VERSION = 2;
 
-        private const float DEFAULT_BGM_VOL = 0.28f;
-        private const float DEFAULT_SFX_VOL = 0.75f;
+        private const float DEFAULT_BGM_VOL = 0.42f;
+        private const float DEFAULT_SFX_VOL = 0.65f;
 
         [Header("Fontes de Áudio")]
         [SerializeField] private AudioSource bgmSource;
@@ -30,6 +33,7 @@ namespace WizardGame.Core
 
         [Header("Trilha Sonora Profissional")]
         public AudioClip menuMusicClip;
+        public List<AudioClip> stageDefaultTracks = new List<AudioClip>();
         public List<AudioClip> gameplayPlaylist = new List<AudioClip>();
 
         [Header("Legado / Fallback")]
@@ -63,10 +67,15 @@ namespace WizardGame.Core
         private int currentGameplayTrackIndex = 0;
         private bool isPlayingGameplayPlaylist = false;
         private Coroutine fadeCoroutine;
+        private readonly Dictionary<AudioClip, float> clipLastPlayTime = new Dictionary<AudioClip, float>();
+        private float lastDeathSoundTime = -10f;
 
         public float BGMVolume => bgmVolume;
         public float SFXVolume => sfxVolume;
         public bool IsMuted => isMuted;
+        public bool IsPlayingGameplayPlaylist => isPlayingGameplayPlaylist;
+
+        public event Action<bool> OnMuteChanged;
 
         private void Awake()
         {
@@ -92,7 +101,7 @@ namespace WizardGame.Core
         private void Update()
         {
             // Se estiver no modo playlist de gameplay e a música atual acabou, toca a próxima
-            if (isPlayingGameplayPlaylist && !isMuted && bgmSource != null && !bgmSource.isPlaying)
+            if (isPlayingGameplayPlaylist && !isMuted && bgmSource != null && !bgmSource.isPlaying && fadeCoroutine == null)
             {
                 if (gameplayPlaylist != null && gameplayPlaylist.Count > 0)
                 {
@@ -103,8 +112,20 @@ namespace WizardGame.Core
 
         private void LoadAudioPreferences()
         {
-            bgmVolume = PlayerPrefs.GetFloat(PREF_BGM_VOL, DEFAULT_BGM_VOL);
-            sfxVolume = PlayerPrefs.GetFloat(PREF_SFX_VOL, DEFAULT_SFX_VOL);
+            if (PlayerPrefs.GetInt(PREF_MIX_VERSION, 1) < CURRENT_MIX_VERSION)
+            {
+                bgmVolume = DEFAULT_BGM_VOL;
+                sfxVolume = DEFAULT_SFX_VOL;
+                PlayerPrefs.SetFloat(PREF_BGM_VOL, bgmVolume);
+                PlayerPrefs.SetFloat(PREF_SFX_VOL, sfxVolume);
+                PlayerPrefs.SetInt(PREF_MIX_VERSION, CURRENT_MIX_VERSION);
+                PlayerPrefs.Save();
+            }
+            else
+            {
+                bgmVolume = PlayerPrefs.GetFloat(PREF_BGM_VOL, DEFAULT_BGM_VOL);
+                sfxVolume = PlayerPrefs.GetFloat(PREF_SFX_VOL, DEFAULT_SFX_VOL);
+            }
             isMuted = PlayerPrefs.GetInt(PREF_MUTED, 0) == 1;
         }
 
@@ -141,34 +162,128 @@ namespace WizardGame.Core
             fadeCoroutine = StartCoroutine(FadeToClip(target, loop: true, 0.8f));
         }
 
-        public void PlayGameplayMusic()
+        public void PlayStageMusic(int stageIndexZeroBased, AudioClip explicitDefaultClip = null)
         {
             isPlayingGameplayPlaylist = true;
 
-            if (gameplayPlaylist == null || gameplayPlaylist.Count == 0)
+            AudioClip startClip = explicitDefaultClip;
+            if (startClip == null && stageDefaultTracks != null && stageDefaultTracks.Count > 0)
             {
-                if (bgmMusicClip != null)
-                {
-                    if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
-                    fadeCoroutine = StartCoroutine(FadeToClip(bgmMusicClip, loop: true, 0.8f));
-                }
+                int safeIdx = Mathf.Clamp(stageIndexZeroBased, 0, stageDefaultTracks.Count - 1);
+                startClip = stageDefaultTracks[safeIdx];
+            }
+
+            if (startClip == null && gameplayPlaylist != null && gameplayPlaylist.Count > 0)
+            {
+                int safeIdx = Mathf.Abs(stageIndexZeroBased) % gameplayPlaylist.Count;
+                startClip = gameplayPlaylist[safeIdx];
+            }
+
+            if (startClip == null)
+            {
+                startClip = bgmMusicClip;
+            }
+            if (startClip == null) return;
+
+            // Sincroniza o índice da playlist para que, se a fase demorar e a música padrão terminar,
+            // o jogo avance automaticamente para as OUTRAS músicas da playlist!
+            if (gameplayPlaylist != null && gameplayPlaylist.Count > 0)
+            {
+                int foundIdx = gameplayPlaylist.IndexOf(startClip);
+                currentGameplayTrackIndex = foundIdx >= 0 ? foundIdx : (Mathf.Abs(stageIndexZeroBased) % gameplayPlaylist.Count);
+            }
+
+            bool hasOtherTracks = CountValidPlaylistTracks(excludeClip: startClip) > 0;
+            if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
+            fadeCoroutine = StartCoroutine(FadeToClip(startClip, loop: !hasOtherTracks, 0.7f));
+        }
+
+        public void StopMusic(float fadeOutDuration = 0.25f)
+        {
+            isPlayingGameplayPlaylist = false;
+            if (fadeCoroutine != null)
+            {
+                StopCoroutine(fadeCoroutine);
+                fadeCoroutine = null;
+            }
+
+            if (bgmSource == null || !bgmSource.isPlaying)
+            {
+                if (bgmSource != null) bgmSource.Stop();
                 return;
             }
 
-            AudioClip nextClip = gameplayPlaylist[currentGameplayTrackIndex];
-            if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
-            fadeCoroutine = StartCoroutine(FadeToClip(nextClip, loop: false, 0.8f));
+            if (fadeOutDuration <= 0.01f)
+            {
+                bgmSource.Stop();
+                bgmSource.volume = 0f;
+            }
+            else
+            {
+                fadeCoroutine = StartCoroutine(FadeOutAndStopRoutine(fadeOutDuration));
+            }
+        }
+
+        private IEnumerator FadeOutAndStopRoutine(float duration)
+        {
+            float startVol = bgmSource.volume;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                bgmSource.volume = Mathf.Lerp(startVol, 0f, Mathf.Clamp01(elapsed / duration));
+                yield return null;
+            }
+            bgmSource.Stop();
+            bgmSource.volume = 0f;
+            fadeCoroutine = null;
+        }
+
+        private int CountValidPlaylistTracks(AudioClip excludeClip)
+        {
+            if (gameplayPlaylist == null) return 0;
+            int count = 0;
+            for (int i = 0; i < gameplayPlaylist.Count; i++)
+            {
+                if (gameplayPlaylist[i] != null && gameplayPlaylist[i] != excludeClip)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
+
+        public void PlayGameplayMusic()
+        {
+            PlayStageMusic(0);
         }
 
         public void PlayNextGameplayTrack()
         {
             if (gameplayPlaylist == null || gameplayPlaylist.Count == 0) return;
 
-            currentGameplayTrackIndex = (currentGameplayTrackIndex + 1) % gameplayPlaylist.Count;
-            AudioClip nextClip = gameplayPlaylist[currentGameplayTrackIndex];
+            AudioClip nextClip = GetValidGameplayTrack(startFromCurrent: false);
+            if (nextClip == null) return;
 
             if (fadeCoroutine != null) StopCoroutine(fadeCoroutine);
-            fadeCoroutine = StartCoroutine(FadeToClip(nextClip, loop: false, 1.2f));
+            fadeCoroutine = StartCoroutine(FadeToClip(nextClip, loop: false, 1.0f));
+        }
+
+        private AudioClip GetValidGameplayTrack(bool startFromCurrent)
+        {
+            if (gameplayPlaylist == null || gameplayPlaylist.Count == 0) return null;
+            int count = gameplayPlaylist.Count;
+            int offset = startFromCurrent ? 0 : 1;
+            for (int i = 0; i < count; i++)
+            {
+                int idx = (currentGameplayTrackIndex + offset + i) % count;
+                if (gameplayPlaylist[idx] != null)
+                {
+                    currentGameplayTrackIndex = idx;
+                    return gameplayPlaylist[idx];
+                }
+            }
+            return bgmMusicClip;
         }
 
         public void PlayBGM(AudioClip clip)
@@ -181,8 +296,6 @@ namespace WizardGame.Core
 
         private IEnumerator FadeToClip(AudioClip newClip, bool loop, float duration)
         {
-            float targetVol = isMuted ? 0f : bgmVolume;
-
             // Fade Out se já estiver tocando
             if (bgmSource.isPlaying)
             {
@@ -193,7 +306,7 @@ namespace WizardGame.Core
                 while (elapsed < halfDuration)
                 {
                     elapsed += Time.unscaledDeltaTime;
-                    bgmSource.volume = Mathf.Lerp(startVol, 0f, elapsed / halfDuration);
+                    bgmSource.volume = isMuted ? 0f : Mathf.Lerp(startVol, 0f, elapsed / halfDuration);
                     yield return null;
                 }
             }
@@ -212,11 +325,12 @@ namespace WizardGame.Core
                 while (elapsed < halfDuration)
                 {
                     elapsed += Time.unscaledDeltaTime;
-                    bgmSource.volume = Mathf.Lerp(0f, targetVol, elapsed / halfDuration);
+                    float liveTargetVol = isMuted ? 0f : bgmVolume;
+                    bgmSource.volume = Mathf.Lerp(0f, liveTargetVol, elapsed / halfDuration);
                     yield return null;
                 }
 
-                bgmSource.volume = targetVol;
+                bgmSource.volume = isMuted ? 0f : bgmVolume;
             }
 
             fadeCoroutine = null;
@@ -271,6 +385,8 @@ namespace WizardGame.Core
                     src.volume = isMuted ? 0f : sfxVolume;
                 }
             }
+
+            OnMuteChanged?.Invoke(isMuted);
         }
 
         #endregion
@@ -279,21 +395,61 @@ namespace WizardGame.Core
 
         public void PlaySFX(AudioClip clip, float volumeScale = 1f)
         {
+            PlaySFXWithCooldown(clip, volumeScale, 0.055f);
+        }
+
+        public void PlaySFXWithCooldown(AudioClip clip, float volumeScale = 1f, float minInterval = 0.055f)
+        {
             if (clip == null || isMuted || sfxSources == null || sfxSources.Count == 0) return;
 
-            AudioSource src = sfxSources[currentSfxIndex];
-            currentSfxIndex = (currentSfxIndex + 1) % sfxSources.Count;
+            float now = Time.unscaledTime;
+            if (clipLastPlayTime.TryGetValue(clip, out float lastTime) && (now - lastTime) < minInterval)
+            {
+                return;
+            }
+            clipLastPlayTime[clip] = now;
 
-            // Multiplica o volume base calibrado pelo modificador da acao
-            src.volume = Mathf.Clamp01(sfxVolume * volumeScale);
-            src.PlayOneShot(clip);
+            // Balanceamento automático por categoria de clipe para mixagem uniforme
+            float categoryScale = GetAutoCategoryScale(clip);
+            float effectiveScale = Mathf.Clamp01(volumeScale * categoryScale);
+
+            AudioSource src = GetAvailableSfxSource();
+            src.volume = sfxVolume;
+            src.PlayOneShot(clip, effectiveScale);
+        }
+
+        private AudioSource GetAvailableSfxSource()
+        {
+            for (int i = 0; i < sfxSources.Count; i++)
+            {
+                if (sfxSources[i] != null && !sfxSources[i].isPlaying)
+                {
+                    return sfxSources[i];
+                }
+            }
+
+            AudioSource fallback = sfxSources[currentSfxIndex];
+            currentSfxIndex = (currentSfxIndex + 1) % sfxSources.Count;
+            return fallback;
+        }
+
+        private float GetAutoCategoryScale(AudioClip clip)
+        {
+            if (clip == normalShotSound) return 0.62f;
+            if (clip == headshotSound) return 0.65f;
+            if (clip == strongShotSound || clip == lightningCastSound) return 0.78f;
+            if (clip == areaCastSound || clip == defeatSound) return 0.80f;
+            if (clip == victorySound) return 0.75f;
+            if (clip == iceCastSound || clip == teleportSound) return 0.72f;
+            if (clip == comboBreakSound) return 0.72f;
+            return 0.75f; // Custom death/escape SFX
         }
 
         public void PlayHeadshotSound()
         {
             if (headshotSound != null)
             {
-                PlaySFX(headshotSound, 1.0f);
+                PlaySFXWithCooldown(headshotSound, 0.90f, 0.09f);
             }
         }
 
@@ -301,7 +457,15 @@ namespace WizardGame.Core
         {
             if (comboBreakSound != null)
             {
-                PlaySFX(comboBreakSound, 0.8f);
+                PlaySFXWithCooldown(comboBreakSound, 0.75f, 0.25f);
+            }
+        }
+
+        public void PlayDryFireSound()
+        {
+            if (comboBreakSound != null)
+            {
+                PlaySFXWithCooldown(comboBreakSound, 0.35f, 0.12f);
             }
         }
 
@@ -309,18 +473,23 @@ namespace WizardGame.Core
         {
             if (commonDeathSounds == null || commonDeathSounds.Count == 0 || isMuted) return;
 
-            int idx = Random.Range(0, commonDeathSounds.Count);
+            // Evita empilhamento de múltiplos gritos no mesmo instante (ex: Área / Tempestade)
+            float now = Time.unscaledTime;
+            if ((now - lastDeathSoundTime) < 0.12f) return;
+            lastDeathSoundTime = now;
+
+            int idx = UnityEngine.Random.Range(0, commonDeathSounds.Count);
             AudioClip chosen = commonDeathSounds[idx];
             if (chosen != null)
             {
-                PlaySFX(chosen, 1.0f);
+                PlaySFXWithCooldown(chosen, 0.95f, 0.12f);
             }
         }
 
         public void PlayIceCastSound()
         {
             if (iceCastSound != null) PlaySFX(iceCastSound, 0.9f);
-            else if (teleportSound != null) PlaySFX(teleportSound, 0.7f);
+            else if (teleportSound != null) PlaySFX(teleportSound, 0.75f);
         }
 
         public void PlayLightningCastSound()

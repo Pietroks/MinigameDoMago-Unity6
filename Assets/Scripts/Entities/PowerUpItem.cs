@@ -246,17 +246,17 @@ namespace WizardGame.Entities
             switch (type)
             {
                 case PowerUpType.Mana:
-                    return "🔵\nMANA";
+                    return "+4\nMANA";
                 case PowerUpType.ArcaneFury:
-                    return "🔥\nFÚRIA";
+                    return "+1 DANO\nFÚRIA";
                 case PowerUpType.ArcaneTime:
-                    return "⏱️\nTEMPO";
+                    return "50%\nTEMPO";
                 case PowerUpType.Storm:
-                    return "💥\nRAIO";
+                    return "RAIO\nCAOS";
                 case PowerUpType.Precision:
-                    return "🎯\nMIRA";
+                    return "MIRA\nPRECISÃO";
                 default:
-                    return "✨";
+                    return "BUFF";
             }
         }
 
@@ -265,17 +265,17 @@ namespace WizardGame.Entities
             switch (type)
             {
                 case PowerUpType.Mana:
-                    return "🔵 MANA RECARREGADA (+4 TIROS)";
+                    return "MANA RECARREGADA (+4 TIROS)";
                 case PowerUpType.ArcaneFury:
-                    return "🔥 FÚRIA ARCANA (+1 DANO POR 5s)";
+                    return "FÚRIA ARCANA (+1 DANO POR 5s)";
                 case PowerUpType.ArcaneTime:
-                    return "⏱️ TEMPO ARCANO (50% MAIS LENTO)";
+                    return "TEMPO ARCANO (50% MAIS LENTO)";
                 case PowerUpType.Storm:
-                    return "💥 TEMPESTADE PRONTA (PRÓXIMO TIRO)";
+                    return "TEMPESTADE PRONTA (PRÓXIMO TIRO)";
                 case PowerUpType.Precision:
-                    return "🎯 MIRA DE PRECISÃO (5s)";
+                    return "MIRA DE PRECISÃO (5s)";
                 default:
-                    return "✨ POWER-UP ATIVADO!";
+                    return "POWER-UP ATIVADO!";
             }
         }
 

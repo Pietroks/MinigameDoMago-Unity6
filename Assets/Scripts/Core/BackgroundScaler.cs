@@ -11,6 +11,10 @@ namespace WizardGame.Core
     {
         [SerializeField] private Camera targetCamera;
         private SpriteRenderer spriteRenderer;
+        private float extraZoom = 1.0f;
+        private int lastScreenWidth;
+        private int lastScreenHeight;
+        private float lastOrthoSize;
 
         private void Awake()
         {
@@ -24,6 +28,22 @@ namespace WizardGame.Core
             AdjustScale();
         }
 
+        private void Update()
+        {
+            if (targetCamera == null) targetCamera = Camera.main;
+            float ortho = targetCamera != null ? targetCamera.orthographicSize : 0f;
+            if (Screen.width != lastScreenWidth || Screen.height != lastScreenHeight || !Mathf.Approximately(ortho, lastOrthoSize))
+            {
+                AdjustScale();
+            }
+        }
+
+        public void SetExtraZoom(float zoom)
+        {
+            extraZoom = Mathf.Clamp(zoom, 1.0f, 1.5f);
+            AdjustScale();
+        }
+
         public void AdjustScale()
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
@@ -31,8 +51,12 @@ namespace WizardGame.Core
             if (targetCamera == null) targetCamera = Camera.main;
             if (targetCamera == null) return;
 
+            lastScreenWidth = Screen.width;
+            lastScreenHeight = Screen.height;
+            lastOrthoSize = targetCamera.orthographicSize;
+
             float worldScreenHeight = targetCamera.orthographicSize * 2f;
-            float worldScreenWidth = worldScreenHeight / Screen.height * Screen.width;
+            float worldScreenWidth = worldScreenHeight / Mathf.Max(1, Screen.height) * Mathf.Max(1, Screen.width);
 
             Vector2 spriteSize = spriteRenderer.sprite.bounds.size;
             if (spriteSize.x <= 0f || spriteSize.y <= 0f) return;
@@ -41,7 +65,7 @@ namespace WizardGame.Core
             float scaleY = worldScreenHeight / spriteSize.y;
 
             // Aspect Fill: garante cobertura total da tela sem bordas pretas
-            float scale = Mathf.Max(scaleX, scaleY);
+            float scale = Mathf.Max(scaleX, scaleY) * Mathf.Max(1.0f, extraZoom);
             transform.localScale = new Vector3(scale, scale, 1f);
             transform.position = new Vector3(targetCamera.transform.position.x, targetCamera.transform.position.y, 0f);
         }

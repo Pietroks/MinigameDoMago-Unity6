@@ -45,6 +45,17 @@ namespace WizardGame.Entities
             }
         }
 
+        private void OnDisable()
+        {
+            if (activeAnimCoroutine != null)
+            {
+                StopCoroutine(activeAnimCoroutine);
+                activeAnimCoroutine = null;
+            }
+            isLocked = false;
+            currentState = AnimationState.Idle;
+        }
+
         public void RegisterState(AnimationState state, Sprite[] frames, float fps = 8f, bool loop = true)
         {
             if (frames == null || frames.Length == 0) return;

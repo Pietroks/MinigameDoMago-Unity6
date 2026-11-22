@@ -22,6 +22,7 @@ namespace WizardGame.Core
         public bool won;
         public int finalScore;
         public int escapedCount;
+        public int maxEscapes;           // Limite configurável de fugitivos (ex: 15)
         public int wizardsDefeated;      // Magos abatidos
         public int totalShotsFired;      // Tiros disparados
         public int totalHits;            // Acertos
@@ -53,21 +54,24 @@ namespace WizardGame.Core
         [SerializeField] private WeaponSystem weaponSystem;
         [SerializeField] private UIManager uiManager;
         [SerializeField] private PowerUpManager powerUpManager;
+        [SerializeField] private StageEnvironmentManager stageEnvironment;
 
         [Header("Regras de Partida")]
         [SerializeField] private int maxEscapesAllowed = 15;
         [SerializeField] private int maxPlayerHealth = 5;
 
-        [Header("Configurações das Ondas (Wave System)")]
+        [Header("Configurações das Fases (Stage & Wave System)")]
         [SerializeField] private List<WaveConfig> waves = new List<WaveConfig>();
-        [SerializeField] private int waveClearBonusBase = 50;
-        [SerializeField] private float delayBetweenWaves = 2.5f;
+        [SerializeField] private List<Sprite> stageBackgroundSprites = new List<Sprite>();
+        [SerializeField] private List<AudioClip> stageDefaultMusicClips = new List<AudioClip>();
+        [SerializeField] private int waveClearBonusBase = 60;
+        [SerializeField] private float delayBetweenWaves = 1.6f;
 
         [Header("Tempos de Recarga dos Feitiços Especiais")]
-        [SerializeField] private float arcaneCooldownDuration = 3.0f;
-        [SerializeField] private float iceCooldownDuration = 4.0f;
-        [SerializeField] private float lightningCooldownDuration = 4.5f;
-        [SerializeField] private float areaCooldownDuration = 5.5f;
+        [SerializeField] private float arcaneCooldownDuration = 2.6f;
+        [SerializeField] private float iceCooldownDuration = 3.8f;
+        [SerializeField] private float lightningCooldownDuration = 4.2f;
+        [SerializeField] private float areaCooldownDuration = 5.0f;
 
         private GameState currentState;
         private int currentScore;
@@ -75,6 +79,8 @@ namespace WizardGame.Core
         private int currentPlayerHealth;
         private int currentWaveIndex = 0;
         private Coroutine waveTransitionCoroutine;
+        private bool isStageEndingOrTransitioning;
+        private static bool autoStartNextLoad = false;
 
         // Timers e Estados dos Feitiços
         private float arcaneTimer;
@@ -106,6 +112,7 @@ namespace WizardGame.Core
         private int skillBonusesCount;
         private int skillBonusTotalPoints;
         private readonly List<float> recentKillTimestamps = new List<float>(16);
+        private readonly List<WizardController> cachedAreaTargets = new List<WizardController>(32);
 
         private void AwardBonus(int points, string bonusName, Color color, AudioClip customSound = null)
         {
@@ -141,11 +148,24 @@ namespace WizardGame.Core
                 weaponSystem.OnReloadStateChanged += (reloading) => uiManager?.UpdateAmmo(weaponSystem.CurrentAmmo, weaponSystem.MaxAmmo, reloading);
             }
 
+            if (stageEnvironment == null) stageEnvironment = FindAnyObjectByType<StageEnvironmentManager>();
+            if (stageEnvironment == null)
+            {
+                var envGo = new GameObject("StageEnvironmentManager");
+                stageEnvironment = envGo.AddComponent<StageEnvironmentManager>();
+            }
+            if (stageEnvironment != null && stageBackgroundSprites != null && stageBackgroundSprites.Count > 0)
+            {
+                stageEnvironment.SetStageBackgroundList(stageBackgroundSprites);
+            }
+
             if (spawner != null)
             {
                 spawner.OnWizardDefeated += HandleWizardDefeated;
                 spawner.OnWizardEscaped += HandleWizardEscaped;
                 spawner.OnBossSpawned += HandleBossSpawned;
+                spawner.OnBossEnraged += HandleBossEnraged;
+                spawner.OnBossAttackInterrupted += HandleBossAttackInterrupted;
                 spawner.OnWaveProgressChanged += HandleWaveProgressChanged;
                 spawner.OnWaveCompleted += HandleWaveCompleted;
                 spawner.OnPlayerDamaged += (wizard, damage, source) => DamagePlayer(damage, source);
@@ -159,14 +179,25 @@ namespace WizardGame.Core
                 uiManager.OnMainMenuClicked += ReturnToMainMenu;
             }
 
-            SetState(GameState.Menu);
+            if (autoStartNextLoad)
+            {
+                autoStartNextLoad = false;
+                StartGameplay();
+            }
+            else
+            {
+                SetState(GameState.Menu);
+            }
         }
 
         private void Update()
         {
             if (currentState == GameState.Playing)
             {
-                matchDuration += Time.deltaTime;
+                if (!isStageEndingOrTransitioning)
+                {
+                    matchDuration += Time.deltaTime;
+                }
                 UpdateCooldown(ref arcaneTimer, ref isArcaneReady, SpellType.Arcane);
                 UpdateCooldown(ref iceTimer, ref isIceReady, SpellType.Ice);
                 UpdateCooldown(ref lightningTimer, ref isLightningReady, SpellType.Lightning);
@@ -200,6 +231,7 @@ namespace WizardGame.Core
             {
                 case GameState.Menu:
                     Time.timeScale = 1f;
+                    Time.fixedDeltaTime = 0.02f;
                     if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
                     powerUpManager?.ResetAllBuffs();
                     powerUpManager?.SetSpawningEnabled(false);
@@ -218,10 +250,10 @@ namespace WizardGame.Core
                     {
                         Time.timeScale = 1f;
                     }
-                    powerUpManager?.SetSpawningEnabled(true);
+                    Time.fixedDeltaTime = 0.02f * Time.timeScale;
+                    powerUpManager?.SetSpawningEnabled(!isStageEndingOrTransitioning);
                     inputHandler?.SetInputBlocked(false);
                     uiManager?.ShowGameplayHUD();
-                    SoundManager.Instance?.PlayGameplayMusic();
                     break;
 
                 case GameState.Paused:
@@ -233,6 +265,7 @@ namespace WizardGame.Core
 
                 case GameState.GameOver:
                     Time.timeScale = 1f;
+                    Time.fixedDeltaTime = 0.02f;
                     if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
                     powerUpManager?.ResetAllBuffs();
                     powerUpManager?.SetSpawningEnabled(false);
@@ -262,6 +295,7 @@ namespace WizardGame.Core
 
             // Reset bônus de habilidade
             isFirstShotAttempt = true;
+            isStageEndingOrTransitioning = false;
             skillBonusesCount = 0;
             skillBonusTotalPoints = 0;
             recentKillTimestamps.Clear();
@@ -311,7 +345,12 @@ namespace WizardGame.Core
                 weaponSystem.RefillAmmo();
             }
 
+            uiManager?.HideStageTransitionImmediate();
             SetState(GameState.Playing);
+            if (waves != null && waves.Count > 0)
+            {
+                stageEnvironment?.ApplyStage(waves[0], 0);
+            }
             StartNextWave();
         }
 
@@ -338,12 +377,19 @@ namespace WizardGame.Core
 
         public void ReturnToMainMenu()
         {
-            RestartGame();
+            autoStartNextLoad = false;
+            Time.timeScale = 1f;
+            Time.fixedDeltaTime = 0.02f;
+            UnityEngine.SceneManagement.SceneManager.LoadScene(
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex
+            );
         }
 
         public void RestartGame()
         {
+            autoStartNextLoad = true;
             Time.timeScale = 1f;
+            Time.fixedDeltaTime = 0.02f;
             UnityEngine.SceneManagement.SceneManager.LoadScene(
                 UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex
             );
@@ -360,7 +406,19 @@ namespace WizardGame.Core
             if (hitInfo.powerUpTarget != null)
             {
                 totalHits++;
+                SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.powerUpTarget.transform.position, true, false, PowerUpItem.GetColorForType(hitInfo.powerUpTarget.Type));
                 hitInfo.powerUpTarget.Collect();
+                return;
+            }
+
+            // Interceptação de Projétil de Chefe
+            if (hitInfo.bossProjectileTarget != null)
+            {
+                totalHits++;
+                Vector3 projPos = hitInfo.bossProjectileTarget.transform.position;
+                SpellEffectsManager.Instance?.SpawnImpactEffect(projPos, true, true, new Color(0.3f, 1f, 0.85f));
+                SpellEffectsManager.Instance?.SpawnFloatingText(projPos, "+5 INTERCEPT!", new Color(0.3f, 1f, 0.85f), 1.05f);
+                AwardBonus(5, "INTERCEPTAÇÃO! +5", new Color(0.3f, 1f, 0.8f), SoundManager.Instance?.headshotSound);
                 return;
             }
 
@@ -370,7 +428,7 @@ namespace WizardGame.Core
                 int stormKills = powerUpManager.ConsumeStormAndAnnihilateCommonGoblins();
                 if (stormKills > 0)
                 {
-                    AwardBonus(10, $"💥 TEMPESTADE! {stormKills} ABATES", new Color(0.7f, 0.4f, 1f), SoundManager.Instance?.lightningCastSound);
+                    AwardBonus(10, $"TEMPESTADE! {stormKills} ABATES (+10)", new Color(0.75f, 0.45f, 1f), SoundManager.Instance?.lightningCastSound);
                 }
             }
 
@@ -378,27 +436,38 @@ namespace WizardGame.Core
             {
                 totalHits++;
                 int bonusDamage = (powerUpManager != null && powerUpManager.IsArcaneFuryActive) ? 1 : 0;
-                int damageToDeal = 1 + bonusDamage;
+                int critBonus = hitInfo.isHeadshot ? 1 : 0;
+                int damageToDeal = 1 + bonusDamage + critBonus;
                 totalDamageDealt += damageToDeal;
+
+                Vector3 hitPos = hitInfo.hitPoint;
+                SpellEffectsManager.Instance?.SpawnImpactEffect(hitPos, true, hitInfo.isHeadshot);
 
                 // Bônus 1: Primeiro Tiro (+5)
                 if (isFirstShotAttempt)
                 {
                     isFirstShotAttempt = false;
-                    AwardBonus(5, "✨ PRIMEIRO TIRO! +5", new Color(1f, 0.85f, 0.2f), SoundManager.Instance?.headshotSound);
+                    AwardBonus(5, "PRIMEIRO TIRO! +5", new Color(1f, 0.85f, 0.25f), SoundManager.Instance?.headshotSound);
                 }
 
-                // Bônus 2: Headshot (+2)
+                // Bônus 2: Headshot Crítico (+1 Dano e +2 Pontos)
                 if (hitInfo.isHeadshot)
                 {
                     headshotsCount++;
-                    AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
+                    AwardBonus(2, "HEADSHOT CRÍTICO! +2", new Color(0.3f, 1f, 0.45f), SoundManager.Instance?.headshotSound);
+                    SpellEffectsManager.Instance?.SpawnFloatingText(hitPos, $"-{damageToDeal} CRIT!", new Color(1f, 0.88f, 0.2f), 1.18f);
+                }
+                else
+                {
+                    Color dmgColor = bonusDamage > 0 ? new Color(1f, 0.48f, 0.18f) : Color.white;
+                    SpellEffectsManager.Instance?.SpawnFloatingText(hitPos, $"-{damageToDeal}", dmgColor, 0.95f);
                 }
 
                 hitInfo.target.TakeDamage(damageToDeal, isNormalShot: true);
             }
             else
             {
+                SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false);
                 if (isFirstShotAttempt)
                 {
                     isFirstShotAttempt = false;
@@ -416,23 +485,51 @@ namespace WizardGame.Core
             HandleSpecialShot(SpellType.Arcane, hitInfo);
         }
 
+        private bool IsSpellReady(SpellType spell)
+        {
+            return spell switch
+            {
+                SpellType.Arcane => isArcaneReady,
+                SpellType.Ice => isIceReady,
+                SpellType.Lightning => isLightningReady,
+                SpellType.Area => isAreaReady,
+                _ => false
+            };
+        }
+
         private void HandleSpecialShot(SpellType spell, ShotHitInfo hitInfo)
         {
             if (currentState != GameState.Playing) return;
+
+            if (!IsSpellReady(spell))
+            {
+                SoundManager.Instance?.PlayDryFireSound();
+                return;
+            }
 
             // Bônus 1: Primeiro Tiro (+5)
             if (isFirstShotAttempt)
             {
                 if (hitInfo.isHit && hitInfo.target != null)
                 {
-                    AwardBonus(5, "✨ PRIMEIRO TIRO! +5", new Color(1f, 0.85f, 0.2f), SoundManager.Instance?.headshotSound);
+                    AwardBonus(5, "PRIMEIRO TIRO! +5", new Color(1f, 0.85f, 0.25f), SoundManager.Instance?.headshotSound);
                 }
                 isFirstShotAttempt = false;
             }
 
+            bool registeredSpellHit = false;
+
             if (hitInfo.powerUpTarget != null)
             {
+                registeredSpellHit = true;
                 hitInfo.powerUpTarget.Collect();
+            }
+
+            if (hitInfo.bossProjectileTarget != null)
+            {
+                registeredSpellHit = true;
+                hitInfo.bossProjectileTarget.Intercept();
+                AwardBonus(5, "INTERCEPTAÇÃO! +5", new Color(0.3f, 1f, 0.8f), SoundManager.Instance?.headshotSound);
             }
 
             if (powerUpManager != null && powerUpManager.IsStormCharged)
@@ -440,14 +537,15 @@ namespace WizardGame.Core
                 int stormKills = powerUpManager.ConsumeStormAndAnnihilateCommonGoblins();
                 if (stormKills > 0)
                 {
-                    AwardBonus(10, $"💥 TEMPESTADE! {stormKills} ABATES", new Color(0.7f, 0.4f, 1f), SoundManager.Instance?.lightningCastSound);
+                    AwardBonus(10, $"TEMPESTADE! {stormKills} ABATES (+10)", new Color(0.75f, 0.45f, 1f), SoundManager.Instance?.lightningCastSound);
                 }
             }
+
+            int furyBonus = (powerUpManager != null && powerUpManager.IsArcaneFuryActive) ? 1 : 0;
 
             switch (spell)
             {
                 case SpellType.Arcane:
-                    if (!isArcaneReady) return;
                     totalShotsFired++;
                     strongShotsCount++;
                     isArcaneReady = false;
@@ -456,21 +554,36 @@ namespace WizardGame.Core
                     SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
                     weaponSystem?.TriggerRecoil();
 
+                    if (hitInfo.isHit)
+                    {
+                        weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
+                    }
+
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
-                        totalHits++;
-                        totalDamageDealt += 3;
+                        int dmg = 4 + furyBonus + (hitInfo.isHeadshot ? 1 : 0);
+                        registeredSpellHit = true;
+                        totalDamageDealt += dmg;
+                        SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, true, hitInfo.isHeadshot, new Color(0.25f, 0.92f, 1f));
                         if (hitInfo.isHeadshot)
                         {
                             headshotsCount++;
-                            AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
+                            AwardBonus(2, "HEADSHOT CRÍTICO! +2", new Color(0.3f, 1f, 0.45f), SoundManager.Instance?.headshotSound);
+                            SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.hitPoint, $"-{dmg} CRIT!", new Color(1f, 0.88f, 0.2f), 1.28f);
                         }
-                        hitInfo.target.TakeDamage(3);
+                        else
+                        {
+                            SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.hitPoint, $"-{dmg}", new Color(0.35f, 0.94f, 1f), 1.15f);
+                        }
+                        hitInfo.target.TakeDamage(dmg, isNormalShot: false, isSpecialSpell: true);
+                    }
+                    else
+                    {
+                        SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.25f, 0.92f, 1f, 0.5f));
                     }
                     break;
 
                 case SpellType.Ice:
-                    if (!isIceReady) return;
                     totalShotsFired++;
                     strongShotsCount++;
                     isIceReady = false;
@@ -479,23 +592,34 @@ namespace WizardGame.Core
                     SoundManager.Instance?.PlayIceCastSound();
                     weaponSystem?.TriggerRecoil();
 
+                    if (hitInfo.isHit)
+                    {
+                        weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
+                    }
+
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
-                        totalHits++;
-                        totalDamageDealt += 1;
+                        int dmg = 1 + furyBonus + (hitInfo.isHeadshot ? 1 : 0);
+                        registeredSpellHit = true;
+                        totalDamageDealt += dmg;
+                        SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, true, hitInfo.isHeadshot, new Color(0.55f, 0.95f, 1f));
                         if (hitInfo.isHeadshot)
                         {
                             headshotsCount++;
-                            AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
+                            AwardBonus(2, "HEADSHOT CRÍTICO! +2", new Color(0.3f, 1f, 0.45f), SoundManager.Instance?.headshotSound);
                         }
-                        hitInfo.target.TakeDamage(1);
-                        hitInfo.target.Freeze(2.5f);
-                        SpellEffectsManager.Instance?.SpawnIceEffect(hitInfo.target, 2.5f);
+                        SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.target.transform.position, $"CONGELADO! -{dmg}", new Color(0.58f, 0.96f, 1f), 1.08f);
+                        hitInfo.target.TakeDamage(dmg, isNormalShot: false, isSpecialSpell: true);
+                        hitInfo.target.Freeze(2.8f);
+                        SpellEffectsManager.Instance?.SpawnIceEffect(hitInfo.target, 2.8f);
+                    }
+                    else
+                    {
+                        SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.55f, 0.95f, 1f, 0.5f));
                     }
                     break;
 
                 case SpellType.Lightning:
-                    if (!isLightningReady) return;
                     totalShotsFired++;
                     strongShotsCount++;
                     isLightningReady = false;
@@ -503,6 +627,11 @@ namespace WizardGame.Core
                     uiManager?.UpdateSpellCooldown(SpellType.Lightning, false, lightningCooldownDuration);
                     SoundManager.Instance?.PlayLightningCastSound();
                     weaponSystem?.TriggerRecoil();
+
+                    if (hitInfo.isHit)
+                    {
+                        weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
+                    }
 
                     Vector3 strikePos = hitInfo.isHit && hitInfo.target != null ? hitInfo.target.transform.position : hitInfo.hitPoint;
                     strikePos.z = 0f;
@@ -512,15 +641,17 @@ namespace WizardGame.Core
 
                     if (hitInfo.isHit && hitInfo.target != null)
                     {
-                        totalHits++;
-                        totalDamageDealt += 2;
+                        int primaryDmg = 2 + furyBonus + (hitInfo.isHeadshot ? 1 : 0);
+                        registeredSpellHit = true;
+                        totalDamageDealt += primaryDmg;
                         if (hitInfo.isHeadshot)
                         {
                             headshotsCount++;
-                            AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
+                            AwardBonus(2, "HEADSHOT CRÍTICO! +2", new Color(0.3f, 1f, 0.45f), SoundManager.Instance?.headshotSound);
                         }
-                        if (hitInfo.target.CurrentHealth <= 2) lightningLethalHits++;
-                        hitInfo.target.TakeDamage(2);
+                        SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.target.transform.position, $"-{primaryDmg}", new Color(1f, 0.92f, 0.28f), 1.12f);
+                        if (hitInfo.target.CurrentHealth <= primaryDmg) lightningLethalHits++;
+                        hitInfo.target.TakeDamage(primaryDmg, isNormalShot: false, isSpecialSpell: true);
                         lightningChainPoints.Add(hitInfo.target.transform.position);
                     }
                     else
@@ -528,34 +659,35 @@ namespace WizardGame.Core
                         lightningChainPoints.Add(strikePos);
                     }
 
-                    // Relâmpago em Cadeia: Atinge até 2 outros goblins próximos em um raio de 3.5m
+                    // Relâmpago em Cadeia: Atinge até 3 outros goblins próximos em um raio de 3.8m causando 2 de dano
                     int chainCount = 0;
+                    int chainDmg = 2 + furyBonus;
                     foreach (var goblin in WizardController.ActiveGoblins)
                     {
-                        if (goblin == null || goblin == hitInfo.target) continue;
-                        if (Vector2.Distance(strikePos, goblin.transform.position) <= 3.5f)
+                        if (goblin == null || goblin == hitInfo.target || goblin.IsDeadOrEscaping) continue;
+                        if (Vector2.Distance(strikePos, goblin.transform.position) <= 3.8f)
                         {
-                            if (goblin.CurrentHealth <= 1) lightningLethalHits++;
-                            goblin.TakeDamage(1);
-                            totalDamageDealt += 1;
-                            totalHits++;
+                            if (goblin.CurrentHealth <= chainDmg) lightningLethalHits++;
+                            SpellEffectsManager.Instance?.SpawnFloatingText(goblin.transform.position, $"-{chainDmg}", new Color(0.5f, 0.92f, 1f), 1.0f);
+                            goblin.TakeDamage(chainDmg, isNormalShot: false, isSpecialSpell: true);
+                            totalDamageDealt += chainDmg;
+                            registeredSpellHit = true;
                             lightningChainPoints.Add(goblin.transform.position);
                             chainCount++;
-                            if (chainCount >= 2) break;
+                            if (chainCount >= 3) break;
                         }
                     }
 
                     // Bônus 6: Matar dois com um feitiço (+10)
                     if (lightningLethalHits >= 2)
                     {
-                        AwardBonus(10, "⚡ FEITIÇO DUPLO! +10", new Color(0.2f, 0.92f, 1f), SoundManager.Instance?.lightningCastSound);
+                        AwardBonus(10, "FEITIÇO DUPLO! +10", new Color(0.25f, 0.94f, 1f), SoundManager.Instance?.lightningCastSound);
                     }
 
                     SpellEffectsManager.Instance?.SpawnLightningChain(strikePos, lightningChainPoints);
                     break;
 
                 case SpellType.Area:
-                    if (!isAreaReady) return;
                     totalShotsFired++;
                     strongShotsCount++;
                     isAreaReady = false;
@@ -564,52 +696,65 @@ namespace WizardGame.Core
                     SoundManager.Instance?.PlayAreaCastSound();
                     weaponSystem?.TriggerRecoil();
 
+                    if (hitInfo.isHit)
+                    {
+                        weaponSystem?.TriggerHitMarker(hitInfo.isHeadshot);
+                    }
+
                     Vector3 center = hitInfo.isHit && hitInfo.target != null ? hitInfo.target.transform.position : hitInfo.hitPoint;
                     center.z = 0f;
 
                     // Aciona o efeito visual expansivo de explosão em área
-                    SpellEffectsManager.Instance?.SpawnAreaExplosion(center, 2.5f);
+                    SpellEffectsManager.Instance?.SpawnAreaExplosion(center, 2.8f);
 
                     if (hitInfo.isHeadshot)
                     {
                         headshotsCount++;
-                        AwardBonus(2, "🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f), SoundManager.Instance?.headshotSound);
+                        AwardBonus(2, "HEADSHOT CRÍTICO! +2", new Color(0.3f, 1f, 0.45f), SoundManager.Instance?.headshotSound);
                     }
 
-                    // Feitiço de Área: Explosão radial de 2.5m de raio causando 2 de dano a todos os goblins no raio
-                    var affectedGoblins = new List<WizardController>();
+                    // Feitiço de Área: Explosão radial de 2.8m de raio causando 3 de dano a todos os goblins no raio (Zero-GC)
+                    cachedAreaTargets.Clear();
                     foreach (var goblin in WizardController.ActiveGoblins)
                     {
-                        if (goblin == null) continue;
-                        if (Vector2.Distance(center, goblin.transform.position) <= 2.5f)
+                        if (goblin == null || goblin.IsDeadOrEscaping) continue;
+                        if (Vector2.Distance(center, goblin.transform.position) <= 2.8f)
                         {
-                            affectedGoblins.Add(goblin);
+                            cachedAreaTargets.Add(goblin);
                         }
                     }
-                    if (affectedGoblins.Count > 0)
+                    int areaDmg = 3 + furyBonus;
+                    if (cachedAreaTargets.Count > 0)
                     {
-                        totalHits += affectedGoblins.Count;
-                        totalDamageDealt += affectedGoblins.Count * 2;
+                        registeredSpellHit = true;
                     }
                     int areaLethalHits = 0;
-                    foreach (var goblin in affectedGoblins)
+                    foreach (var goblin in cachedAreaTargets)
                     {
-                        if (goblin.CurrentHealth <= 2) areaLethalHits++;
-                        goblin.TakeDamage(2);
+                        int perTargetDmg = areaDmg + (hitInfo.isHeadshot && goblin == hitInfo.target ? 1 : 0);
+                        totalDamageDealt += perTargetDmg;
+                        if (goblin.CurrentHealth <= perTargetDmg) areaLethalHits++;
+                        SpellEffectsManager.Instance?.SpawnFloatingText(goblin.transform.position, $"-{perTargetDmg}", new Color(1f, 0.45f, 0.2f), 1.12f);
+                        goblin.TakeDamage(perTargetDmg, isNormalShot: false, isSpecialSpell: true);
                     }
 
                     // Bônus 6: Matar dois com um feitiço (+10)
                     if (areaLethalHits >= 2)
                     {
-                        AwardBonus(10, "⚡ FEITIÇO DUPLO! +10", new Color(0.2f, 0.92f, 1f), SoundManager.Instance?.lightningCastSound);
+                        AwardBonus(10, "FEITIÇO DUPLO! +10", new Color(0.25f, 0.94f, 1f), SoundManager.Instance?.lightningCastSound);
                     }
                     break;
+            }
+
+            if (registeredSpellHit)
+            {
+                totalHits++;
             }
         }
 
         private void HandleShotMissed()
         {
-            if (currentState != GameState.Playing) return;
+            if (currentState != GameState.Playing || isStageEndingOrTransitioning) return;
 
             isFirstShotAttempt = false;
 
@@ -626,7 +771,20 @@ namespace WizardGame.Core
 
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
             SpellEffectsManager.Instance?.TriggerCameraShake(0.24f, 0.22f);
-            uiManager?.ShowBossSpawnBanner(data.displayName, "O CHEFE ENTROU NO CAMPO DE BATALHA!");
+            uiManager?.ShowBossSpawnBanner(data.displayName, "INTERROMPA GOLPES E INTERCEPTE OS ORBES PARA NÃO SOFRER DANO!");
+        }
+
+        private void HandleBossEnraged(WizardController wizard, WizardDataSO data)
+        {
+            if (currentState != GameState.Playing) return;
+            SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
+            uiManager?.ShowBossEnragedBanner(data != null ? data.displayName : "Chefe");
+        }
+
+        private void HandleBossAttackInterrupted(WizardController wizard, string bossName)
+        {
+            if (currentState != GameState.Playing) return;
+            AwardBonus(8, "CONTRA-ATAQUE! +8", new Color(0.25f, 1f, 0.85f), SoundManager.Instance?.headshotSound);
         }
 
         private void HandleWizardDefeated(WizardController wizard, int basePoints)
@@ -636,14 +794,33 @@ namespace WizardGame.Core
             wizardsDefeated++;
 
             // Incrementa sequência de combo
+            int previousMultiplier = currentMultiplier;
             currentStreak++;
             if (currentStreak > maxStreak) maxStreak = currentStreak;
 
             currentMultiplier = CalculateMultiplier(currentStreak);
 
+            // Recompensa de ritmo: atingir novo patamar de multiplicador (5, 10, 20 abates) restaura +2 Mana!
+            if (currentMultiplier > previousMultiplier && weaponSystem != null)
+            {
+                weaponSystem.AddAmmo(2);
+                uiManager?.ShowSkillBonusPopup($"COMBO ×{currentMultiplier}! +2 MANA", new Color(0.35f, 0.92f, 1f));
+            }
+
             // Aplica multiplicador na pontuação
             int pointsEarned = basePoints * currentMultiplier;
             currentScore += pointsEarned;
+
+            if (wizard != null)
+            {
+                string ptsLabel = currentMultiplier > 1 ? $"+{pointsEarned} (×{currentMultiplier})" : $"+{pointsEarned}";
+                SpellEffectsManager.Instance?.SpawnFloatingText(
+                    wizard.transform.position + Vector3.up * 0.45f,
+                    ptsLabel,
+                    new Color(1f, 0.88f, 0.25f),
+                    currentMultiplier >= 3 ? 1.15f : 0.98f,
+                    1.1f);
+            }
 
             uiManager?.UpdateScore(currentScore);
             uiManager?.UpdateCombo(currentStreak, currentMultiplier);
@@ -664,37 +841,47 @@ namespace WizardGame.Core
             if (recentKillTimestamps.Count >= 3)
             {
                 recentKillTimestamps.Clear();
-                AwardBonus(5, "🔥 TRIPLO ABATE RÁPIDO! +5", new Color(1f, 0.45f, 0.1f), SoundManager.Instance?.strongShotSound);
+                AwardBonus(5, "TRIPLO ABATE RÁPIDO! +5", new Color(1f, 0.5f, 0.15f), SoundManager.Instance?.strongShotSound);
             }
 
             // Bônus 4: Matar durante teleporte (+10)
             if (wizard != null && (wizard.DiedWhileTeleporting || wizard.IsTeleporting))
             {
-                AwardBonus(10, "🌀 INTERRUPÇÃO DIMENSIONAL! +10", new Color(0.75f, 0.35f, 1f), SoundManager.Instance?.strongShotSound);
+                AwardBonus(10, "INTERRUPÇÃO DIMENSIONAL! +10", new Color(0.75f, 0.4f, 1f), SoundManager.Instance?.strongShotSound);
             }
 
             // Bônus 5: Matar Dourado com tiro normal (+3)
             if (data != null && data.wizardType == WizardType.Dourado && wizard != null && wizard.WasLastDamageNormalShot)
             {
-                AwardBonus(3, "🛡️ DESAFIO DOURADO! +3", new Color(1f, 0.88f, 0.15f), SoundManager.Instance?.headshotSound);
+                AwardBonus(3, "DESAFIO DOURADO! +3", new Color(1f, 0.88f, 0.2f), SoundManager.Instance?.headshotSound);
             }
 
             if (isBoss)
             {
-                // Celebração de Boss Derrotado
+                // Ao derrotar o Chefe da fase: para a música ambiente e toca APENAS a fanfarra de vitória!
                 SpellEffectsManager.Instance?.TriggerCameraShake(0.35f, 0.32f);
-                SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
-                uiManager?.ShowBossDefeatedBanner(data.displayName, pointsEarned);
+                SoundManager.Instance?.StopMusic(0.20f);
+                SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound, 1.0f);
 
-                // No 50º goblin (Chefe Final): Derrotar ele = VITÓRIA IMEDIATA!
+                // No Chefe Final: Derrotar ele = VITÓRIA IMEDIATA!
                 if (data.wizardType == WizardType.ChefeFinal)
                 {
+                    isStageEndingOrTransitioning = true;
+                    powerUpManager?.SetSpawningEnabled(false);
+                    uiManager?.ShowBossDefeatedBanner(data.displayName, pointsEarned, "A FORTALEZA FOI LIBERTADA!");
                     StartCoroutine(FinalBossVictorySequenceRoutine());
                     return;
                 }
+
+                isStageEndingOrTransitioning = true;
+                string nextHint = (currentWaveIndex + 1 < waves.Count)
+                    ? $"Avançando para a Fase {currentWaveIndex + 2}: {waves[currentWaveIndex + 1].waveName}!"
+                    : "";
+                uiManager?.ShowBossDefeatedBanner(data.displayName, pointsEarned, nextHint);
+                return;
             }
 
-            // Som de Morte
+            // Som de Morte (para lacaios comuns e especiais; chefes usam a fanfarra de vitória acima sem sobreposição)
             if (data != null && data.customDeathSound != null)
             {
                 SoundManager.Instance?.PlaySFX(data.customDeathSound);
@@ -708,7 +895,7 @@ namespace WizardGame.Core
         private IEnumerator FinalBossVictorySequenceRoutine()
         {
             yield return new WaitForSeconds(1.2f);
-            EndGame(won: true);
+            EndGame(won: true, playEndAudio: false);
         }
 
         private void HandleWizardEscaped(WizardController wizard, int penalty)
@@ -745,7 +932,10 @@ namespace WizardGame.Core
             uiManager?.TriggerDamageFlash();
 
             SpellEffectsManager.Instance?.TriggerCameraShake(0.28f, 0.25f);
-            SoundManager.Instance?.PlaySFX(SoundManager.Instance.defeatSound);
+            if (currentPlayerHealth > 0)
+            {
+                SoundManager.Instance?.PlaySFX(SoundManager.Instance.defeatSound, 0.72f);
+            }
 
             if (currentPlayerHealth <= 0)
             {
@@ -803,16 +993,15 @@ namespace WizardGame.Core
             int maxStreak,
             int strongShots)
         {
-            // 1. Fator Mortes (Magos Abatidos): até 500 pts (10 pts por mago)
-            int killsScore = kills * 10;
+            // 1. Fator Mortes (Magos Abatidos): até 520 pts (8 pts por mago)
+            int killsScore = Mathf.Min(kills * 8, 520);
 
             // 2. Fator Precisão (% de acertos): até 250 pts
             int accuracyScore = Mathf.RoundToInt((Mathf.Clamp(accuracy, 0f, 100f) / 100f) * 250f);
 
-            // 3. Fator Tempo: até 200 pts de bônus por rapidez e eficiência
-            // <= 60s dá 200 pts; decai gradativamente até 240s; multiplicado pelo progresso de abates
-            float timeFactor = Mathf.Clamp01(1f - (Mathf.Max(0f, durationSeconds - 60f) / 180f));
-            float progressRatio = Mathf.Clamp01(kills / 40f);
+            // 3. Fator Tempo: até 200 pts de bônus por rapidez e eficiência (<= 110s máximo; decai até 350s)
+            float timeFactor = Mathf.Clamp01(1f - (Mathf.Max(0f, durationSeconds - 110f) / 240f));
+            float progressRatio = Mathf.Clamp01(kills / 55f);
             int timeScore = Mathf.RoundToInt(timeFactor * 200f * progressRatio);
 
             // 4. Fator Magos Escapados:
@@ -839,35 +1028,35 @@ namespace WizardGame.Core
             {
                 grade = "S";
                 title = "Arquimago Supremo";
-                badge = "👑";
+                badge = "";
                 color = new Color(1f, 0.84f, 0.0f); // Dourado Radiante
             }
             else if (totalRankScore >= 850)
             {
                 grade = "A";
                 title = "Mago Mestre";
-                badge = "🔮";
+                badge = "";
                 color = new Color(0.78f, 0.35f, 1f); // Púrpura Arcano
             }
             else if (totalRankScore >= 650)
             {
                 grade = "B";
                 title = "Feiticeiro Adepto";
-                badge = "⚡";
+                badge = "";
                 color = new Color(0.15f, 0.82f, 1f); // Ciano Brilhante
             }
             else if (totalRankScore >= 450)
             {
                 grade = "C";
                 title = "Mago Aprendiz";
-                badge = "📜";
+                badge = "";
                 color = new Color(0.4f, 0.95f, 0.4f); // Verde Esmeralda
             }
             else
             {
                 grade = "D";
                 title = "Iniciante Novato";
-                badge = "🔰";
+                badge = "";
                 color = new Color(0.7f, 0.7f, 0.75f); // Cinza Prateado
             }
 
@@ -880,7 +1069,7 @@ namespace WizardGame.Core
             return (rank.title, rank.badge, rank.color);
         }
 
-        private void EndGame(bool won, string defeatReason = "")
+        private void EndGame(bool won, string defeatReason = "", bool playEndAudio = true)
         {
             SetState(GameState.GameOver);
 
@@ -891,14 +1080,30 @@ namespace WizardGame.Core
             }
 
             spawner?.ClearActiveGoblins();
+            SoundManager.Instance?.StopMusic(0.30f);
 
-            if (won)
+            if (playEndAudio)
             {
-                SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
+                if (won)
+                {
+                    SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound, 1.0f);
+                }
+                else
+                {
+                    SoundManager.Instance?.PlaySFX(SoundManager.Instance.defeatSound, 1.0f);
+                }
             }
-            else
+
+            if (!won && string.IsNullOrEmpty(defeatReason))
             {
-                SoundManager.Instance?.PlaySFX(SoundManager.Instance.defeatSound);
+                if (currentPlayerHealth <= 0)
+                {
+                    defeatReason = "SUA VIDA FOI ESGOTADA PELOS INIMIGOS!";
+                }
+                else
+                {
+                    defeatReason = $"MUITOS GOBLINS ESCAPARAM ({currentEscaped}/{maxEscapesAllowed})!";
+                }
             }
 
             float accuracy = totalShotsFired > 0 ? ((float)totalHits / totalShotsFired) * 100f : 0f;
@@ -909,6 +1114,7 @@ namespace WizardGame.Core
                 won = won,
                 finalScore = currentScore,
                 escapedCount = currentEscaped,
+                maxEscapes = maxEscapesAllowed,
                 wizardsDefeated = wizardsDefeated,
                 totalShotsFired = totalShotsFired,
                 totalHits = totalHits,
@@ -941,12 +1147,21 @@ namespace WizardGame.Core
                 return;
             }
 
+            isStageEndingOrTransitioning = false;
             int waveNumber = currentWaveIndex + 1;
             WaveConfig config = waves[currentWaveIndex];
 
             spawner?.StartWave(config, waveNumber);
             uiManager?.ShowWaveStartBanner(waveNumber, config.waveName, config.waveDescription);
             uiManager?.UpdateWaveProgress(waveNumber, waves.Count, config.TotalEnemies, config.TotalEnemies);
+
+            // Inicia a música padrão dedicada desta fase (e alterna para a playlist caso a fase demore)
+            AudioClip stageMusic = config.defaultMusicClip;
+            if (stageMusic == null && stageDefaultMusicClips != null && currentWaveIndex < stageDefaultMusicClips.Count)
+            {
+                stageMusic = stageDefaultMusicClips[currentWaveIndex];
+            }
+            SoundManager.Instance?.PlayStageMusic(currentWaveIndex, stageMusic);
 
             // Som de início / alerta de onda
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
@@ -962,73 +1177,225 @@ namespace WizardGame.Core
         {
             if (currentState != GameState.Playing) return;
 
+            bool wasAlreadyTransitioning = isStageEndingOrTransitioning;
+            isStageEndingOrTransitioning = true;
+
+            // Garante parada da música ambiente e fanfarra de vitória mesmo se a fase acabar sem chefe
+            if (!wasAlreadyTransitioning)
+            {
+                SoundManager.Instance?.StopMusic(0.20f);
+                SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound, 1.0f);
+            }
+
             if (waveTransitionCoroutine != null) StopCoroutine(waveTransitionCoroutine);
             waveTransitionCoroutine = StartCoroutine(WaveTransitionRoutine(completedWaveNumber));
         }
 
         private IEnumerator WaveTransitionRoutine(int completedWaveNumber)
         {
-            // Bônus de pontuação proporcional à onda e restauração completa de mana
+            // Se era o Chefe Final (última fase), a sequência final de vitória assume
+            if (currentWaveIndex + 1 >= waves.Count)
+            {
+                yield break;
+            }
+
+            powerUpManager?.SetSpawningEnabled(false);
+
+            // 1. Deixa o jogador curtir a explosão do Chefe e o banner de vitória da fase
+            yield return new WaitForSeconds(delayBetweenWaves);
+
+            if (currentState != GameState.Playing) yield break;
+
+            // 2. Recompensa de Fase: Pontos bônus, Mana restaurada e +1 HP recuperado!
             int bonus = waveClearBonusBase * completedWaveNumber;
             currentScore += bonus;
             uiManager?.UpdateScore(currentScore);
-
             weaponSystem?.RefillAmmo();
 
-            // Fanfarra de conclusão de onda
-            SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
-            uiManager?.ShowWaveClearedBanner(completedWaveNumber, bonus);
-
-            yield return new WaitForSeconds(delayBetweenWaves);
+            bool healed = false;
+            if (currentPlayerHealth < maxPlayerHealth)
+            {
+                currentPlayerHealth++;
+                healed = true;
+                uiManager?.UpdatePlayerHealth(currentPlayerHealth, maxPlayerHealth);
+            }
 
             currentWaveIndex++;
-            if (currentWaveIndex >= waves.Count)
+            WaveConfig nextStage = waves[currentWaveIndex];
+
+            string healNote = healed ? "+1 Vida Recuperada  •  " : "";
+            string diffNote = $"+{bonus} Pontos  •  {healNote}Mana Cheia!  •  Velocidade {nextStage.speedMultiplier:F2}x";
+
+            // 3. Cortina cinematográfica de mudança de fase com troca de cenário no ponto médio
+            inputHandler?.SetInputBlocked(true);
+            WizardController.ClearAllBossProjectiles();
+
+            if (uiManager != null)
             {
-                EndGame(won: true);
+                yield return StartCoroutine(uiManager.PlayStageTransitionRoutine(
+                    nextStage.stageNumber,
+                    nextStage.waveName,
+                    nextStage.bossDisplayName,
+                    diffNote,
+                    onMidpointSwap: () => {
+                        stageEnvironment?.ApplyStage(nextStage, currentWaveIndex);
+                        uiManager?.UpdateWaveProgress(currentWaveIndex + 1, waves.Count, nextStage.TotalEnemies, nextStage.TotalEnemies);
+                    }
+                ));
             }
             else
             {
-                StartNextWave();
+                stageEnvironment?.ApplyStage(nextStage, currentWaveIndex);
             }
+
+            if (currentState != GameState.Playing) yield break;
+
+            inputHandler?.SetInputBlocked(false);
+            powerUpManager?.SetSpawningEnabled(true);
+            StartNextWave();
         }
 
         public void PopulateDefaultWaves()
         {
+            Sprite bg1 = (stageBackgroundSprites != null && stageBackgroundSprites.Count > 0) ? stageBackgroundSprites[0] : null;
+            Sprite bg2 = (stageBackgroundSprites != null && stageBackgroundSprites.Count > 1) ? stageBackgroundSprites[1] : bg1;
+            Sprite bg3 = (stageBackgroundSprites != null && stageBackgroundSprites.Count > 2) ? stageBackgroundSprites[2] : bg2;
+            Sprite bg4 = (stageBackgroundSprites != null && stageBackgroundSprites.Count > 3) ? stageBackgroundSprites[3] : bg3;
+            Sprite bg5 = (stageBackgroundSprites != null && stageBackgroundSprites.Count > 4) ? stageBackgroundSprites[4] : bg4;
+
+            AudioClip m1 = (stageDefaultMusicClips != null && stageDefaultMusicClips.Count > 0) ? stageDefaultMusicClips[0] : null;
+            AudioClip m2 = (stageDefaultMusicClips != null && stageDefaultMusicClips.Count > 1) ? stageDefaultMusicClips[1] : null;
+            AudioClip m3 = (stageDefaultMusicClips != null && stageDefaultMusicClips.Count > 2) ? stageDefaultMusicClips[2] : null;
+            AudioClip m4 = (stageDefaultMusicClips != null && stageDefaultMusicClips.Count > 3) ? stageDefaultMusicClips[3] : null;
+            AudioClip m5 = (stageDefaultMusicClips != null && stageDefaultMusicClips.Count > 4) ? stageDefaultMusicClips[4] : null;
+
+            // Preserva sprites e músicas já vinculados caso PopulateDefaultWaves seja rechamado
+            if (waves != null)
+            {
+                if (bg1 == null && waves.Count > 0) bg1 = waves[0].backgroundSprite;
+                if (bg2 == null && waves.Count > 1) bg2 = waves[1].backgroundSprite;
+                if (bg3 == null && waves.Count > 2) bg3 = waves[2].backgroundSprite;
+                if (bg4 == null && waves.Count > 3) bg4 = waves[3].backgroundSprite;
+                if (bg5 == null && waves.Count > 4) bg5 = waves[4].backgroundSprite;
+
+                if (m1 == null && waves.Count > 0) m1 = waves[0].defaultMusicClip;
+                if (m2 == null && waves.Count > 1) m2 = waves[1].defaultMusicClip;
+                if (m3 == null && waves.Count > 2) m3 = waves[2].defaultMusicClip;
+                if (m4 == null && waves.Count > 3) m4 = waves[3].defaultMusicClip;
+                if (m5 == null && waves.Count > 4) m5 = waves[4].defaultMusicClip;
+            }
+
             waves = new List<WaveConfig>
             {
-                // Onda 1 (Goblins 1 a 10): 6 Comuns + 3 Fugitivos + 1 Grande Goblin (10º Goblin)
-                new WaveConfig("Fortaleza Sob Cerco", "6 Comuns + 3 Fugitivos + 👑 GRANDE GOBLIN (10º Goblin)!", 1.35f, 1.0f,
-                    (WizardType.Comum, 6),
+                // FASE 1: Muralhas da Fortaleza — Chefe: Grande Goblin (Fugitivo 0.62x)
+                new WaveConfig(
+                    stageNumber: 1,
+                    name: "Muralhas da Fortaleza",
+                    desc: "7 Comuns + 3 Fugitivos   •   CHEFE: GRANDE GOBLIN!",
+                    bossDisplayName: "Grande Goblin",
+                    backgroundSprite: bg1,
+                    backgroundTint: Color.white,
+                    backgroundZoom: 1.0f,
+                    ambientParticleColor: new Color(0.6f, 0.85f, 1f, 0.55f),
+                    defaultMusicClip: m1,
+                    interval: 1.30f,
+                    speedMult: 1.00f,
+                    fugitiveSpeedMult: 0.62f,
+                    escapeTimerMult: 1.00f,
+                    maxConcurrent: 4,
+                    doubleSpawnChance: 0f,
+                    (WizardType.Comum, 7),
                     (WizardType.Fugitivo, 3),
                     (WizardType.Chefe, 1)),
 
-                // Onda 2 (Goblins 11 a 20): 4 Comuns + 3 Fugitivos + 2 Dourados + 1 Xamã do Caos (20º Goblin)
-                new WaveConfig("Fúria Flamejante", "4 Comuns + 3 Fugitivos + 2 Dourados + 🔥 XAMÃ DO CAOS (20º Goblin)!", 1.15f, 1.12f,
+                // FASE 2: Ruínas Iluminadas pela Lua — Chefe: Xamã do Caos (Fugitivo 0.78x)
+                new WaveConfig(
+                    stageNumber: 2,
+                    name: "Ruínas Iluminadas pela Lua",
+                    desc: "4 Comuns + 5 Fugitivos + 3 Dourados   •   CHEFE: XAMÃ DO CAOS!",
+                    bossDisplayName: "Xamã do Caos",
+                    backgroundSprite: bg2,
+                    backgroundTint: Color.white,
+                    backgroundZoom: 1.0f,
+                    ambientParticleColor: new Color(0.4f, 1f, 0.8f, 0.6f),
+                    defaultMusicClip: m2,
+                    interval: 1.08f,
+                    speedMult: 1.14f,
+                    fugitiveSpeedMult: 0.78f,
+                    escapeTimerMult: 0.94f,
+                    maxConcurrent: 5,
+                    doubleSpawnChance: 0.18f,
                     (WizardType.Comum, 4),
-                    (WizardType.Fugitivo, 3),
-                    (WizardType.Dourado, 2),
+                    (WizardType.Fugitivo, 5),
+                    (WizardType.Dourado, 3),
                     (WizardType.Chefe2, 1)),
 
-                // Onda 3 (Goblins 21 a 30): 3 Comuns + 3 Dourados + 3 Fantasmas + 1 Feiticeiro Espectral (30º Goblin)
-                new WaveConfig("Sombras Espectrais", "3 Comuns + 3 Dourados + 3 Fantasmas + 🔮 FEITICEIRO ESPECTRAL (30º Goblin)!", 1.0f, 1.22f,
+                // FASE 3: Fortaleza Vulcânica — Chefe: Feiticeiro Espectral (Fugitivo 0.96x)
+                new WaveConfig(
+                    stageNumber: 3,
+                    name: "Fortaleza Vulcânica",
+                    desc: "3 Comuns + 4 Fugitivos + 3 Dourados + 4 Fantasmas   •   CHEFE: FEITICEIRO ESPECTRAL!",
+                    bossDisplayName: "Feiticeiro Espectral",
+                    backgroundSprite: bg3,
+                    backgroundTint: Color.white,
+                    backgroundZoom: 1.0f,
+                    ambientParticleColor: new Color(1f, 0.45f, 0.12f, 0.72f),
+                    defaultMusicClip: m3,
+                    interval: 0.94f,
+                    speedMult: 1.26f,
+                    fugitiveSpeedMult: 0.96f,
+                    escapeTimerMult: 0.88f,
+                    maxConcurrent: 6,
+                    doubleSpawnChance: 0.28f,
                     (WizardType.Comum, 3),
-                    (WizardType.Dourado, 3),
-                    (WizardType.Fantasma, 3),
-                    (WizardType.Chefe3, 1)),
-
-                // Onda 4 (Goblins 31 a 40): 2 Comuns + 3 Fugitivos + 2 Dourados + 2 Fantasmas + 1 Lorde Carmesim (40º Goblin)
-                new WaveConfig("Legião Carmesim", "2 Comuns + 3 Fugitivos + 2 Dourados + 2 Fantasmas + 🩸 LORDE CARMESIM (40º Goblin)!", 0.9f, 1.32f,
-                    (WizardType.Comum, 2),
-                    (WizardType.Fugitivo, 3),
-                    (WizardType.Dourado, 2),
-                    (WizardType.Fantasma, 2),
-                    (WizardType.Chefe4, 1)),
-
-                // Onda 5 (Goblins 41 a 50): 2 Fugitivos + 3 Dourados + 4 Fantasmas + ⚔️ GOBLIN REI SUPREMO (50º Goblin)
-                new WaveConfig("O Confronto Supremo", "2 Fugitivos + 3 Dourados + 4 Fantasmas + ⚔️ GOBLIN REI SUPREMO (50º Goblin)!", 0.8f, 1.4f,
-                    (WizardType.Fugitivo, 2),
+                    (WizardType.Fugitivo, 4),
                     (WizardType.Dourado, 3),
                     (WizardType.Fantasma, 4),
+                    (WizardType.Chefe3, 1)),
+
+                // FASE 4: Salão do Trono em Ruínas — Chefe: Lorde Carmesim (Fugitivo 1.15x)
+                new WaveConfig(
+                    stageNumber: 4,
+                    name: "Salão do Trono em Ruínas",
+                    desc: "2 Comuns + 5 Fugitivos + 4 Dourados + 5 Fantasmas   •   CHEFE: LORDE CARMESIM!",
+                    bossDisplayName: "Lorde Carmesim",
+                    backgroundSprite: bg4,
+                    backgroundTint: new Color(0.84f, 0.82f, 1.0f, 1f),
+                    backgroundZoom: 1.0f,
+                    ambientParticleColor: new Color(0.82f, 0.35f, 1f, 0.68f),
+                    defaultMusicClip: m4,
+                    interval: 0.82f,
+                    speedMult: 1.38f,
+                    fugitiveSpeedMult: 1.15f,
+                    escapeTimerMult: 0.84f,
+                    maxConcurrent: 7,
+                    doubleSpawnChance: 0.38f,
+                    (WizardType.Comum, 2),
+                    (WizardType.Fugitivo, 5),
+                    (WizardType.Dourado, 4),
+                    (WizardType.Fantasma, 5),
+                    (WizardType.Chefe4, 1)),
+
+                // FASE 5: Altar do Rei Supremo — Chefe Final: Goblin Rei Supremo (Fugitivo 1.35x)
+                new WaveConfig(
+                    stageNumber: 5,
+                    name: "Altar do Rei Supremo",
+                    desc: "5 Fugitivos + 6 Dourados + 7 Fantasmas   •   CHEFE FINAL: GOBLIN REI SUPREMO!",
+                    bossDisplayName: "Goblin Rei Supremo",
+                    backgroundSprite: bg5,
+                    backgroundTint: new Color(1.0f, 0.72f, 0.65f, 1f),
+                    backgroundZoom: 1.12f,
+                    ambientParticleColor: new Color(1f, 0.22f, 0.15f, 0.8f),
+                    defaultMusicClip: m5,
+                    interval: 0.72f,
+                    speedMult: 1.50f,
+                    fugitiveSpeedMult: 1.35f,
+                    escapeTimerMult: 0.80f,
+                    maxConcurrent: 8,
+                    doubleSpawnChance: 0.48f,
+                    (WizardType.Fugitivo, 5),
+                    (WizardType.Dourado, 6),
+                    (WizardType.Fantasma, 7),
                     (WizardType.ChefeFinal, 1))
             };
         }

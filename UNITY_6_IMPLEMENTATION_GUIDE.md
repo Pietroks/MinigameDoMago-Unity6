@@ -21,38 +21,60 @@ Este documento contém o Game Design Document Técnico (GDD), a arquitetura de s
 ## 2. Regras e Mecânicas de Gameplay
 
 ### 2.1 Core Loop
-1. **Spawn**: Magos surgem dentro dos limites visíveis da câmera ortográfica 2D com animação de escala de 0 a 1.
-2. **Combate & Arsenal**:
-   - **Tiro Normal**: Clique esquerdo (LMB). Causa **1 de dano** (gasta 1 mana).
-   - **Feitiços Especiais**: Tiro Arcano (3 dano), Gelo (congela 2.5s), Raio (dano 2 + saltos em cadeia) e Área (explosão 2.5m de dano 2).
-3. **Temporizador de Fuga (Escape)**:
-   - Se o mago não for derrotado antes do seu tempo limite (`escapeTime`), ele escapa com animação ascendente e risada cômica, somando pontos na barra de fuga (`escaped += escapePenalty`).
-4. **Condições de Fim de Jogo**:
-   - **Vitória**: Concluir as 5 ondas derrotando os 5 Grandes Chefes (10º, 20º, 30º, 40º e o 50º Boss Final Supremo).
-   - **Derrota**: Permitir que **15 magos** escapem.
-
-### 2.2 Bônus de Habilidade & Precisão (Skill Shots / Trick Bonuses)
-Recompensas com feedback audiovisual imediato (popups coloridos com punch scale vertical e efeitos sonoros dedicados):
-- **✨ Primeiro Tiro (+5 pts)**: O primeiro disparo da partida atinge um alvo sem errar.
-- **🎯 Headshot (+2 pts)**: Acerto de alta precisão no topo da cabeça do goblin (y > 22% da altura).
-- **🔥 Triplo Abate Rápido (+5 pts)**: Eliminar 3 goblins em uma janela de até 2.0 segundos.
-- **🌀 Interrupção de Teleporte (+10 pts)**: Eliminar um Goblin Fantasma ou Feiticeiro Espectral durante o portal dimensional.
-- **🛡️ Desafio Dourado (+3 pts)**: Superar a couraça e o escudo do Goblin Dourado utilizando apenas o disparo normal de mana.
-- **⚡ Feitiço Duplo (+10 pts)**: Eliminar 2 ou mais inimigos na mesma conjuração de feitiço (Raio ou Área).
+1. **Spawn em Ondas**: Goblins surgem em 5 ondas dinâmicas e estruturadas com taxa de spawn e velocidades aceleradas.
+2. **Arsenal Mágico (5 Feitiços)**:
+   - **Tiro Normal** (`LMB`): Disparo rápido com consumo de mana (1 de dano, pente de 8 tiros, recarga de 1.2s via `[R]`).
+   - **Tiro Arcano** (`[1]`, `[Q]` ou `RMB`): 3 de dano direto concentrado (recarga 3.0s).
+   - **Feitiço de Gelo** (`[2]` ou `[E]`): Congela o alvo por 2.5s impedindo movimentação e ataques (1 de dano, recarga 4.0s).
+   - **Raio em Cadeia** (`[3]` ou `[F]`): Atinge o alvo com 2 de dano e encadeia eletrocutando até 2 alvos próximos (recarga 4.5s).
+   - **Explosão em Área** (`[4]`, `[C]` ou `[Espaço]`): Onda de choque expansiva de 2.5m que atinge todos os goblins no raio com 2 de dano (recarga 5.5s).
+3. **Sistema de Combos & Headshot**:
+   - Multiplicadores dinâmicos de pontuação (x1 a x4) por abates consecutivos.
+   - Bônus de Headshot (+1 ponto imediato) ao acertar o terço superior do goblin.
+   - Erros de tiro ou fugas quebram o multiplicador de combo.
+4. **Os 5 Grandes Chefes (A cada 10 goblins)**:
+   - 10º: Grande Goblin (15 HP) | 20º: Xamã do Caos (25 HP) | 30º: Feiticeiro Espectral (35 HP)
+   - 40º: Lorde Carmesim (50 HP) | 50º: Goblin Rei Supremo (80 HP - Derrotar = Vitória Imediata!).
+5. **Sistema de Vida do Jogador & Dupla Condição de Derrota**:
+   - O jogador possui **5 Pontos de Vida** (`❤️❤️❤️❤️❤️`), monitorados em tempo real no HUD.
+   - **Perigo Primário (Whack-a-Mole)**: Impedir que 15 goblins escapem da arena.
+   - **Perigo Secundário (Ataques Seletivos)**: Determinados goblins atacam o jogador:
+     - **Comum**: 0 Dano (foco em escapar).
+     - **Fugitivo**: Causa **1 Dano** ao escapar em disparada retaliatória.
+     - **Dourado**: Causa **2 Danos** ao escapar com descarga de mana.
+     - **Chefes**: Golpes sísmicos e projéteis arcanos desferem **1 a 2 Danos** ao jogador.
+   - **Feedback Imediato**: Vinheta avermelhada em tela inteira (`DamageFlashOverlay`), tremor de câmera e som de impacto.
+   - **Telas de Derrota Dinâmicas**: Apresenta motivo customizado ("VOCÊ CAIU EM COMBATE!" ou "MUITOS GOBLINS ESCAPARAM!").
+6. **Sistema de Rank da Partida (S / A / B / C / D)**:
+   - Avaliação pós-jogo calculada a partir de 6 fatores: mortes, precisão (%), tempo de partida, fugitivos, combo e feitiços fortes.
+7. **Sistema de Power-ups (Itens Mágicos Flutuantes Raros)**:
+   - Orbes mágicos que surgem como eventos especiais ocasionais (a cada **24 a 38s**, máx. 1 em tela por vez).
+   - Pairam com movimentação orgânica senoidal e oscilação por **9 segundos** antes de dissipar.
+   - Os 5 Power-ups:
+     - 🔵 **Mana**: Restaura instantaneamente 4 tiros no pente de mana da varinha.
+     - 🔥 **Fúria Arcana**: Concede +1 de dano a todos os disparos normais durante 5s (dano 2 por tiro).
+     - ⏱️ **Tempo Arcano**: Desacelera o tempo do jogo em 50% durante 3s (`Time.timeScale = 0.5f`).
+     - 💥 **Tempestade**: O próximo disparo conjura relâmpagos que aniquilam todos os goblins comuns em tela.
+     - 🎯 **Precisão**: Encolhe o retículo de mira em 40% durante 5s, permitindo disparos cirúrgicos.
 
 ---
 
-## 3. Especificação dos Inimigos (Magos)
+## 3. Especificação dos Inimigos (Goblins & Chefes)
 
 ```
-+---------------+----+--------+------------+-------+--------------------+---------------------------------------------------+
-| Tipo          | HP | Pontos | Escape (s) | Peso  | Penalidade Escape  | Mecânica Especial                                 |
-+---------------+----+--------+------------+-------+--------------------+---------------------------------------------------+
-| Comum         | 1  | 1      | 5.0s       | 65%   | 1                  | Oscilação suave aleatória (+-40px).               |
-| Rápido        | 2  | 2      | 6.0s       | 20%   | 2                  | Rápido; ao levar 1º tiro, squash/stretch e foge!  |
-| Dourado       | 3  | 5      | 7.0s       | 10%   | 1                  | Tint pulsante dourado; corre entre pontos suaves. |
-| Fantasma      | 4  | 3      | 9.0s       | 15%   | 1                  | Alpha pulsante; ao levar dano, TELEPORTA no mapa! |
-+---------------+----+--------+------------+-------+--------------------+---------------------------------------------------+
++------------------------+----+--------+------------+-------+--------------------+-------------+---------------------------------------------------+
+| Tipo                   | HP | Pontos | Escape (s) | Peso  | Penalidade Escape  | Dano Jogador| Mecânica Especial                                 |
++------------------------+----+--------+------------+-------+--------------------+-------------+---------------------------------------------------+
+| Comum                  | 1  | 1      | 5.0s       | 60%   | 1                  | 0 HP        | Movimentação aleatória e golpes com facas.        |
+| Fugitivo               | 2  | 2      | 4.5s       | 20%   | 2                  | 1 HP (Fuga) | Ao tomar dano, salta em disparada; fustiga na fuga|
+| Dourado                | 3  | 5      | 6.0s       | 10%   | 1                  | 2 HP (Fuga) | Rápido, escudo impenetrável; contra-ataca na fuga |
+| Fantasma               | 4  | 3      | 7.5s       | 10%   | 1                  | 0 HP        | Alpha espectral; teleporta através de portais!    |
+| Chefe 1 (Grande)       | 15 | +25    | 18.0s      | Boss  | 3                  | 1 HP (Soco) | Golpe sísmico em área e investidas brutais.       |
+| Chefe 2 (Xamã)         | 25 | +50    | 22.0s      | Boss  | 3                  | 1 HP (Fogo) | Projéteis de fogo e erupções vulcânicas.          |
+| Chefe 3 (Espectral)    | 35 | +100   | 26.0s      | Boss  | 4                  | 1 HP (Orbe) | Teleporte contínuo, invisibilidade e servos.      |
+| Chefe 4 (Carmesim)     | 50 | +150   | 30.0s      | Boss  | 4                  | 2 HP (Sang) | Cetro sísmico, orbes de sangue e rito carmesim.   |
+| Chefe Final (Supremo)  | 80 | +500   | 40.0s      | Boss  | 5                  | 2 HP (Magma)| Abalo colossal, magma triplo! DERROTAR = VITÓRIA! |
++------------------------+----+--------+------------+-------+--------------------+-------------+---------------------------------------------------+
 ```
 
 ---
@@ -66,9 +88,14 @@ namespace WizardGame.Data
     public enum WizardType
     {
         Comum,
-        Rapido,
+        Fugitivo,
         Dourado,
-        Fantasma
+        Fantasma,
+        Chefe,
+        Chefe2,
+        Chefe3,
+        Chefe4,
+        ChefeFinal
     }
 }
 ```
@@ -1126,3 +1153,97 @@ Na pasta `Assets/ScriptableObjects/WizardData/`, clique com botão direito > **C
 1. **Desempenho Nativo sem Garbage Collection**: Com `UnityEngine.Pool.ObjectPool`, a taxa de quadros permanece constante a 60/120+ FPS sem engasgos de GC.
 2. **Multiplataforma Pronta**: O código arquitetado roda sem alterações no Windows, WebGL, Android e iOS graças ao New Input System.
 3. **Pós-processamento URP 2D**: Permite adicionar luzes 2D, partículas de impacto e Bloom cinematográfico aos efeitos de teleporte e ouro.
+
+---
+
+## 7. Sistema de IA com Personalidade (`AIPersonality`)
+
+A inteligência dos inimigos foi desacoplada em arquétipos e padrões modulares no `WizardDataSO`:
+
+### 7.1 Arquétipos Implementados
+- **Goblin Comum (`CommonWanderer`)**:
+  - Padrão: `Wander` (perambulação orgânica errática, paradas naturais de 0.4s a 0.9s e ataques periódicos).
+  - Reação ao dano: `Jiggle` (vibração de impacto).
+- **Goblin Fugitivo (`FastFleeAfterHit`)**:
+  - Padrão: `Wander` acelerado enquanto não ferido.
+  - Reação ao dano: `FleeAfterHit` (pulo de pânico, arranque em disparada com 2.2x de velocidade na direção oposta ao cursor/tiro com duração de 2.5s, retornando ao estado calmo caso sobreviva).
+- **Goblin Dourado (`GoldenStraight`)**:
+  - Padrão: `StraightMovement` (patrulha retilínea militar contínua, com reflexão/inversão nas bordas e postura marcial).
+  - Reação ao dano: `DefensiveShield` (ergue escudo defensivo e absorve recuo).
+- **Goblin Fantasma (`GhostTeleporter`)**:
+  - Padrão: `SpectralHover` (flutuação senoidal contínua com translucidez ondulante).
+  - Reação ao dano: `TeleportAfterHit` (salto dimensional instantâneo por portal para novo setor da tela).
+
+### 7.2 Preparação Nativa para Futuras Expansões
+- `Escudo / ShieldWizard` (`ProtectAlly`): Avança na direção de aliados feridos para erguer barreira protetora.
+- `Curandeiro / HealerWizard` (`HealerSupport`): Mantém recuo estratégico e emite ondas restaurando vida de aliados.
+- `Ilusionista / IllusionWizard` (`SpawnDecoy`): Invoca cópias ilusórias de distração.
+- `Bombardeiro / BomberWizard` (`ExplodeOnDeath`): Contagem regressiva em flash e detonação arcana em área com tremor de câmera.
+
+---
+
+## 8. Correções Críticas, Robustez de Arquitetura e Interatividade de Projéteis dos Chefes
+
+Após a análise detalhada e auditoria de código de ponta a ponta, todos os gargalos técnicos, bugs de transição de estado e melhorias de gameplay foram implementados:
+
+### 8.1 Correção dos 5 Bugs Críticos
+1. **Invulnerabilidade Infinita do Chefe 3 (Mago da Fumaça)**:
+   - *Causa*: Quando o Boss 3 entrava em modo furtivo (`isInvulnerable = true`) e recebia um Feitiço de Gelo (`FreezeRoutine`) ou a onda era finalizada (`StopAllActiveCoroutines()`), a flag de invulnerabilidade e a transparência ficavam presas indefinidamente.
+   - *Solução*: `FreezeRoutine`, `StopAllActiveCoroutines()` e `OnDisable()` em `WizardController.cs` agora forçam `isInvulnerable = false` e restauram a cor/alfa original do sprite.
+2. **Desincronização de ObjectPool e Vazamento de Corrotinas de Morte**:
+   - *Causa*: O método `Die()` removia prematuramente o goblin da lista `activeGoblins` enquanto a animação e corrotina de morte ainda rodavam por 1.0s. Se uma nova onda começasse ou a limpeza de onda (`ClearActiveGoblins`) ocorresse, a corrotina antiga continuava viva e chamava `OnDefeated`, computando pontos e mortes fantasma na onda seguinte.
+   - *Solução*: Criado o método `CancelAndDespawnImmediately()` que desliga corrotinas ativas de morte, previne invocação fantasma de eventos e desativa o GameObject de forma atômica. `ClearActiveGoblins()` agora itera sobre todas as instâncias em campo e invoca essa limpeza imediata antes de devolver ao pool.
+3. **Deriva da Câmera por Múltiplos Tremores Concorrentes (Camera Shake Drift)**:
+   - *Causa*: `SpellEffectsManager.TriggerCameraShake` calculava offsets a partir da posição momentânea da câmera. Múltiplas explosões simultâneas faziam o retorno final da câmera ficar permanentemente deslocado do centro.
+   - *Solução*: Ancoragem absoluta em `cameraAnchorPos = new Vector3(0f, 0f, -10f)` com cancelamento prévio da corrotina ativa (`activeShakeCoroutine`) antes de iniciar um novo tremor.
+4. **Inconsistência no Cancelamento de Recarga do `WeaponSystem`**:
+   - *Causa*: O cancelamento por string `StopCoroutine("ReloadRoutine")` falhava silenciosamente quando a corrotina era iniciada com parâmetros ou sob diferentes assinaturas do compilador Mono/IL2CPP.
+   - *Solução*: Uso exclusivo de referência tipada `Coroutine activeReloadCoroutine`, cancelada de forma determinística em `StartReload()`, `RefillAmmo()` e `AddAmmo()`.
+5. **Animações Travadas no Reuso do ObjectPool (`FrameAnimator`)**:
+   - *Causa*: Se um goblin fosse devolvido ao pool no meio de uma animação travada com `isLocked = true` (ex: impacto ou ataque), ele renascia com o lock ativo ou com a corrotina anterior ainda referenciada.
+   - *Solução*: Implementação do método `OnDisable()` no `FrameAnimator`, cancelando `activeAnimCoroutine`, destravando `isLocked = false` e resetando o estado para `AnimationState.Idle`.
+
+### 8.2 Interatividade e Gameplay Ativo
+1. **Interceptação de Projéteis dos Chefes (Mechanic: Spell Interception)**:
+   - Projéteis disparados pelos Chefes 2, 3, 4 e Final agora recebem a classe componente `BossProjectileInstance` com `CircleCollider2D` na layer `Wizard`.
+   - O jogador pode clicar diretamente na bola de fogo ou projétil para destruí-lo no ar, ganhando bônus de habilidade (+5 pontos de precisão e reflexo) e evitando sofrer dano à barra de vida.
+   - Caso o projétil atinja o jogador (alcance da tela), ele causa dano real com base no chefe respectivo (1 a 3 pontos de dano) e som de impacto.
+2. **Feedback Fiel de Feitiços e Prevenção de Falsos Hitmarkers**:
+   - `PlayerInputHandler` não dispara mais som de acerto ou animação de hitmarker na tela quando o feitiço está em cooldown ou sem mana/mágica. A confirmação de acerto é concedida exclusivamente após autorização e validação de dano pelo `GameManager`.
+3. **Efeito Sonoro de Disparo Vazio (Dry-Fire SFX)**:
+   - Quando o jogador tenta atirar sem munição suficiente ou feitiço em recarga, é emitido um estalo sonoro sutil de disparo vazio (`SoundManager.PlayDryFireSound()`), guiando a intuição do jogador para recarregar ou trocar de estratégia.
+4. **Sincronização Física em Câmera Lenta**:
+   - Durante efeitos de desaceleração temporal (Power-up *Tempo Arcano*), `Time.fixedDeltaTime` é dinamicamente sincronizado com `0.02f * Time.timeScale` em todos os estados de transição do jogo, eliminando oscilações visuais e interpolação engasgada de física 2D.
+5. **Zero-Allocation Garbage Collection em Feitiços de Área**:
+   - Pré-alocação e reutilização contínua do buffer `cachedAreaTargets` no `GameManager`, eliminando coletas periódicas de lixo (GC spikes) durante tempestades mágicas ou explosões com dezenas de goblins em cena.
+6. **Interface Dinâmica de Condição de Derrota**:
+   - A tela de derrota do `UIManager` agora exibe dinamicamente o número máximo de fugitivos permitidos da partida (`escapedCount / maxEscapes`), respeitando customizações e modificadores de dificuldade.
+
+---
+
+## 9. Fases por Chefe, Transição Cinematográfica, Balanceamento Dinâmico e Profundidade 2.5D
+
+### 9.1 Uma Fase Dedicada por Chefe (`StageEnvironmentManager`)
+Cada um dos 5 grandes Chefes agora comanda sua própria fase com bioma, partículas ambientais, iluminação e ritmo progressivo configurados diretamente no `WaveConfig`:
+1. **Fase 1 — Muralhas da Fortaleza** (`cenario1.png`): Poeira lunar fria; foco em Comuns e Fugitivos; Chefe: **👑 Grande Goblin** (20 HP).
+2. **Fase 2 — Ruínas Iluminadas pela Lua** (`Ruínas Iluminadas pela Lua.png`): Vaga-lumes místicos; introdução do Goblin Dourado e spawns duplos (18%); Chefe: **🔥 Xamã do Caos** (30 HP).
+3. **Fase 3 — Fortaleza Vulcânica** (`Fortaleza Vulcânica da Fase 3.png`): Brasas vulcânicas ascendentes; estreia do Goblin Fantasma e ritmo acelerado (28% spawn duplo); Chefe: **🔮 Feiticeiro Espectral** (42 HP).
+4. **Fase 4 — Salão do Trono em Ruínas** (`Salão do Trono em Ruínas.png`, atmosfera sombria violeta): Faíscas arcanas; pressão contínua (38% spawn duplo, máx. 7 simultâneos); Chefe: **🩸 Lorde Carmesim** (56 HP).
+5. **Fase 5 — Altar do Rei Supremo** (`Salão do Trono em Ruínas.png`, iluminação rubra e zoom dramático `1.12x`): Brasas de magma intensas; elite pura sem Goblins Comuns (48% spawn duplo, velocidade `1.50x`); Chefe Final: **⚔️ Goblin Rei Supremo** (85 HP).
+
+### 9.2 Transição Cinematográfica de Mudança de Fase
+- Quando todos os lacaios de uma fase são abatidos/escapam, o Chefe realiza sua entrada triunfal sozinho na arena (`WizardSpawner`).
+- Ao derrotar o Chefe atual, eventuais reforços invocados e projéteis são limpos instantaneamente, o jogador recebe o bônus da fase, **Mana 100% recarregada** e **+1 ❤️ de Vida recuperado**.
+- Em seguida, `UIManager.PlayStageTransitionRoutine` exibe a cortina de transição (*Fade In → Troca de Cenário e Bioma em `StageEnvironmentManager` → Fade Out*), revelando a nova fase.
+
+### 9.3 Combate Justo, Dinâmico e Balanceamento
+- **Fim do Dano Inevitável de Chefes**: Golpes pesados (`Golpe Sísmico`, `Labareda`, `Golpe de Cetro`, `Terremoto`, `Choque de Magma`) agora exibem um **anel telegrafado de aviso** (`ExecuteTelegraphedSlamRoutine`), podendo ser **interrompidos** com qualquer Feitiço Especial ou 2 acertos rápidos (**+8 pts CONTRA-ATAQUE!**).
+- **Orbes com Aproximação 2.5D**: Projéteis de chefes crescem de escala (`0.35x → 1.15x`) enquanto voam na direção da câmera/jogador, permitindo leitura clara e interceptação com clique (**+5 pts**).
+- **Fúria dos Chefes (50% HP)**: Ao atingir metade da vida, Chefes ganham `+24%` de velocidade e invocam até 2 reforços para manter a pressão.
+- **Arsenal & Economia Calibrados**:
+  - Mana máxima aumentada para **10 disparos** com recarga rápida de **1.0s** e cadência anti-macro de `0.11s`.
+  - **Arcano**: 4 Dano (`2.6s` CD) • **Gelo**: 1 Dano + `2.8s` congelamento (`3.8s` CD) • **Relâmpago**: 2 Dano em até 4 alvos (`4.2s` CD) • **Área**: 3 Dano em raio `2.8m` (`5.0s` CD).
+  - Power-up **Tempestade** agora também aplica 2 de dano em goblins de elite e 3 em chefes.
+
+### 9.4 Profundidade 2.5D por Eixo Y
+- Em `WizardController.ApplyDepthSortingAndScale()`, o `sortingOrder` e a escala de cada goblin variam dinamicamente conforme sua posição `Y` na tela (`1.07x` próximo à borda inferior, `0.89x` próximo ao fundo), preparando a arquitetura diretamente para oclusão atrás de objetos recortados em camadas.

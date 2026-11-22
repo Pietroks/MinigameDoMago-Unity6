@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using WizardGame.Core;
@@ -19,6 +20,7 @@ namespace WizardGame.UI
         [SerializeField] private GameObject startMenuPanel;
         [SerializeField] private GameObject pauseMenuPanel;
         [SerializeField] private GameObject instructionsPanel;
+        [SerializeField] private GameObject settingsPanel;
         [SerializeField] private GameObject gameOverPanel;
         [SerializeField] private GameObject inGameHUD;
 
@@ -32,6 +34,16 @@ namespace WizardGame.UI
         [SerializeField] private Button muteButton;
         [SerializeField] private Text muteButtonText;
         [SerializeField] private Image damageFlashOverlay;
+
+        [Header("Ícones Visuais de Vida, Mana e Medalhão")]
+        [SerializeField] private List<Image> healthHeartImages = new List<Image>();
+        [SerializeField] private Sprite heartFullSprite;
+        [SerializeField] private Sprite heartEmptySprite;
+        [SerializeField] private List<Image> manaCrystalImages = new List<Image>();
+        [SerializeField] private Sprite manaCrystalOnSprite;
+        [SerializeField] private Sprite manaCrystalOffSprite;
+        [SerializeField] private Image manaOrbImage;
+        [SerializeField] private Image spellMedallionGlowImage;
 
         [Header("Arsenal Mágico (Feitiços Especiais)")]
         [SerializeField] private GameObject spellArsenalContainer;
@@ -58,11 +70,15 @@ namespace WizardGame.UI
         [SerializeField] private GameObject activeBuffsContainer;
         [SerializeField] private Text activeBuffsText;
 
-        [Header("Sistema de Ondas (Wave System UI)")]
+        [Header("Sistema de Ondas e Transição de Fases")]
         [SerializeField] private Text waveText;
         [SerializeField] private GameObject waveBannerContainer;
         [SerializeField] private Text waveBannerTitle;
         [SerializeField] private Text waveBannerSubtitle;
+        [SerializeField] private GameObject stageTransitionPanel;
+        [SerializeField] private Text stageTransitionTitleText;
+        [SerializeField] private Text stageTransitionSubtitleText;
+        [SerializeField] private Text stageTransitionDetailText;
 
         [Header("Elementos de Fim de Jogo")]
         [SerializeField] private Text endTitleText;
@@ -76,6 +92,8 @@ namespace WizardGame.UI
         [SerializeField] private Button playButton;
         [SerializeField] private Button instructionsButton;
         [SerializeField] private Button closeInstructionsButton;
+        [SerializeField] private Button settingsButton;
+        [SerializeField] private Button closeSettingsButton;
         [SerializeField] private Button quitButton;
 
         [Header("Elementos do Menu de Pausa")]
@@ -106,6 +124,10 @@ namespace WizardGame.UI
         private Coroutine waveBannerCoroutine;
         private Coroutine damageFlashCoroutine;
 
+        private SpellType currentlySelectedSpell = SpellType.Arcane;
+        private readonly Dictionary<SpellType, bool> spellReadyMap = new Dictionary<SpellType, bool>();
+        private readonly Dictionary<SpellType, float> spellCooldownMap = new Dictionary<SpellType, float>();
+
         private void Awake()
         {
             if (playButton != null) playButton.onClick.AddListener(() => OnPlayClicked?.Invoke());
@@ -118,12 +140,16 @@ namespace WizardGame.UI
             if (muteButton != null) muteButton.onClick.AddListener(ToggleMute);
             if (instructionsButton != null) instructionsButton.onClick.AddListener(() => ShowInstructions(true));
             if (closeInstructionsButton != null) closeInstructionsButton.onClick.AddListener(() => ShowInstructions(false));
+            if (settingsButton != null) settingsButton.onClick.AddListener(() => ShowSettings(true));
+            if (closeSettingsButton != null) closeSettingsButton.onClick.AddListener(() => ShowSettings(false));
             if (quitButton != null) quitButton.onClick.AddListener(() => Application.Quit());
 
             if (comboContainer != null) comboContainer.SetActive(false);
             if (headshotPopupContainer != null) headshotPopupContainer.SetActive(false);
             if (comboBreakText != null) comboBreakText.gameObject.SetActive(false);
             if (waveBannerContainer != null) waveBannerContainer.SetActive(false);
+            if (stageTransitionPanel != null) stageTransitionPanel.SetActive(false);
+            if (settingsPanel != null) settingsPanel.SetActive(false);
             if (damageFlashOverlay != null) damageFlashOverlay.gameObject.SetActive(false);
             if (activeBuffsContainer != null) activeBuffsContainer.SetActive(false);
         }
@@ -135,7 +161,9 @@ namespace WizardGame.UI
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
             if (instructionsPanel != null) instructionsPanel.SetActive(false);
+            if (settingsPanel != null) settingsPanel.SetActive(false);
             if (waveBannerContainer != null) waveBannerContainer.SetActive(false);
+            if (stageTransitionPanel != null) stageTransitionPanel.SetActive(false);
             Cursor.visible = true;
         }
 
@@ -146,6 +174,7 @@ namespace WizardGame.UI
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
             if (gameOverPanel != null) gameOverPanel.SetActive(false);
             if (instructionsPanel != null) instructionsPanel.SetActive(false);
+            if (settingsPanel != null) settingsPanel.SetActive(false);
             Cursor.visible = false;
         }
 
@@ -158,6 +187,13 @@ namespace WizardGame.UI
         public void ShowInstructions(bool show)
         {
             if (instructionsPanel != null) instructionsPanel.SetActive(show);
+            if (show && settingsPanel != null) settingsPanel.SetActive(false);
+        }
+
+        public void ShowSettings(bool show)
+        {
+            if (settingsPanel != null) settingsPanel.SetActive(show);
+            if (show && instructionsPanel != null) instructionsPanel.SetActive(false);
         }
 
         public void ShowGameOver(GamePerformanceStats stats)
@@ -193,14 +229,13 @@ namespace WizardGame.UI
             {
                 if (endRankGradeText != null)
                 {
-                    endScoreText.text = $"<size=22><b>{stats.rankBadge} {stats.rankTitle.ToUpper()}</b></size>";
+                    endScoreText.text = $"<size=22><b>{stats.rankTitle.ToUpper()}</b></size>";
                     endScoreText.color = stats.rankColor;
                 }
                 else
                 {
-                    // Fallback visual caso endRankGradeText não tenha sido associado no Inspector
                     endScoreText.text = $"<size=74><b>{stats.rankGrade}</b></size>\n" +
-                                        $"<size=20><b>{stats.rankBadge} {stats.rankTitle.ToUpper()}</b></size>";
+                                        $"<size=20><b>{stats.rankTitle.ToUpper()}</b></size>";
                     endScoreText.color = stats.rankColor;
                 }
             }
@@ -212,12 +247,10 @@ namespace WizardGame.UI
                 string timeFormatted = $"{minutes:00}:{seconds:00}";
 
                 endStatsText.text =
-                    $"<size=24><b>{stats.wizardsDefeated} MAGOS</b></size>\n" +
-                    $"<size=24><b>{stats.accuracy:F0}% PRECISÃO</b></size>\n" +
-                    $"<size=24><b>COMBO x{stats.maxStreak}</b></size>\n\n" +
-                    $"<size=30><color=#{colorHex}><b>{stats.finalScore} PONTOS</b></color></size>\n\n" +
-                    $"<size=15><color=#A8B2C0>Tempo: {timeFormatted}   •   Tiros Fortes: {stats.strongShotsCount}   •   Bônus de Habilidade: {stats.skillBonusesCount} (+{stats.skillBonusTotalPoints} pts)\n" +
-                    $"Disparos: {stats.totalShotsFired}   |   Acertos: {stats.totalHits}   |   Dano: {stats.totalDamageDealt}   |   Fugitivos: {stats.escapedCount}/15</color></size>";
+                    $"<size=23><b>{stats.wizardsDefeated} INIMIGOS ABATIDOS   •   {stats.accuracy:F0}% PRECISÃO   •   COMBO ×{stats.maxStreak}</b></size>\n\n" +
+                    $"<size=32><color=#{colorHex}><b>{stats.finalScore:D5} PONTOS</b></color></size>\n\n" +
+                    $"<size=15><color=#B8C4D4>Tempo: {timeFormatted}   •   Magias Especiais: {stats.strongShotsCount}   •   Bônus: {stats.skillBonusesCount} (+{stats.skillBonusTotalPoints} pts)\n" +
+                    $"Disparos: {stats.totalShotsFired}   •   Acertos: {stats.totalHits}   •   Dano Total: {stats.totalDamageDealt}   •   Fugas: {stats.escapedCount}/{(stats.maxEscapes > 0 ? stats.maxEscapes : 15)}</color></size>";
             }
         }
 
@@ -230,6 +263,7 @@ namespace WizardGame.UI
                 won = won,
                 finalScore = score,
                 escapedCount = escaped,
+                maxEscapes = 15,
                 wizardsDefeated = score,
                 totalShotsFired = Math.Max(1, score),
                 totalHits = score,
@@ -246,7 +280,7 @@ namespace WizardGame.UI
                 rankTitle = rank.title,
                 rankBadge = rank.badge,
                 rankColor = rank.color,
-                defeatReason = won ? "" : "MUITOS GOBLINS ESCAPARAM (15/15)!"
+                defeatReason = won ? "" : $"MUITOS GOBLINS ESCAPARAM ({escaped}/15)!"
             };
             ShowGameOver(stats);
         }
@@ -255,7 +289,7 @@ namespace WizardGame.UI
         {
             if (scoreText != null)
             {
-                scoreText.text = target > 0 ? $"Pontos: {score} / {target}" : $"Pontos: {score}";
+                scoreText.text = target > 0 ? $"{score:D5} / {target}" : $"{score:D5}";
             }
         }
 
@@ -263,75 +297,110 @@ namespace WizardGame.UI
         {
             if (escapeText != null)
             {
-                escapeText.text = $"Fugiram: {current} / {max}";
-                escapeText.color = current >= (max - 3) ? Color.red : new Color(1f, 0.6f, 0.6f);
+                escapeText.text = $"{current} / {max}";
+                escapeText.color = current >= (max - 3)
+                    ? new Color(1f, 0.35f, 0.35f)
+                    : new Color(0.95f, 0.85f, 0.72f);
             }
         }
 
         public void UpdatePlayerHealth(int current, int max)
         {
+            if (healthHeartImages != null && healthHeartImages.Count > 0)
+            {
+                for (int i = 0; i < healthHeartImages.Count; i++)
+                {
+                    if (healthHeartImages[i] == null) continue;
+                    bool visible = i < max;
+                    healthHeartImages[i].gameObject.SetActive(visible);
+                    if (visible)
+                    {
+                        bool filled = i < current;
+                        healthHeartImages[i].sprite = filled ? heartFullSprite : heartEmptySprite;
+                        healthHeartImages[i].color = filled ? Color.white : new Color(0.75f, 0.75f, 0.85f, 0.85f);
+                    }
+                }
+            }
+
             if (playerHealthText == null) return;
 
-            string hearts = "";
-            for (int i = 0; i < max; i++)
+            if (healthHeartImages != null && healthHeartImages.Count > 0)
             {
-                hearts += (i < current) ? "❤️" : "🖤";
-            }
-
-            playerHealthText.text = $"VIDA: {hearts} ({Mathf.Max(0, current)}/{max})";
-            if (current <= 1)
-            {
-                playerHealthText.color = new Color(1f, 0.25f, 0.25f);
-            }
-            else if (current <= 2)
-            {
-                playerHealthText.color = new Color(1f, 0.65f, 0.2f);
+                playerHealthText.text = $"{Mathf.Max(0, current)}/{max}";
             }
             else
             {
-                playerHealthText.color = new Color(0.4f, 1f, 0.4f);
+                string hearts = "";
+                for (int i = 0; i < max; i++)
+                {
+                    hearts += (i < current) ? "♥" : "·";
+                }
+                playerHealthText.text = $"VIDA: {hearts} ({Mathf.Max(0, current)}/{max})";
             }
+
+            if (current <= 1) playerHealthText.color = new Color(1f, 0.3f, 0.3f);
+            else if (current <= 2) playerHealthText.color = new Color(1f, 0.72f, 0.28f);
+            else playerHealthText.color = new Color(0.95f, 0.9f, 0.82f);
         }
 
         public void UpdateAmmo(int current, int max, bool isReloading)
         {
+            if (manaCrystalImages != null && manaCrystalImages.Count > 0)
+            {
+                for (int i = 0; i < manaCrystalImages.Count; i++)
+                {
+                    if (manaCrystalImages[i] == null) continue;
+                    bool activeSlot = i < max;
+                    manaCrystalImages[i].gameObject.SetActive(activeSlot);
+                    if (!activeSlot) continue;
+
+                    bool hasCharge = !isReloading && i < current;
+                    if (hasCharge && manaCrystalOnSprite != null)
+                    {
+                        manaCrystalImages[i].sprite = manaCrystalOnSprite;
+                        manaCrystalImages[i].color = Color.white;
+                    }
+                    else if (manaCrystalOffSprite != null)
+                    {
+                        manaCrystalImages[i].sprite = manaCrystalOffSprite;
+                        manaCrystalImages[i].color = isReloading
+                            ? new Color(1f, 0.85f, 0.35f, 0.7f)
+                            : new Color(0.7f, 0.75f, 0.9f, 0.75f);
+                    }
+                }
+            }
+
+            if (manaOrbImage != null)
+            {
+                if (isReloading) manaOrbImage.color = new Color(1f, 0.82f, 0.32f, 1f);
+                else if (current <= 2) manaOrbImage.color = new Color(1f, 0.4f, 0.4f, 1f);
+                else manaOrbImage.color = Color.white;
+            }
+
             if (ammoText == null) return;
 
             if (isReloading)
             {
-                ammoText.text = "MANA: [RECARREGANDO...]";
-                ammoText.color = Color.yellow;
+                ammoText.text = "RECARREGANDO...";
+                ammoText.color = new Color(1f, 0.85f, 0.25f);
             }
             else
             {
-                ammoText.text = $"MANA: {current} / {max}  [R]";
-                ammoText.color = current <= 2 ? Color.red : Color.cyan;
+                ammoText.text = $"{current}/{max}  [R]";
+                ammoText.color = current <= 2 ? new Color(1f, 0.35f, 0.35f) : new Color(0.55f, 0.92f, 1f);
             }
         }
 
         public void UpdateStrongCooldown(bool ready, float remainingSeconds = 0f)
         {
-            if (strongShotText != null)
-            {
-                if (ready)
-                {
-                    strongShotText.text = "TIRO FORTE [RMB]: PRONTO!";
-                    strongShotText.color = Color.green;
-                }
-                else
-                {
-                    strongShotText.text = $"TIRO FORTE [RMB]: {remainingSeconds:F1}s";
-                    strongShotText.color = new Color(1f, 0.4f, 0.4f);
-                }
-            }
-
             UpdateSpellCooldown(SpellType.Arcane, ready, remainingSeconds);
         }
 
         public void UpdateSelectedSpell(SpellType spell)
         {
-            Color activeColor = new Color(1f, 0.85f, 0.2f, 1f);
-            Color inactiveColor = new Color(0.25f, 0.25f, 0.35f, 0.65f);
+            currentlySelectedSpell = spell;
+            Color activeColor = new Color(1f, 0.82f, 0.25f, 1f);
+            Color inactiveColor = new Color(0.45f, 0.38f, 0.3f, 0.72f);
 
             if (arcaneHighlight != null) arcaneHighlight.color = (spell == SpellType.Arcane) ? activeColor : inactiveColor;
             if (iceHighlight != null) iceHighlight.color = (spell == SpellType.Ice) ? activeColor : inactiveColor;
@@ -340,20 +409,26 @@ namespace WizardGame.UI
 
             if (activeSpellNoticeText != null)
             {
-                string spellDesc = spell switch
+                string spellName = spell switch
                 {
-                    SpellType.Arcane => "💥 TIRO ARCANO (Dano 3)",
-                    SpellType.Ice => "❄️ FEITIÇO DE GELO (Congela 2.5s)",
-                    SpellType.Lightning => "⚡ RELÂMPAGO (Corrente em até 3)",
-                    SpellType.Area => "🌀 FEITIÇO DE ÁREA (Explosão mágica)",
-                    _ => "TIRO ESPECIAL"
+                    SpellType.Arcane => "TIRO ARCANO",
+                    SpellType.Ice => "FEITIÇO DE GELO",
+                    SpellType.Lightning => "RELÂMPAGO",
+                    SpellType.Area => "EXPLOSÃO ÁREA",
+                    _ => "FEITIÇO"
                 };
-                activeSpellNoticeText.text = $"[RMB]: {spellDesc}";
+                activeSpellNoticeText.text = spellName;
             }
+
+            RefreshSelectedMedallionState();
         }
 
         public void UpdateSpellCooldown(SpellType spell, bool ready, float remainingSeconds = 0f)
         {
+            bool wasCoolingDown = spellReadyMap.TryGetValue(spell, out bool prevReady) && !prevReady;
+            spellReadyMap[spell] = ready;
+            spellCooldownMap[spell] = remainingSeconds;
+
             Text targetText = spell switch
             {
                 SpellType.Arcane => arcaneCooldownText,
@@ -363,17 +438,76 @@ namespace WizardGame.UI
                 _ => null
             };
 
-            if (targetText == null) return;
-
-            if (ready)
+            if (targetText != null)
             {
-                targetText.text = "PRONTO";
-                targetText.color = new Color(0.2f, 1f, 0.35f);
+                if (ready)
+                {
+                    targetText.text = "PRONTO";
+                    targetText.color = new Color(0.35f, 0.98f, 0.52f);
+                }
+                else
+                {
+                    targetText.text = $"{remainingSeconds:F1}s";
+                    targetText.color = new Color(1f, 0.46f, 0.46f);
+                }
             }
-            else
+
+            if (ready && wasCoolingDown)
             {
-                targetText.text = $"{remainingSeconds:F1}s";
-                targetText.color = new Color(1f, 0.45f, 0.45f);
+                Image slotImg = spell switch
+                {
+                    SpellType.Arcane => arcaneHighlight,
+                    SpellType.Ice => iceHighlight,
+                    SpellType.Lightning => lightningHighlight,
+                    SpellType.Area => areaHighlight,
+                    _ => null
+                };
+                if (slotImg != null && slotImg.gameObject.activeInHierarchy)
+                {
+                    StartCoroutine(PunchScaleRoutine(slotImg.transform));
+                }
+                if (spell == currentlySelectedSpell && spellMedallionGlowImage != null && spellMedallionGlowImage.gameObject.activeInHierarchy)
+                {
+                    StartCoroutine(PunchScaleRoutine(spellMedallionGlowImage.transform.parent));
+                }
+            }
+
+            if (spell == currentlySelectedSpell)
+            {
+                RefreshSelectedMedallionState();
+            }
+        }
+
+        private void RefreshSelectedMedallionState()
+        {
+            bool ready = !spellReadyMap.TryGetValue(currentlySelectedSpell, out bool r) || r;
+            float rem = spellCooldownMap.TryGetValue(currentlySelectedSpell, out float s) ? s : 0f;
+
+            if (strongShotText != null)
+            {
+                if (ready)
+                {
+                    strongShotText.text = "[RMB] PRONTO";
+                    strongShotText.color = new Color(0.38f, 1f, 0.55f);
+                }
+                else
+                {
+                    strongShotText.text = $"CD: {rem:F1}s";
+                    strongShotText.color = new Color(1f, 0.55f, 0.35f);
+                }
+            }
+
+            if (spellMedallionGlowImage != null)
+            {
+                Color spellCol = currentlySelectedSpell switch
+                {
+                    SpellType.Arcane => new Color(0.35f, 0.9f, 1f, 1f),
+                    SpellType.Ice => new Color(0.62f, 0.95f, 1f, 1f),
+                    SpellType.Lightning => new Color(1f, 0.88f, 0.25f, 1f),
+                    SpellType.Area => new Color(1f, 0.38f, 0.22f, 1f),
+                    _ => Color.white
+                };
+                spellMedallionGlowImage.color = ready ? spellCol : new Color(spellCol.r * 0.45f, spellCol.g * 0.45f, spellCol.b * 0.45f, 0.7f);
             }
         }
 
@@ -386,12 +520,12 @@ namespace WizardGame.UI
             if (streak >= 2)
             {
                 comboContainer.SetActive(true);
-                comboText.text = $"COMBO x{multiplier} - {streak} ABATES";
+                comboText.text = $"COMBO ×{multiplier}  •  {streak} ABATES";
 
-                if (multiplier >= 4) comboText.color = new Color(1f, 0.2f, 1f); // Magenta
-                else if (multiplier == 3) comboText.color = new Color(1f, 0.3f, 0.1f); // Vermelho
-                else if (multiplier == 2) comboText.color = new Color(1f, 0.7f, 0f); // Laranja
-                else comboText.color = new Color(1f, 0.95f, 0.4f); // Amarelo
+                if (multiplier >= 4) comboText.color = new Color(1f, 0.35f, 0.95f);
+                else if (multiplier == 3) comboText.color = new Color(1f, 0.42f, 0.18f);
+                else if (multiplier == 2) comboText.color = new Color(1f, 0.78f, 0.22f);
+                else comboText.color = new Color(1f, 0.92f, 0.45f);
 
                 if (comboPulseCoroutine != null) StopCoroutine(comboPulseCoroutine);
                 comboPulseCoroutine = StartCoroutine(PunchScaleRoutine(comboContainer.transform));
@@ -417,17 +551,30 @@ namespace WizardGame.UI
         {
             comboBreakText.gameObject.SetActive(true);
             comboBreakText.text = $"COMBO QUEBRADO! ({reason})";
-            comboBreakText.color = Color.red;
+            comboBreakText.color = new Color(1f, 0.32f, 0.32f, 1f);
+
+            var cg = comboBreakText.GetComponent<CanvasGroup>();
+            if (cg == null) cg = comboBreakText.gameObject.AddComponent<CanvasGroup>();
+            cg.alpha = 1f;
+            comboBreakText.transform.localScale = new Vector3(1.18f, 1.18f, 1f);
 
             float elapsed = 0f;
-            float dur = 0.9f;
+            float dur = 1.05f;
             while (elapsed < dur)
             {
-                elapsed += Time.unscaledDeltaTime;
+                if (Time.timeScale > 0.0001f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / dur);
+                    comboBreakText.transform.localScale = Vector3.Lerp(new Vector3(1.18f, 1.18f, 1f), Vector3.one, Mathf.Clamp01(t * 4f));
+                    cg.alpha = t > 0.55f ? 1f - ((t - 0.55f) / 0.45f) : 1f;
+                }
                 yield return null;
             }
 
+            cg.alpha = 0f;
             comboBreakText.gameObject.SetActive(false);
+            comboBreakCoroutine = null;
         }
 
         private IEnumerator PunchScaleRoutine(Transform target)
@@ -451,7 +598,7 @@ namespace WizardGame.UI
 
         public void ShowHeadshotPopup(Vector3 worldPoint)
         {
-            ShowSkillBonusPopup("🎯 HEADSHOT! +2", new Color(0.25f, 1f, 0.35f));
+            ShowSkillBonusPopup("HEADSHOT! +2", new Color(0.32f, 1f, 0.45f));
         }
 
         public void ShowSkillBonusPopup(string text, Color color)
@@ -465,6 +612,10 @@ namespace WizardGame.UI
         private IEnumerator SkillBonusPopupRoutine(string text, Color color)
         {
             headshotPopupContainer.SetActive(true);
+            var cg = headshotPopupContainer.GetComponent<CanvasGroup>();
+            if (cg == null) cg = headshotPopupContainer.AddComponent<CanvasGroup>();
+            cg.alpha = 1f;
+
             if (headshotPopupText != null)
             {
                 headshotPopupText.text = text;
@@ -476,23 +627,28 @@ namespace WizardGame.UI
             if (rect != null)
             {
                 rect.anchoredPosition = initialPos;
-                rect.localScale = new Vector3(1.25f, 1.25f, 1f);
+                rect.localScale = new Vector3(1.28f, 1.28f, 1f);
             }
 
             float elapsed = 0f;
-            float dur = 0.95f;
+            float dur = 1.05f;
             while (elapsed < dur)
             {
                 elapsed += Time.unscaledDeltaTime;
-                float t = elapsed / dur;
+                float t = Mathf.Clamp01(elapsed / dur);
                 if (rect != null)
                 {
-                    rect.anchoredPosition = initialPos + new Vector2(0f, 45f * t);
-                    rect.localScale = Vector3.Lerp(new Vector3(1.25f, 1.25f, 1f), Vector3.one, Mathf.Clamp01(t * 3f));
+                    rect.anchoredPosition = initialPos + new Vector2(0f, 48f * Mathf.Sin(t * Mathf.PI * 0.5f));
+                    rect.localScale = Vector3.Lerp(new Vector3(1.28f, 1.28f, 1f), Vector3.one, Mathf.Clamp01(t * 3.5f));
+                }
+                if (t > 0.65f)
+                {
+                    cg.alpha = 1f - ((t - 0.65f) / 0.35f);
                 }
                 yield return null;
             }
 
+            cg.alpha = 0f;
             headshotPopupContainer.SetActive(false);
         }
 
@@ -501,6 +657,38 @@ namespace WizardGame.UI
         private void Start()
         {
             InitializeVolumeSliders();
+            UpdateMuteUI();
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.OnMuteChanged += HandleMuteChanged;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (SoundManager.Instance != null)
+            {
+                SoundManager.Instance.OnMuteChanged -= HandleMuteChanged;
+            }
+        }
+
+        private void Update()
+        {
+            if (startMenuPanel != null && startMenuPanel.activeSelf && UnityEngine.Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (settingsPanel != null && settingsPanel.activeSelf)
+                {
+                    ShowSettings(false);
+                }
+                else if (instructionsPanel != null && instructionsPanel.activeSelf)
+                {
+                    ShowInstructions(false);
+                }
+            }
+        }
+
+        private void HandleMuteChanged(bool _)
+        {
             UpdateMuteUI();
         }
 
@@ -595,13 +783,13 @@ namespace WizardGame.UI
             }
         }
 
-        #region Sistema de Ondas UI
+        #region Sistema de Fases & Ondas UI
 
         public void UpdateWaveProgress(int currentWave, int totalWaves, int remainingInWave, int totalInWave)
         {
             if (waveText != null)
             {
-                waveText.text = $"⚔️ ONDA {currentWave} / {totalWaves}  •  Restam: {remainingInWave} / {totalInWave}";
+                waveText.text = $"FASE {currentWave}/{totalWaves}   •   RESTAM {remainingInWave}/{totalInWave}";
             }
         }
 
@@ -611,9 +799,9 @@ namespace WizardGame.UI
 
             if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
             waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
-                title: $"⚔️ ONDA {waveNumber}: {waveName.ToUpper()}",
+                title: $"FASE {waveNumber}: {waveName.ToUpper()}",
                 subtitle: description,
-                titleColor: new Color(1f, 0.85f, 0.2f),
+                titleColor: new Color(1f, 0.85f, 0.25f),
                 duration: 2.8f
             ));
         }
@@ -624,10 +812,10 @@ namespace WizardGame.UI
 
             if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
             waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
-                title: $"🎉 ONDA {waveNumber} CONCLUÍDA!",
-                subtitle: $"+{bonusPoints} Pontos de Bônus!  •  Mana Totalmente Restaurada!",
-                titleColor: new Color(0.25f, 1f, 0.45f),
-                duration: 2.4f
+                title: $"FASE {waveNumber} CONCLUÍDA!",
+                subtitle: $"+{bonusPoints} Pontos de Bônus   •   Mana Restaurada!",
+                titleColor: new Color(0.32f, 1f, 0.52f),
+                duration: 2.2f
             ));
         }
 
@@ -637,24 +825,160 @@ namespace WizardGame.UI
 
             if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
             waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
-                title: $"⚠️ ALERTA DE BOSS: {bossName.ToUpper()}!",
+                title: $"CHEFE DA FASE: {bossName.ToUpper()}!",
                 subtitle: description,
-                titleColor: new Color(1f, 0.25f, 0.25f),
+                titleColor: new Color(1f, 0.3f, 0.25f),
                 duration: 3.2f
             ));
         }
 
-        public void ShowBossDefeatedBanner(string bossName, int bonusPoints)
+        public void ShowBossEnragedBanner(string bossName)
         {
             if (waveBannerContainer == null) return;
 
             if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
             waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
-                title: $"👑 BOSS DERROTADO! +{bonusPoints}",
-                subtitle: $"{bossName.ToUpper()} FOI ANIQUILADO COM MAESTRIA!",
-                titleColor: new Color(1f, 0.85f, 0.15f),
-                duration: 3.0f
+                title: $"{bossName.ToUpper()} ENTROU EM FÚRIA!",
+                subtitle: "Velocidade aumentada e reforços convocados!",
+                titleColor: new Color(1f, 0.48f, 0.14f),
+                duration: 2.4f
             ));
+        }
+
+        public void ShowBossDefeatedBanner(string bossName, int bonusPoints, string nextStageHint = "")
+        {
+            if (waveBannerContainer == null) return;
+
+            string sub = string.IsNullOrEmpty(nextStageHint)
+                ? $"{bossName.ToUpper()} FOI ANIQUILADO COM MAESTRIA!"
+                : $"{bossName.ToUpper()} DERROTADO!   •   {nextStageHint}";
+
+            if (waveBannerCoroutine != null) StopCoroutine(waveBannerCoroutine);
+            waveBannerCoroutine = StartCoroutine(WaveBannerRoutine(
+                title: $"CHEFE DERROTADO!  +{bonusPoints} PTS",
+                subtitle: sub,
+                titleColor: new Color(1f, 0.85f, 0.22f),
+                duration: 2.6f
+            ));
+        }
+
+        public void HideStageTransitionImmediate()
+        {
+            if (stageTransitionPanel != null) stageTransitionPanel.SetActive(false);
+        }
+
+        public IEnumerator PlayStageTransitionRoutine(int nextStageNumber, string stageName, string bossName, string bonusAndDifficultyNote, Action onMidpointSwap)
+        {
+            EnsureStageTransitionPanel();
+            if (stageTransitionPanel == null)
+            {
+                onMidpointSwap?.Invoke();
+                yield break;
+            }
+
+            if (stageTransitionTitleText != null)
+            {
+                stageTransitionTitleText.text = $"FASE {nextStageNumber}";
+            }
+            if (stageTransitionSubtitleText != null)
+            {
+                stageTransitionSubtitleText.text = stageName.ToUpper();
+            }
+            if (stageTransitionDetailText != null)
+            {
+                stageTransitionDetailText.text = $"Chefe da Fase: {bossName}\n{bonusAndDifficultyNote}";
+            }
+
+            var cg = stageTransitionPanel.GetComponent<CanvasGroup>();
+            if (cg == null) cg = stageTransitionPanel.AddComponent<CanvasGroup>();
+
+            cg.alpha = 0f;
+            stageTransitionPanel.SetActive(true);
+            stageTransitionPanel.transform.SetAsLastSibling();
+
+            // 1. Fade-in da cortina cinematográfica
+            float fadeIn = 0.45f;
+            float elapsed = 0f;
+            while (elapsed < fadeIn)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                cg.alpha = Mathf.Clamp01(elapsed / fadeIn);
+                yield return null;
+            }
+            cg.alpha = 1f;
+
+            // 2. No auge da transição, troca cenário, bioma e prepara próxima fase
+            onMidpointSwap?.Invoke();
+
+            // 3. Pausa breve de apresentação da nova fase
+            yield return new WaitForSecondsRealtime(1.45f);
+
+            // 4. Fade-out revelando o novo cenário
+            float fadeOut = 0.55f;
+            elapsed = 0f;
+            while (elapsed < fadeOut)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                cg.alpha = 1f - Mathf.Clamp01(elapsed / fadeOut);
+                yield return null;
+            }
+            cg.alpha = 0f;
+            stageTransitionPanel.SetActive(false);
+        }
+
+        private void EnsureStageTransitionPanel()
+        {
+            if (stageTransitionPanel != null) return;
+
+            Canvas parentCanvas = GetComponentInParent<Canvas>();
+            if (parentCanvas == null) parentCanvas = FindAnyObjectByType<Canvas>();
+            if (parentCanvas == null) return;
+
+            Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (font == null) font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+
+            stageTransitionPanel = new GameObject("StageTransitionPanel");
+            stageTransitionPanel.transform.SetParent(parentCanvas.transform, false);
+            var rect = stageTransitionPanel.AddComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+
+            var bg = stageTransitionPanel.AddComponent<Image>();
+            bg.color = new Color(0.03f, 0.03f, 0.07f, 0.96f);
+            bg.raycastTarget = true;
+
+            stageTransitionTitleText = CreateFallbackText(stageTransitionPanel.transform, "TransitionTitle", "FASE 2", 68, new Color(1f, 0.85f, 0.2f), new Vector2(0f, 85f), font);
+            stageTransitionTitleText.fontStyle = FontStyle.Bold;
+            stageTransitionSubtitleText = CreateFallbackText(stageTransitionPanel.transform, "TransitionSubtitle", "RUÍNAS ILUMINADAS PELA LUA", 34, Color.white, new Vector2(0f, 5f), font);
+            stageTransitionSubtitleText.fontStyle = FontStyle.Bold;
+            stageTransitionDetailText = CreateFallbackText(stageTransitionPanel.transform, "TransitionDetail", "Chefe: Xamã do Caos", 22, new Color(0.75f, 0.9f, 1f), new Vector2(0f, -80f), font);
+
+            stageTransitionPanel.SetActive(false);
+        }
+
+        private Text CreateFallbackText(Transform parent, string name, string text, int size, Color col, Vector2 pos, Font font)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var r = go.AddComponent<RectTransform>();
+            r.anchorMin = new Vector2(0.5f, 0.5f);
+            r.anchorMax = new Vector2(0.5f, 0.5f);
+            r.sizeDelta = new Vector2(1200f, 140f);
+            r.anchoredPosition = pos;
+            var t = go.AddComponent<Text>();
+            t.text = text;
+            t.font = font;
+            t.fontSize = size;
+            t.color = col;
+            t.alignment = TextAnchor.MiddleCenter;
+            t.horizontalOverflow = HorizontalWrapMode.Overflow;
+            t.verticalOverflow = VerticalWrapMode.Overflow;
+            var ol = go.AddComponent<Outline>();
+            ol.effectColor = new Color(0f, 0f, 0f, 0.9f);
+            ol.effectDistance = new Vector2(2f, -2f);
+            return t;
         }
 
         public void ShowPowerUpBanner(string title, string subtitle, Color color)
@@ -686,33 +1010,48 @@ namespace WizardGame.UI
             var canvasGroup = waveBannerContainer.GetComponent<CanvasGroup>();
             if (canvasGroup == null) canvasGroup = waveBannerContainer.AddComponent<CanvasGroup>();
 
-            // Fade In com leve pop de escala
+            // Fade In com leve pop de escala (tempo real ativo: ignora slow-mo mas respeita pausa)
             float elapsed = 0f;
             float fadeInTime = 0.25f;
             waveBannerContainer.transform.localScale = Vector3.one * 0.82f;
 
             while (elapsed < fadeInTime)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / fadeInTime;
-                canvasGroup.alpha = t;
-                waveBannerContainer.transform.localScale = Vector3.Lerp(Vector3.one * 0.82f, Vector3.one, t);
+                if (Time.timeScale > 0.0001f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / fadeInTime);
+                    canvasGroup.alpha = t;
+                    waveBannerContainer.transform.localScale = Vector3.Lerp(Vector3.one * 0.82f, Vector3.one, t);
+                }
                 yield return null;
             }
 
             canvasGroup.alpha = 1f;
             waveBannerContainer.transform.localScale = Vector3.one;
 
-            yield return new WaitForSeconds(Mathf.Max(0.5f, duration - 0.55f));
+            float holdDuration = Mathf.Max(0.5f, duration - 0.55f);
+            float holdElapsed = 0f;
+            while (holdElapsed < holdDuration)
+            {
+                if (Time.timeScale > 0.0001f)
+                {
+                    holdElapsed += Time.unscaledDeltaTime;
+                }
+                yield return null;
+            }
 
             // Fade Out
             elapsed = 0f;
             float fadeOutTime = 0.35f;
             while (elapsed < fadeOutTime)
             {
-                elapsed += Time.deltaTime;
-                float t = elapsed / fadeOutTime;
-                canvasGroup.alpha = 1f - t;
+                if (Time.timeScale > 0.0001f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / fadeOutTime);
+                    canvasGroup.alpha = 1f - t;
+                }
                 yield return null;
             }
 

@@ -20,8 +20,8 @@ namespace WizardGame.Entities
         [SerializeField] private UIManager uiManager;
 
         [Header("Cadência Rara de Spawn (Eventos Especiais)")]
-        [SerializeField] private float minSpawnInterval = 24.0f;
-        [SerializeField] private float maxSpawnInterval = 38.0f;
+        [SerializeField] private float minSpawnInterval = 18.0f;
+        [SerializeField] private float maxSpawnInterval = 28.0f;
 
         [Header("Duração dos Buffs")]
         [SerializeField] private float arcaneFuryDuration = 5.0f;
@@ -72,7 +72,7 @@ namespace WizardGame.Entities
             if (mainCam == null) return;
 
             float vertExtent = mainCam.orthographicSize;
-            float horzExtent = vertExtent * (float)Screen.width / Screen.height;
+            float horzExtent = vertExtent * (float)Mathf.Max(1, Screen.width) / Mathf.Max(1, Screen.height);
             Vector3 camPos = mainCam.transform.position;
             arenaBounds = new Bounds(new Vector3(camPos.x, camPos.y, 0f), new Vector3(horzExtent * 2f, vertExtent * 2f, 2f));
         }
@@ -85,7 +85,10 @@ namespace WizardGame.Entities
 
         private void Update()
         {
-            // 1. Atualização dos Buffs Ativos (usando unscaledDeltaTime para garantir precisão)
+            // Não consome duração de buffs nem spawna itens enquanto o jogo estiver pausado (timeScale == 0)
+            if (Time.timeScale <= 0.0001f) return;
+
+            // 1. Atualização dos Buffs Ativos (usando unscaledDeltaTime para garantir duração real em slow motion)
             UpdateActiveBuffs();
 
             // 2. Timer de Spawn de Power-up Raro
@@ -112,7 +115,7 @@ namespace WizardGame.Entities
             {
                 arcaneFuryTimer -= Time.unscaledDeltaTime;
                 anyBuffActive = true;
-                buffSummary += $"🔥 FÚRIA: {Mathf.CeilToInt(arcaneFuryTimer)}s   ";
+                buffSummary += $"FÚRIA: {Mathf.CeilToInt(arcaneFuryTimer)}s   ";
                 if (arcaneFuryTimer <= 0f)
                 {
                     arcaneFuryTimer = 0f;
@@ -124,7 +127,7 @@ namespace WizardGame.Entities
             {
                 arcaneTimeTimer -= Time.unscaledDeltaTime;
                 anyBuffActive = true;
-                buffSummary += $"⏱️ TEMPO: {Mathf.CeilToInt(arcaneTimeTimer)}s   ";
+                buffSummary += $"TEMPO: {Mathf.CeilToInt(arcaneTimeTimer)}s   ";
                 if (arcaneTimeTimer <= 0f)
                 {
                     arcaneTimeTimer = 0f;
@@ -137,7 +140,7 @@ namespace WizardGame.Entities
             {
                 precisionTimer -= Time.unscaledDeltaTime;
                 anyBuffActive = true;
-                buffSummary += $"🎯 PRECISÃO: {Mathf.CeilToInt(precisionTimer)}s   ";
+                buffSummary += $"PRECISÃO: {Mathf.CeilToInt(precisionTimer)}s   ";
                 if (precisionTimer <= 0f)
                 {
                     precisionTimer = 0f;
@@ -149,7 +152,7 @@ namespace WizardGame.Entities
             if (isStormCharged)
             {
                 anyBuffActive = true;
-                buffSummary += "⚡ TEMPESTADE PRONTA!   ";
+                buffSummary += "TEMPESTADE PRONTA!   ";
             }
 
             uiManager?.UpdateActiveBuffs(anyBuffActive, buffSummary.TrimEnd());
@@ -208,29 +211,29 @@ namespace WizardGame.Entities
             {
                 case PowerUpType.Mana:
                     weaponSystem?.AddAmmo(4);
-                    uiManager?.ShowPowerUpBanner("🔵 MANA RECARREGADA!", "+4 Disparos Adicionados à Varinha!", PowerUpItem.GetColorForType(type));
+                    uiManager?.ShowPowerUpBanner("MANA RECARREGADA!", "+4 Disparos Adicionados à Varinha!", PowerUpItem.GetColorForType(type));
                     break;
 
                 case PowerUpType.ArcaneFury:
                     arcaneFuryTimer = arcaneFuryDuration;
-                    uiManager?.ShowPowerUpBanner("🔥 FÚRIA ARCANA ATIVADA!", "+1 Dano em Todos os Tiros durante 5s!", PowerUpItem.GetColorForType(type));
+                    uiManager?.ShowPowerUpBanner("FÚRIA ARCANA ATIVADA!", "+1 Dano em Todos os Tiros durante 5s!", PowerUpItem.GetColorForType(type));
                     break;
 
                 case PowerUpType.ArcaneTime:
                     arcaneTimeTimer = arcaneTimeDuration;
                     ApplySlowMotion(true);
-                    uiManager?.ShowPowerUpBanner("⏱️ TEMPO ARCANO!", "O Mundo fica 50% Mais Lento por 3s!", PowerUpItem.GetColorForType(type));
+                    uiManager?.ShowPowerUpBanner("TEMPO ARCANO!", "O Mundo fica 50% Mais Lento por 3s!", PowerUpItem.GetColorForType(type));
                     break;
 
                 case PowerUpType.Storm:
                     isStormCharged = true;
-                    uiManager?.ShowPowerUpBanner("💥 TEMPESTADE CARREGADA!", "Seu Próximo Tiro Aniquilará Todos os Goblins Comuns!", PowerUpItem.GetColorForType(type));
+                    uiManager?.ShowPowerUpBanner("TEMPESTADE CARREGADA!", "Seu Próximo Tiro Aniquilará os Goblins!", PowerUpItem.GetColorForType(type));
                     break;
 
                 case PowerUpType.Precision:
                     precisionTimer = precisionDuration;
                     weaponSystem?.SetPrecisionMode(true);
-                    uiManager?.ShowPowerUpBanner("🎯 MIRA DE PRECISÃO!", "Retículo Compacto e Cirúrgico durante 5s!", PowerUpItem.GetColorForType(type));
+                    uiManager?.ShowPowerUpBanner("MIRA DE PRECISÃO!", "Retículo Compacto e Cirúrgico durante 5s!", PowerUpItem.GetColorForType(type));
                     break;
             }
         }
@@ -248,12 +251,23 @@ namespace WizardGame.Entities
 
             foreach (var goblin in activeGoblins)
             {
-                if (goblin != null && goblin.gameObject.activeSelf && goblin.GetData() != null)
+                if (goblin != null && goblin.gameObject.activeSelf && !goblin.IsDeadOrEscaping && goblin.GetData() != null)
                 {
-                    if (goblin.GetData().wizardType == WizardType.Comum)
+                    var wType = goblin.GetData().wizardType;
+                    if (wType == WizardType.Comum)
                     {
                         killedCount++;
                         goblin.TakeDamage(goblin.CurrentHealth);
+                    }
+                    else if (!WaveConfig.IsBossType(wType))
+                    {
+                        // Fases avançadas: causa 2 de dano em goblins de elite em vez de ficar inútil
+                        if (goblin.CurrentHealth <= 2) killedCount++;
+                        goblin.TakeDamage(2);
+                    }
+                    else
+                    {
+                        goblin.TakeDamage(3);
                     }
                 }
             }

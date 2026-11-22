@@ -36,6 +36,8 @@
 Thumbs.db
 Desktop.ini
 
-# Raw Source Folders
+# Raw Source Folders & Local Logs / Scratch Projects
 soundtrack_/
-build.log
+*.log
+My project/
+aula/

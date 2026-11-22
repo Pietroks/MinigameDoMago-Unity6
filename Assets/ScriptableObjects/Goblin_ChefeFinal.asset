@@ -88,10 +88,10 @@ MonoBehaviour:
   - {fileID: 21300000, guid: ecf185230a23f1448952bc7b2757fe66, type: 3}
   - {fileID: 21300000, guid: ff3cd3230f620fb43b8f94e1e92fd2b9, type: 3}
   specialActionSprite: {fileID: 0}
-  maxHealth: 80
+  maxHealth: 85
   pointsOnDefeat: 500
   moveSpeed: 2.5
-  escapeTimeSeconds: 35
+  escapeTimeSeconds: 50
   spawnWeight: 5
   escapePenalty: 4
   escapeSound: {fileID: 8300000, guid: 7a42177b24244084db1878919656fb4d, type: 3}

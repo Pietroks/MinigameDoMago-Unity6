@@ -22,10 +22,25 @@ namespace WizardGame.Data
     [Serializable]
     public class WaveConfig
     {
-        public string waveName = "Onda 1";
+        [Header("Identidade da Fase & Chefe")]
+        public int stageNumber = 1;
+        public string waveName = "Muralhas da Fortaleza";
         public string waveDescription = "Invasão Inicial de Goblins";
-        public float spawnInterval = 1.4f;
+        public string bossDisplayName = "Grande Goblin";
+        public Sprite backgroundSprite;
+        public Color backgroundTint = Color.white;
+        public float backgroundZoom = 1.0f;
+        public Color ambientParticleColor = new Color(0.6f, 0.85f, 1f, 0.55f);
+        public AudioClip defaultMusicClip;
+
+        [Header("Ritmo e Progressão de Dificuldade")]
+        public float spawnInterval = 1.35f;
         public float speedMultiplier = 1.0f;
+        public float fugitiveSpeedMultiplier = 1.0f;
+        public float escapeTimerMultiplier = 1.0f;
+        public int maxConcurrentEnemies = 4;
+        [Range(0f, 1f)] public float doubleSpawnChance = 0f;
+
         public List<WaveEnemyEntry> enemies = new List<WaveEnemyEntry>();
 
         public int TotalEnemies
@@ -47,11 +62,62 @@ namespace WizardGame.Data
         public WaveConfig() { }
 
         public WaveConfig(string name, string desc, float interval, float speedMult, params (WizardType type, int count)[] entries)
+            : this(1, name, desc, "Chefe", null, Color.white, 1.0f, new Color(0.6f, 0.85f, 1f, 0.55f), interval, speedMult, 1.0f, 5, 0f, entries)
         {
+        }
+
+        public WaveConfig(
+            int stageNumber,
+            string name,
+            string desc,
+            string bossDisplayName,
+            Sprite backgroundSprite,
+            Color backgroundTint,
+            float backgroundZoom,
+            Color ambientParticleColor,
+            float interval,
+            float speedMult,
+            float escapeTimerMult,
+            int maxConcurrent,
+            float doubleSpawnChance,
+            params (WizardType type, int count)[] entries)
+            : this(stageNumber, name, desc, bossDisplayName, backgroundSprite, backgroundTint, backgroundZoom, ambientParticleColor, null, interval, speedMult, speedMult, escapeTimerMult, maxConcurrent, doubleSpawnChance, entries)
+        {
+        }
+
+        public WaveConfig(
+            int stageNumber,
+            string name,
+            string desc,
+            string bossDisplayName,
+            Sprite backgroundSprite,
+            Color backgroundTint,
+            float backgroundZoom,
+            Color ambientParticleColor,
+            AudioClip defaultMusicClip,
+            float interval,
+            float speedMult,
+            float fugitiveSpeedMult,
+            float escapeTimerMult,
+            int maxConcurrent,
+            float doubleSpawnChance,
+            params (WizardType type, int count)[] entries)
+        {
+            this.stageNumber = stageNumber;
             this.waveName = name;
             this.waveDescription = desc;
+            this.bossDisplayName = bossDisplayName;
+            this.backgroundSprite = backgroundSprite;
+            this.backgroundTint = backgroundTint;
+            this.backgroundZoom = backgroundZoom;
+            this.ambientParticleColor = ambientParticleColor;
+            this.defaultMusicClip = defaultMusicClip;
             this.spawnInterval = interval;
             this.speedMultiplier = speedMult;
+            this.fugitiveSpeedMultiplier = fugitiveSpeedMult;
+            this.escapeTimerMultiplier = escapeTimerMult;
+            this.maxConcurrentEnemies = maxConcurrent;
+            this.doubleSpawnChance = doubleSpawnChance;
             this.enemies = new List<WaveEnemyEntry>();
 
             if (entries != null)
