@@ -65,8 +65,8 @@ MonoBehaviour:
   specialActionSprite: {fileID: 21300000, guid: 2b718702dbff98e4f8a8f00b9c61ccec, type: 3}
   maxHealth: 3
   pointsOnDefeat: 5
-  moveSpeed: 4
-  escapeTimeSeconds: 6
+  moveSpeed: 3
+  escapeTimeSeconds: 8.5
   spawnWeight: 10
   escapePenalty: 1
   escapeSound: {fileID: 8300000, guid: aaf1dd34fb2244f48b8e2800310b3f5d, type: 3}

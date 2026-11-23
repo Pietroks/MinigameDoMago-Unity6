@@ -1,7 +1,7 @@
-# Estado Atual do Projeto — Arcano: Caçada aos Goblins (Unity 6)
+# Estado Atual do Projeto — Mata Goblin (Unity 6)
 
 > **Última atualização:** 22/11/2026  
-> **Título Oficial (`productName`):** `Arcano: Caçada aos Goblins`  
+> **Título Oficial (`productName`):** `Mata Goblin`  
 > **Engine / Pipeline:** Unity 6 (2D/2.5D, UGUI 2.0.0, Physics2D)  
 > **Repositório:** `https://github.com/Pietroks/MinigameDoMago-Unity6.git` (branch `main`)  
 > **Status da Compilação C#:** `Assembly-CSharp.csproj` e `Assembly-CSharp-Editor.csproj` compilando com **0 Erros e 0 Warnings** (`dotnet build`).
@@ -10,7 +10,7 @@
 
 ## 1. Visão Geral do Jogo
 
-**Arcano: Caçada aos Goblins** é um jogo *point-and-click* arcade em primeira pessoa (POV de varinha mágica + retículo de mira) com temática *dark-fantasy* e cenários em **profundidade 2.5D** (parallax reativo ao mouse, obstáculos recortados onde os goblins passam por trás e pela frente, sombras de contato nos pés e partículas em 2 planos). O jogador defende o castelo ao longo de **5 fases progressivas**, enfrentando ondas balanceadas de goblins com personalidades de IA distintas e **5 chefes exclusivos**, gerenciando **Mana**, **Vida**, **Arsenal Mágico**, **Combos** e **Power-ups raros**.
+**Mata Goblin** é um jogo *point-and-click* arcade em primeira pessoa (POV de varinha mágica + retículo de mira) com temática *dark-fantasy* e cenários em **profundidade 2.5D** (parallax reativo ao mouse, obstáculos recortados onde os goblins passam por trás e pela frente, sombras de contato nos pés e partículas em 2 planos). O jogador defende o castelo ao longo de **5 fases progressivas**, enfrentando ondas balanceadas de goblins com personalidades de IA distintas e **5 chefes exclusivos**, gerenciando **Mana**, **Vida**, **Arsenal Mágico**, **Combos** e **Power-ups raros**.
 
 ### Condições de Vitória e Derrota
 - **Vitória:** Derrotar o **Goblin Rei Supremo** ao final da **Fase 5**.
@@ -46,7 +46,7 @@ O projeto possui **21 scripts C#** organizados em 6 namespaces sob `WizardGame.*
 | `Input/` | `PlayerInputHandler.cs` | Captura de mira, disparos (`LMB`/`RMB`), seleção de feitiços (`1–4`, `Q/E/F/C`, `Scroll`), recarga (`R`), mute (`M`), pausa (`ESC`/`P`), detecção *Zero-GC* (`ContactFilter2D.noFilter`) e bloqueio contra cliques acidentais em botões do HUD. |
 | `UI/` | `UIManager.cs` | Controle do Menu Inicial (com Recorde salvo), Configurações, Grimório, Pausa, HUD flutuante, **barra épica de Chefe no topo**, pulso de tensão com 1 de Vida, corações, cristais de mana, medalhão de feitiço, banners, cortina de transição de fase e tela de Rank. |
 | `UI/` | `UIButtonJuice.cs` | Animação tátil em `unscaledDeltaTime` (hover `1.045x`, clique `0.96x` e brilho) para botões temáticos. |
-| `Editor/` | `ProjectSetupWizard.cs` | Ferramenta de Editor (`Tools > Setup Arcano Complete` e `Tools > Build Game Standalone`) que configura sprites (9-slice), áudios, `ScriptableObjects`, prefab `Goblin_Base` e reconstrói integralmente a cena `Assets/Scenes/Gameplay.unity`. |
+| `Editor/` | `ProjectSetupWizard.cs` | Ferramenta de Editor (`Tools > Setup Mata Goblin Complete` e `Tools > Build Game Standalone`) que configura sprites (9-slice), áudios, `ScriptableObjects`, prefab `Goblin_Base` e reconstrói integralmente a cena `Assets/Scenes/Gameplay.unity`. |
 
 ---
 
@@ -90,7 +90,7 @@ Cada fase possui **cenário próprio**, **chefe dedicado**, **música padrão de
 - **Barra Épica de Vida do Chefe no Topo do HUD:** Exibida automaticamente ao iniciar lutas contra chefes com animação suave de vida, nome do chefe e alerta pulsante `• FÚRIA!` abaixo de 50% de HP (sem sobrepor os indicadores de buffs ativos).
 - **Multiplicadores de Combo & Cura por Habilidade:** `×1` (1–4), `×2` (5–9), `×3` (10–19), `×4` (20+ abates). Subir de patamar restaura **+2 Mana**, e atingir sequências de **12, 24, 36... abates** sem errar recupera **+1 Vida** (ou concede **+25 pts IMPARÁVEL!** se a vida estiver cheia).
 - **Tensão em 1 HP & Feedback no Mundo:** Vinheta rubra pulsante suave quando o jogador cai para 1 ponto de Vida, além de textos flutuantes coloridos ao coletar Power-ups (`+4 MANA!`, `+1 DANO (5s)!`, etc.).
-- **Persistência de Recorde (`PlayerPrefs`):** Salva automaticamente a maior pontuação e o melhor Rank (`Arcano_BestScore` / `Arcano_BestRank`), exibindo o recorde no Menu Inicial e destacando `• NOVO RECORDE! •` na tela final.
+- **Persistência de Recorde (`PlayerPrefs`):** Salva automaticamente a maior pontuação e o melhor Rank (`MataGoblin_BestScore` / `MataGoblin_BestRank`), exibindo o recorde no Menu Inicial e destacando `• NOVO RECORDE! •` na tela final.
 - **Bônus Dinâmicos:** Primeiro Tiro (`+5`), Headshot Crítico (`+2` e `+1` dano), Triplo Abate Rápido (`+5`), Interrupção Dimensional (`+10`), Desafio Dourado (`+3`), Feitiço Duplo (`+10`), Interceptação (`+5`), Contra-Ataque (`+8`), Tempestade (`+10`).
 - **5 Power-ups Raros Flutuantes:** `Mana` (+4 tiros), `Fúria Arcana` (+1 dano por 5s), `Tempo Arcano` (50% mais lento por 3s), `Tempestade` (próximo tiro aniquila comuns / fere elites e chefes) e `Precisão` (retículo reduzido e destacado em esmeralda por 5s).
 - **Sistema de Rank Final (`S / A / B / C / D`):** Avalia abates, precisão, tempo, fugas, maior combo e uso de feitiços especiais.
@@ -131,9 +131,9 @@ Durante a verificação completa dos arquivos foram identificados e corrigidos o
 
 ### Ação no Unity Editor
 Sempre que atualizar scripts do `ProjectSetupWizard`, abra o projeto no **Unity 6 Editor** e execute no menu superior:
-> **`Tools > Setup Arcano Complete`**
+> **`Tools > Setup Mata Goblin Complete`**
 
-Isso regenera `Assets/Scenes/Gameplay.unity` e os `ScriptableObjects` com todas as referências atualizadas (novo título **Arcano: Caçada aos Goblins**, obstáculos 2.5D recortados, 5 músicas padrão de fase, balanceamento suave das Fases 1–5 e Grimório revisado).
+Isso regenera `Assets/Scenes/Gameplay.unity` e os `ScriptableObjects` com todas as referências atualizadas (título **Mata Goblin**, obstáculos 2.5D recortados, 5 músicas padrão de fase, balanceamento suave das Fases 1–5 e Grimório revisado).
 
 ### Próximos Passos Sugeridos (Roadmap)
 - [x] Implementar camada de **cenário 2.5D com obstáculos/coberturas em primeiro plano** (pedras, pilares, caixas com `sortingOrder` intermediário onde goblins passam atrás e na frente + parallax reativo ao mouse).

@@ -65,9 +65,9 @@ MonoBehaviour:
   maxHealth: 2
   pointsOnDefeat: 2
   moveSpeed: 5
-  escapeTimeSeconds: 5
+  escapeTimeSeconds: 6.8
   spawnWeight: 25
-  escapePenalty: 2
+  escapePenalty: 1
   escapeSound: {fileID: 8300000, guid: 7a42177b24244084db1878919656fb4d, type: 3}
   customDamageSound: {fileID: 8300000, guid: 40e3755dbd91c03468a32174af2b4d90, type: 3}
   customDeathSound: {fileID: 0}

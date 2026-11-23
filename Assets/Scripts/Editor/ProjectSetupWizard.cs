@@ -14,10 +14,10 @@ namespace WizardGame.EditorTools
 {
     public static class ProjectSetupWizard
     {
-        [MenuItem("Tools/Setup Arcano Complete")]
+        [MenuItem("Tools/Setup Mata Goblin Complete")]
         public static void SetupProject()
         {
-            Debug.Log("Iniciando reconstrucao completa de Arcano: Cacada aos Goblins...");
+            Debug.Log("Iniciando reconstrucao completa de Mata Goblin...");
 
             ConfigureSprites();
             ConfigureAudio();
@@ -28,13 +28,13 @@ namespace WizardGame.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("Arcano: Cacada aos Goblins configurado com sucesso!");
+            Debug.Log("Mata Goblin configurado com sucesso!");
         }
 
         [MenuItem("Tools/Build Game Standalone")]
         public static void BuildGame()
         {
-            Debug.Log("Iniciando reconstrucao e build de Arcano: Cacada aos Goblins...");
+            Debug.Log("Iniciando reconstrucao e build de Mata Goblin...");
             SetupProject();
 
             EditorBuildSettings.scenes = new[] {
@@ -47,7 +47,7 @@ namespace WizardGame.EditorTools
                 System.IO.Directory.CreateDirectory(buildFolder);
             }
 
-            string buildPath = buildFolder + "/ArcanoCacadaAosGoblins.exe";
+            string buildPath = buildFolder + "/MataGoblin.exe";
 
             BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
             buildPlayerOptions.scenes = new[] { "Assets/Scenes/Gameplay.unity" };
@@ -822,13 +822,13 @@ namespace WizardGame.EditorTools
             lvImg.color = Color.white;
             lvImg.raycastTarget = false;
 
-            // Coluna lateral esquerda com o novo título oficial: Arcano: Caçada aos Goblins
+            // Coluna lateral esquerda com o título oficial: Mata Goblin
             float menuCenterX = 335f;
-            var titleMain = CreateUIText(startMenu.transform, "Title", "ARCANO", 82, new Color(1f, 0.68f, 0.14f), new Vector2(menuCenterX, 244f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
+            var titleMain = CreateUIText(startMenu.transform, "Title", "MATA", 84, new Color(1f, 0.68f, 0.14f), new Vector2(menuCenterX, 254f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
             titleMain.fontStyle = FontStyle.Bold;
             titleMain.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
-            var titleSub = CreateUIText(startMenu.transform, "TitleSub", "CAÇADA AOS GOBLINS", 25, new Color(0.98f, 0.92f, 0.78f), new Vector2(menuCenterX, 174f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
+            var titleSub = CreateUIText(startMenu.transform, "TitleSub", "GOBLIN", 58, new Color(0.98f, 0.92f, 0.78f), new Vector2(menuCenterX, 182f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
             titleSub.fontStyle = FontStyle.Bold;
             titleSub.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 

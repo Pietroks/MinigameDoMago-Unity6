@@ -80,7 +80,7 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 0c2c976080f61b14bb00a864e3f1d523, type: 3}
   - {fileID: 21300000, guid: ea6965de99143964a923ee58c7ed7e18, type: 3}
   specialActionSprite: {fileID: 0}
-  maxHealth: 42
+  maxHealth: 32
   pointsOnDefeat: 120
   moveSpeed: 2.3
   escapeTimeSeconds: 38

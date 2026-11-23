@@ -85,8 +85,8 @@ namespace WizardGame.Core
         private bool isStageEndingOrTransitioning;
         private static bool autoStartNextLoad = false;
 
-        private const string PREF_BEST_SCORE = "Arcano_BestScore";
-        private const string PREF_BEST_RANK = "Arcano_BestRank";
+        private const string PREF_BEST_SCORE = "MataGoblin_BestScore";
+        private const string PREF_BEST_RANK = "MataGoblin_BestRank";
 
         // Timers e Estados dos Feitiços
         private float arcaneTimer;
