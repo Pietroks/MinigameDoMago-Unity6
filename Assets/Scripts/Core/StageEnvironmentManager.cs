@@ -78,6 +78,8 @@ namespace WizardGame.Core
         private class StageCoverPropInstance
         {
             public GameObject root;
+            public SpriteRenderer renderer;
+            public Collider2D collider;
             public Vector3 basePosition;
             public float parallaxFactor;
         }
@@ -311,7 +313,8 @@ namespace WizardGame.Core
             float spH = Mathf.Max(0.1f, sprite.bounds.size.y);
             float spW = Mathf.Max(0.1f, sprite.bounds.size.x);
             float scale = targetHeight / spH;
-            root.transform.localScale = new Vector3(scale, scale, 1f);
+            // Espelha via escala X negativa para que o PolygonCollider2D acompanhe exatamente a silhueta visual
+            root.transform.localScale = new Vector3(flipX ? -scale : scale, scale, 1f);
 
             // Base real do obstáculo para cálculo exato do sortingOrder (mesma fórmula Y do WizardController!)
             float baseY = worldCenter.y - (targetHeight * 0.42f);
@@ -319,12 +322,29 @@ namespace WizardGame.Core
 
             var sr = root.AddComponent<SpriteRenderer>();
             sr.sprite = sprite;
-            sr.flipX = flipX;
+            sr.flipX = false;
             sr.sortingOrder = propOrder;
 
             // Mescla levemente com o tint da fase + perspectiva atmosférica
             Color baseTint = (stageIndex >= 4) ? new Color(1f, 0.78f, 0.72f, 1f) : Color.Lerp(Color.white, currentTint, 0.55f);
             sr.color = Color.Lerp(baseTint, CurrentDepthFogColor, depthFogBlend);
+
+            // Colisor 2D automático da silhueta do obstáculo para impedir dano em goblins protegidos atrás dele
+            Collider2D coverCol;
+            var polyCol = root.AddComponent<PolygonCollider2D>();
+            polyCol.isTrigger = true;
+            if (polyCol.pathCount > 0)
+            {
+                coverCol = polyCol;
+            }
+            else
+            {
+                Destroy(polyCol);
+                var boxCol = root.AddComponent<BoxCollider2D>();
+                boxCol.isTrigger = true;
+                boxCol.size = new Vector2(spW * 0.84f, spH * 0.84f);
+                coverCol = boxCol;
+            }
 
             // Sombra de contato suave sob a base do obstáculo (escala exata baseada no bounds do sprite oval)
             GameObject shadowGo = new GameObject("PropGroundShadow");
@@ -345,9 +365,45 @@ namespace WizardGame.Core
             activeCoverProps.Add(new StageCoverPropInstance
             {
                 root = root,
+                renderer = sr,
+                collider = coverCol,
                 basePosition = worldCenter,
                 parallaxFactor = parallaxFactor
             });
+        }
+
+        /// <summary>
+        /// Retorna true se o ponto no mundo estiver coberto por algum muro/objeto 2.5D posicionado na frente do alvo.
+        /// </summary>
+        public bool IsPointBlockedByCover(Vector2 worldPos, int targetSortingOrder)
+        {
+            for (int i = 0; i < activeCoverProps.Count; i++)
+            {
+                var prop = activeCoverProps[i];
+                if (prop == null || prop.root == null || prop.renderer == null || prop.collider == null) continue;
+                if (prop.renderer.sortingOrder > targetSortingOrder && prop.collider.OverlapPoint(worldPos))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Retorna true se a posição central do inimigo estiver abrigada atrás de algum muro/objeto 2.5D.
+        /// </summary>
+        public bool IsTargetProtectedByCover(Vector2 targetCenterWorldPos, int targetSortingOrder)
+        {
+            for (int i = 0; i < activeCoverProps.Count; i++)
+            {
+                var prop = activeCoverProps[i];
+                if (prop == null || prop.root == null || prop.renderer == null || prop.collider == null) continue;
+                if (prop.renderer.sortingOrder > targetSortingOrder && prop.collider.OverlapPoint(targetCenterWorldPos))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

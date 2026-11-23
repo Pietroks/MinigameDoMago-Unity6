@@ -197,8 +197,8 @@ namespace WizardGame.Entities
                 currentActiveItem = null;
             }
 
-            // Efeitos sonoros e visuais de coleta
-            SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
+            // Efeitos sonoros e visuais de coleta (som mágico dedicado, sem música de vitória)
+            SoundManager.Instance?.PlayPowerUpPickupSound();
             SpellEffectsManager.Instance?.TriggerCameraShake(0.18f, 0.15f);
             if (item != null)
             {
@@ -267,6 +267,11 @@ namespace WizardGame.Entities
             {
                 if (goblin != null && goblin.gameObject.activeSelf && !goblin.IsDeadOrEscaping && goblin.GetData() != null)
                 {
+                    if (goblin.IsBehindCover())
+                    {
+                        SpellEffectsManager.Instance?.SpawnFloatingText(goblin.transform.position + Vector3.up * 0.35f, "COBERTO!", new Color(0.78f, 0.82f, 0.88f), 0.9f, 0.65f);
+                        continue;
+                    }
                     Vector3 gPos = goblin.transform.position;
                     stormTargets.Add(gPos);
                     var wType = goblin.GetData().wizardType;

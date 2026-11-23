@@ -493,7 +493,16 @@ namespace WizardGame.Core
             }
             else
             {
-                SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false);
+                if (hitInfo.blockedByCover)
+                {
+                    SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.75f, 0.78f, 0.84f));
+                    SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.hitPoint + Vector3.up * 0.25f, "COBERTO!", new Color(0.78f, 0.82f, 0.88f), 0.95f, 0.65f);
+                    SoundManager.Instance?.PlayCoverBlockSound();
+                }
+                else
+                {
+                    SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false);
+                }
                 if (isFirstShotAttempt)
                 {
                     isFirstShotAttempt = false;
@@ -610,7 +619,16 @@ namespace WizardGame.Core
                     }
                     else
                     {
-                        SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.25f, 0.92f, 1f, 0.5f));
+                        if (hitInfo.blockedByCover)
+                        {
+                            SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.75f, 0.78f, 0.84f));
+                            SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.hitPoint + Vector3.up * 0.25f, "COBERTO!", new Color(0.78f, 0.82f, 0.88f), 0.95f, 0.65f);
+                            SoundManager.Instance?.PlayCoverBlockSound();
+                        }
+                        else
+                        {
+                            SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.25f, 0.92f, 1f, 0.5f));
+                        }
                     }
                     break;
 
@@ -652,7 +670,16 @@ namespace WizardGame.Core
                     }
                     else
                     {
-                        SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.55f, 0.95f, 1f, 0.5f));
+                        if (hitInfo.blockedByCover)
+                        {
+                            SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.75f, 0.78f, 0.84f));
+                            SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.hitPoint + Vector3.up * 0.25f, "COBERTO!", new Color(0.78f, 0.82f, 0.88f), 0.95f, 0.65f);
+                            SoundManager.Instance?.PlayCoverBlockSound();
+                        }
+                        else
+                        {
+                            SpellEffectsManager.Instance?.SpawnImpactEffect(hitInfo.hitPoint, false, false, new Color(0.55f, 0.95f, 1f, 0.5f));
+                        }
                     }
                     break;
 
@@ -704,6 +731,11 @@ namespace WizardGame.Core
                         if (goblin == null || goblin == hitInfo.target || goblin.IsDeadOrEscaping) continue;
                         if (Vector2.Distance(strikePos, goblin.transform.position) <= 3.8f)
                         {
+                            if (goblin.IsBehindCover())
+                            {
+                                SpellEffectsManager.Instance?.SpawnFloatingText(goblin.transform.position + Vector3.up * 0.35f, "COBERTO!", new Color(0.78f, 0.82f, 0.88f), 0.9f, 0.65f);
+                                continue;
+                            }
                             if (goblin.CurrentHealth <= chainDmg) lightningLethalHits++;
                             SpellEffectsManager.Instance?.SpawnFloatingText(goblin.transform.position, $"-{chainDmg}", new Color(0.5f, 0.92f, 1f), 1.0f);
                             goblin.TakeDamage(chainDmg, isNormalShot: false, isSpecialSpell: true);
@@ -757,6 +789,11 @@ namespace WizardGame.Core
                         if (goblin == null || goblin.IsDeadOrEscaping) continue;
                         if (Vector2.Distance(center, goblin.transform.position) <= 2.8f)
                         {
+                            if (goblin.IsBehindCover())
+                            {
+                                SpellEffectsManager.Instance?.SpawnFloatingText(goblin.transform.position + Vector3.up * 0.35f, "COBERTO!", new Color(0.78f, 0.82f, 0.88f), 0.9f, 0.65f);
+                                continue;
+                            }
                             cachedAreaTargets.Add(goblin);
                         }
                     }
@@ -872,7 +909,7 @@ namespace WizardGame.Core
                     currentPlayerHealth++;
                     uiManager?.UpdatePlayerHealth(currentPlayerHealth, maxPlayerHealth);
                     uiManager?.ShowSkillBonusPopup($"+1 VIDA! (COMBO {currentStreak})", new Color(0.32f, 1f, 0.52f));
-                    SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound, 0.72f);
+                    SoundManager.Instance?.PlayPowerUpPickupSound();
                 }
                 else
                 {
@@ -1253,9 +1290,6 @@ namespace WizardGame.Core
                 stageMusic = stageDefaultMusicClips[currentWaveIndex];
             }
             SoundManager.Instance?.PlayStageMusic(currentWaveIndex, stageMusic);
-
-            // Som de início / alerta de onda
-            SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
         }
 
         private void HandleWaveProgressChanged(int remaining, int total)

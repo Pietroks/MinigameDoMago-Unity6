@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using WizardGame.Core;
 using WizardGame.Data;
 
 namespace WizardGame.Entities
@@ -76,6 +77,8 @@ namespace WizardGame.Entities
         private bool isFlashingGlow;
 
         private Camera mainCam;
+        private static readonly Collider2D[] hoverBuffer = new Collider2D[12];
+        private static readonly ContactFilter2D hoverNoFilter = ContactFilter2D.noFilter;
 
         public event Action<int, int> OnAmmoChanged;
         public event Action<bool> OnReloadStateChanged;
@@ -161,10 +164,27 @@ namespace WizardGame.Entities
                                 Vector3 wPos = mainCam.ScreenToWorldPoint(mPos);
                                 wPos.z = 0f;
 
-                                Collider2D hoverCol = Physics2D.OverlapPoint(wPos);
-                                if (hoverCol != null && (hoverCol.TryGetComponent<WizardController>(out _) || hoverCol.TryGetComponent<BossProjectileInstance>(out _) || hoverCol.TryGetComponent<PowerUpItem>(out _)))
+                                int hoverCount = Physics2D.OverlapPoint(wPos, hoverNoFilter, hoverBuffer);
+                                var env = StageEnvironmentManager.Instance;
+                                for (int i = 0; i < hoverCount; i++)
                                 {
-                                    isHovering = true;
+                                    Collider2D hoverCol = hoverBuffer[i];
+                                    if (hoverCol == null) continue;
+                                    if (hoverCol.TryGetComponent<BossProjectileInstance>(out _) || hoverCol.TryGetComponent<PowerUpItem>(out _))
+                                    {
+                                        isHovering = true;
+                                        break;
+                                    }
+                                    if (hoverCol.TryGetComponent<WizardController>(out var hoverWiz) && !hoverWiz.IsDeadOrEscaping)
+                                    {
+                                        bool blocked = env != null &&
+                                            (env.IsPointBlockedByCover(wPos, hoverWiz.CurrentSortingOrder) || hoverWiz.IsBehindCover());
+                                        if (!blocked)
+                                        {
+                                            isHovering = true;
+                                            break;
+                                        }
+                                    }
                                 }
                             }
 

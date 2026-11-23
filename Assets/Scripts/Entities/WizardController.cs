@@ -178,6 +178,13 @@ namespace WizardGame.Entities
         public bool IsFrozen => isFrozen;
         public bool IsBossEnraged => isBossEnraged;
         public int CurrentHealth => currentHealth;
+        public int CurrentSortingOrder => spriteRenderer != null ? spriteRenderer.sortingOrder : 0;
+
+        public bool IsBehindCover()
+        {
+            return StageEnvironmentManager.Instance != null &&
+                   StageEnvironmentManager.Instance.IsTargetProtectedByCover(transform.position, CurrentSortingOrder);
+        }
         public int MaxHealth => currentData != null ? currentData.maxHealth : 1;
         public bool IsTeleporting { get; private set; }
         public bool DiedWhileTeleporting { get; private set; }
@@ -765,6 +772,13 @@ namespace WizardGame.Entities
         public void TakeDamage(int damage, bool isNormalShot = false, bool isSpecialSpell = false)
         {
             if (isDeadOrEscaping) return;
+
+            if (IsBehindCover())
+            {
+                SpellEffectsManager.Instance?.SpawnFloatingText(transform.position + Vector3.up * 0.35f, "COBERTO!", new Color(0.78f, 0.82f, 0.88f), 0.92f, 0.65f);
+                SoundManager.Instance?.PlayCoverBlockSound();
+                return;
+            }
 
             if (isInvulnerable)
             {

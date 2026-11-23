@@ -16,6 +16,7 @@ namespace WizardGame.Input
         public BossProjectileInstance bossProjectileTarget;
         public bool isHit;
         public bool isHeadshot;
+        public bool blockedByCover;
         public Vector3 hitPoint;
     }
 
@@ -211,7 +212,7 @@ namespace WizardGame.Input
             }
             worldPos.z = 0f;
 
-            WizardController hitWizard = FindWizardAtPosition(worldPos);
+            WizardController hitWizard = FindWizardAtPosition(worldPos, out bool blockedByCover);
             PowerUpItem hitPowerUp = (hitWizard == null) ? FindPowerUpAtPosition(worldPos) : null;
             BossProjectileInstance hitBossProj = (hitWizard == null && hitPowerUp == null) ? FindBossProjectileAtPosition(worldPos) : null;
             bool isHeadshot = false;
@@ -233,6 +234,7 @@ namespace WizardGame.Input
                 bossProjectileTarget = hitBossProj,
                 isHit = (hitWizard != null || hitPowerUp != null || hitBossProj != null),
                 isHeadshot = isHeadshot,
+                blockedByCover = (hitWizard == null && hitPowerUp == null && hitBossProj == null && blockedByCover),
                 hitPoint = worldPos
             };
         }
@@ -274,9 +276,12 @@ namespace WizardGame.Input
             return null;
         }
 
-        private WizardController FindWizardAtPosition(Vector3 worldPos)
+        private WizardController FindWizardAtPosition(Vector3 worldPos, out bool blockedByCover)
         {
-            // 1. Prioridade absoluta: Clique direto no colisor do goblin (Zero-GC)
+            blockedByCover = false;
+            var env = StageEnvironmentManager.Instance;
+
+            // 1. Prioridade absoluta: Clique direto no colisor do goblin (Zero-GC), respeitando cobertura 2.5D
             int directCount = Physics2D.OverlapPoint(worldPos, noFilter, hitBuffer);
             WizardController bestDirect = null;
             int highestDirectOrder = int.MinValue;
@@ -286,8 +291,13 @@ namespace WizardGame.Input
                 var col = hitBuffer[i];
                 if (col != null && col.TryGetComponent<WizardController>(out var wizard))
                 {
-                    var sr = wizard.GetComponent<SpriteRenderer>();
-                    int order = sr != null ? sr.sortingOrder : 0;
+                    if (wizard.IsDeadOrEscaping) continue;
+                    int order = wizard.CurrentSortingOrder;
+                    if (env != null && (env.IsPointBlockedByCover(worldPos, order) || env.IsTargetProtectedByCover(wizard.transform.position, order)))
+                    {
+                        blockedByCover = true;
+                        continue;
+                    }
                     if (order > highestDirectOrder)
                     {
                         highestDirectOrder = order;
@@ -298,7 +308,7 @@ namespace WizardGame.Input
 
             if (bestDirect != null) return bestDirect;
 
-            // 2. Fallback: Raio de tolerância (clickToleranceRadius), priorizando quem estiver na frente
+            // 2. Fallback: Raio de tolerância (clickToleranceRadius), priorizando quem estiver na frente e fora de cobertura
             int circleCount = Physics2D.OverlapCircle(worldPos, clickToleranceRadius, noFilter, hitBuffer);
             WizardController bestTarget = null;
             float closestDist = float.MaxValue;
@@ -309,8 +319,13 @@ namespace WizardGame.Input
                 var col = hitBuffer[i];
                 if (col != null && col.TryGetComponent<WizardController>(out var wizard))
                 {
-                    var sr = wizard.GetComponent<SpriteRenderer>();
-                    int order = sr != null ? sr.sortingOrder : 0;
+                    if (wizard.IsDeadOrEscaping) continue;
+                    int order = wizard.CurrentSortingOrder;
+                    if (env != null && (env.IsPointBlockedByCover(worldPos, order) || env.IsTargetProtectedByCover(wizard.transform.position, order)))
+                    {
+                        blockedByCover = true;
+                        continue;
+                    }
                     float dist = Vector2.Distance(worldPos, wizard.transform.position);
 
                     if (order > highestSortingOrder || (order == highestSortingOrder && dist < closestDist))

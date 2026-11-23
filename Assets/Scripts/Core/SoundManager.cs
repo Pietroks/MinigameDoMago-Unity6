@@ -51,6 +51,7 @@ namespace WizardGame.Core
         [Header("Clipes de Combo e Precisão")]
         public AudioClip headshotSound;
         public AudioClip comboBreakSound;
+        public AudioClip powerUpPickupSound;
 
         [Header("Clipes de Fim de Jogo")]
         public AudioClip victorySound;
@@ -69,6 +70,8 @@ namespace WizardGame.Core
         private Coroutine fadeCoroutine;
         private readonly Dictionary<AudioClip, float> clipLastPlayTime = new Dictionary<AudioClip, float>();
         private float lastDeathSoundTime = -10f;
+        private AudioClip proceduralPowerUpChime;
+        private AudioClip proceduralCoverBlockClip;
 
         public float BGMVolume => bgmVolume;
         public float SFXVolume => sfxVolume;
@@ -506,6 +509,91 @@ namespace WizardGame.Core
         {
             if (areaCastSound != null) PlaySFX(areaCastSound, 1.0f);
             else if (defeatSound != null) PlaySFX(defeatSound, 0.9f);
+        }
+
+        /// <summary>
+        /// Som mágico cristalino dedicado à coleta de Power-ups (sem usar a música de vitória).
+        /// </summary>
+        public void PlayPowerUpPickupSound()
+        {
+            if (powerUpPickupSound != null)
+            {
+                PlaySFXWithCooldown(powerUpPickupSound, 0.85f, 0.08f);
+                return;
+            }
+
+            if (proceduralPowerUpChime == null)
+            {
+                proceduralPowerUpChime = CreateProceduralPowerUpChime();
+            }
+            PlaySFXWithCooldown(proceduralPowerUpChime, 0.90f, 0.08f);
+        }
+
+        /// <summary>
+        /// Som curto e seco de feitiço bloqueado por muro/obstáculo do cenário 2.5D.
+        /// </summary>
+        public void PlayCoverBlockSound()
+        {
+            if (proceduralCoverBlockClip == null)
+            {
+                proceduralCoverBlockClip = CreateProceduralCoverBlockClip();
+            }
+            PlaySFXWithCooldown(proceduralCoverBlockClip, 0.72f, 0.07f);
+        }
+
+        private static AudioClip CreateProceduralPowerUpChime()
+        {
+            const int sampleRate = 44100;
+            const float duration = 0.34f;
+            int totalSamples = Mathf.CeilToInt(sampleRate * duration);
+            float[] data = new float[totalSamples];
+
+            // Arpejo mágico cristalino curto (C5 -> E5 -> G5 -> C6)
+            float[] notes = { 523.25f, 659.25f, 783.99f, 1046.50f };
+            float noteStep = 0.062f;
+
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = i / (float)sampleRate;
+                float sample = 0f;
+                for (int n = 0; n < notes.Length; n++)
+                {
+                    float localT = t - (n * noteStep);
+                    if (localT < 0f) continue;
+                    float env = Mathf.Min(1f, localT / 0.008f) * Mathf.Exp(-localT * 11.5f);
+                    float freq = notes[n];
+                    float wave = Mathf.Sin(2f * Mathf.PI * freq * localT) * 0.65f
+                               + Mathf.Sin(2f * Mathf.PI * (freq * 2f) * localT) * 0.25f;
+                    sample += wave * env * 0.32f;
+                }
+                data[i] = Mathf.Clamp(sample, -0.95f, 0.95f);
+            }
+
+            AudioClip clip = AudioClip.Create("ProceduralPowerUpChime", totalSamples, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
+        }
+
+        private static AudioClip CreateProceduralCoverBlockClip()
+        {
+            const int sampleRate = 44100;
+            const float duration = 0.095f;
+            int totalSamples = Mathf.CeilToInt(sampleRate * duration);
+            float[] data = new float[totalSamples];
+
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = i / (float)sampleRate;
+                float env = Mathf.Exp(-t * 42f);
+                // Batida seca em pedra/madeira
+                float thud = Mathf.Sin(2f * Mathf.PI * (165f - t * 480f) * t) * 0.72f
+                           + Mathf.Sin(2f * Mathf.PI * 520f * t) * 0.22f * Mathf.Exp(-t * 70f);
+                data[i] = Mathf.Clamp(thud * env * 0.75f, -0.95f, 0.95f);
+            }
+
+            AudioClip clip = AudioClip.Create("ProceduralCoverBlock", totalSamples, 1, sampleRate, false);
+            clip.SetData(data, 0);
+            return clip;
         }
 
         #endregion
