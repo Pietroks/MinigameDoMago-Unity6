@@ -93,8 +93,8 @@ MonoBehaviour:
   escapeSound: {fileID: 8300000, guid: 7a42177b24244084db1878919656fb4d, type: 3}
   customDamageSound: {fileID: 0}
   customDeathSound: {fileID: 8300000, guid: a8ea7ba7bed7a6941b20d78cde1a9fb2, type: 3}
-  personalityArchetype: 0
-  movementPattern: 0
+  personalityArchetype: 8
+  movementPattern: 5
   hitReaction: 0
   deathReaction: 0
   fleeSpeedMultiplier: 2.2

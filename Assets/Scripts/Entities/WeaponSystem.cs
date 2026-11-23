@@ -31,7 +31,7 @@ namespace WizardGame.Entities
 
         [Header("Parâmetros de Munição (Mana)")]
         [SerializeField] private int maxAmmo = 10;
-        [SerializeField] private float reloadDuration = 1.0f;
+        [SerializeField] private float reloadDuration = 0.78f;
 
         [Header("Parâmetros de Mira & Rastreamento")]
         [SerializeField] private float aimTrackingSpeed = 24f;
@@ -162,7 +162,7 @@ namespace WizardGame.Entities
                                 wPos.z = 0f;
 
                                 Collider2D hoverCol = Physics2D.OverlapPoint(wPos);
-                                if (hoverCol != null && (hoverCol.TryGetComponent<WizardController>(out _) || hoverCol.TryGetComponent<BossProjectileInstance>(out _)))
+                                if (hoverCol != null && (hoverCol.TryGetComponent<WizardController>(out _) || hoverCol.TryGetComponent<BossProjectileInstance>(out _) || hoverCol.TryGetComponent<PowerUpItem>(out _)))
                                 {
                                     isHovering = true;
                                 }

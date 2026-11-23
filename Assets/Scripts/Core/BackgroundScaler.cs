@@ -12,6 +12,8 @@ namespace WizardGame.Core
         [SerializeField] private Camera targetCamera;
         private SpriteRenderer spriteRenderer;
         private float extraZoom = 1.0f;
+        private Vector2 parallaxOffset = Vector2.zero;
+        private Vector3 basePosition = Vector3.zero;
         private int lastScreenWidth;
         private int lastScreenHeight;
         private float lastOrthoSize;
@@ -44,6 +46,12 @@ namespace WizardGame.Core
             AdjustScale();
         }
 
+        public void SetParallaxOffset(Vector2 offset)
+        {
+            parallaxOffset = offset;
+            transform.position = new Vector3(basePosition.x + parallaxOffset.x, basePosition.y + parallaxOffset.y, 0f);
+        }
+
         public void AdjustScale()
         {
             if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
@@ -64,10 +72,11 @@ namespace WizardGame.Core
             float scaleX = worldScreenWidth / spriteSize.x;
             float scaleY = worldScreenHeight / spriteSize.y;
 
-            // Aspect Fill: garante cobertura total da tela sem bordas pretas
+            // Aspect Fill com margem de zoom segura para o parallax 2.5D nunca revelar bordas pretas
             float scale = Mathf.Max(scaleX, scaleY) * Mathf.Max(1.0f, extraZoom);
             transform.localScale = new Vector3(scale, scale, 1f);
-            transform.position = new Vector3(targetCamera.transform.position.x, targetCamera.transform.position.y, 0f);
+            basePosition = new Vector3(targetCamera.transform.position.x, targetCamera.transform.position.y, 0f);
+            transform.position = new Vector3(basePosition.x + parallaxOffset.x, basePosition.y + parallaxOffset.y, 0f);
         }
 
 #if UNITY_EDITOR

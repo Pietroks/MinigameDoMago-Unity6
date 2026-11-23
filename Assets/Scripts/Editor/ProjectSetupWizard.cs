@@ -14,10 +14,10 @@ namespace WizardGame.EditorTools
 {
     public static class ProjectSetupWizard
     {
-        [MenuItem("Tools/Setup Goblin Minigame Complete")]
+        [MenuItem("Tools/Setup Arcano Complete")]
         public static void SetupProject()
         {
-            Debug.Log("Iniciando reconstrucao completa com Goblins e Spritesheets...");
+            Debug.Log("Iniciando reconstrucao completa de Arcano: Cacada aos Goblins...");
 
             ConfigureSprites();
             ConfigureAudio();
@@ -28,13 +28,13 @@ namespace WizardGame.EditorTools
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("Minigame dos Goblins configurado com sucesso!");
+            Debug.Log("Arcano: Cacada aos Goblins configurado com sucesso!");
         }
 
         [MenuItem("Tools/Build Game Standalone")]
         public static void BuildGame()
         {
-            Debug.Log("Iniciando reconstrucao e build de MinigameDoMago...");
+            Debug.Log("Iniciando reconstrucao e build de Arcano: Cacada aos Goblins...");
             SetupProject();
 
             EditorBuildSettings.scenes = new[] {
@@ -47,7 +47,7 @@ namespace WizardGame.EditorTools
                 System.IO.Directory.CreateDirectory(buildFolder);
             }
 
-            string buildPath = buildFolder + "/MinigameDoMago.exe";
+            string buildPath = buildFolder + "/ArcanoCacadaAosGoblins.exe";
 
             BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions();
             buildPlayerOptions.scenes = new[] { "Assets/Scenes/Gameplay.unity" };
@@ -94,7 +94,7 @@ namespace WizardGame.EditorTools
                         importer.alphaIsTransparency = true;
                         dirty = true;
                     }
-                    bool isSmooth = path.Contains("Background") || path.Contains("cenario") || path.Contains("Weapon") || path.Contains("crosshair") || path.Contains("UI");
+                    bool isSmooth = path.Contains("Background") || path.Contains("cenario") || path.Contains("Weapon") || path.Contains("crosshair") || path.Contains("UI") || path.Contains("Environment");
                     FilterMode targetFilter = isSmooth ? FilterMode.Bilinear : FilterMode.Point;
                     if (importer.filterMode != targetFilter)
                     {
@@ -171,7 +171,7 @@ namespace WizardGame.EditorTools
             comum.maxHealth = 1;
             comum.pointsOnDefeat = 1;
             comum.moveSpeed = 2.0f;
-            comum.escapeTimeSeconds = 5.5f;
+            comum.escapeTimeSeconds = 6.0f;
             comum.spawnWeight = 50;
             comum.escapePenalty = 1;
             comum.baseTint = Color.white;
@@ -197,9 +197,9 @@ namespace WizardGame.EditorTools
             fugitivo.maxHealth = 2;
             fugitivo.pointsOnDefeat = 2;
             fugitivo.moveSpeed = 5.0f;
-            fugitivo.escapeTimeSeconds = 5.0f;
+            fugitivo.escapeTimeSeconds = 6.8f;
             fugitivo.spawnWeight = 25;
-            fugitivo.escapePenalty = 2;
+            fugitivo.escapePenalty = 1;
             fugitivo.baseTint = Color.white;
             fugitivo.portraitSprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/portrait.png");
             fugitivo.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Goblins/Fugitivo/idle_0.png");
@@ -222,8 +222,8 @@ namespace WizardGame.EditorTools
             dourado.displayName = "Goblin Dourado";
             dourado.maxHealth = 3;
             dourado.pointsOnDefeat = 5;
-            dourado.moveSpeed = 4.0f;
-            dourado.escapeTimeSeconds = 6.0f;
+            dourado.moveSpeed = 3.0f;
+            dourado.escapeTimeSeconds = 8.5f;
             dourado.spawnWeight = 10;
             dourado.escapePenalty = 1;
             dourado.baseTint = Color.white;
@@ -246,10 +246,10 @@ namespace WizardGame.EditorTools
             var fantasma = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Fantasma.asset");
             fantasma.wizardType = WizardType.Fantasma;
             fantasma.displayName = "Goblin Fantasma";
-            fantasma.maxHealth = 4;
+            fantasma.maxHealth = 3;
             fantasma.pointsOnDefeat = 3;
-            fantasma.moveSpeed = 3.0f;
-            fantasma.escapeTimeSeconds = 7.5f;
+            fantasma.moveSpeed = 2.6f;
+            fantasma.escapeTimeSeconds = 9.0f;
             fantasma.spawnWeight = 15;
             fantasma.escapePenalty = 1;
             fantasma.baseTint = Color.white;
@@ -268,11 +268,11 @@ namespace WizardGame.EditorTools
             EditorUtility.SetDirty(fantasma);
             list.Add(fantasma);
 
-            // 5. Goblin Chefe (Fase 1): Grande Goblin (HP 20, Pontos 50)
+            // 5. Goblin Chefe (Fase 1): Grande Goblin (HP 18, Pontos 50)
             var chefe = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe.asset");
             chefe.wizardType = WizardType.Chefe;
             chefe.displayName = "Grande Goblin";
-            chefe.maxHealth = 20;
+            chefe.maxHealth = 18;
             chefe.pointsOnDefeat = 50;
             chefe.moveSpeed = 2.0f;
             chefe.escapeTimeSeconds = 30.0f;
@@ -294,11 +294,11 @@ namespace WizardGame.EditorTools
             EditorUtility.SetDirty(chefe);
             list.Add(chefe);
 
-            // 6. Goblin Chefe Fase 2: Xamã do Caos (HP 30, Pontos 80)
+            // 6. Goblin Chefe Fase 2: Xamã do Caos (HP 24, Pontos 80)
             var chefe2 = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe2.asset");
             chefe2.wizardType = WizardType.Chefe2;
             chefe2.displayName = "Xamã do Caos";
-            chefe2.maxHealth = 30;
+            chefe2.maxHealth = 24;
             chefe2.pointsOnDefeat = 80;
             chefe2.moveSpeed = 2.2f;
             chefe2.escapeTimeSeconds = 34.0f;
@@ -320,11 +320,11 @@ namespace WizardGame.EditorTools
             EditorUtility.SetDirty(chefe2);
             list.Add(chefe2);
 
-            // 7. Goblin Chefe Fase 3: Feiticeiro Espectral (HP 42, Pontos 120)
+            // 7. Goblin Chefe Fase 3: Feiticeiro Espectral (HP 32, Pontos 120)
             var chefe3 = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe3.asset");
             chefe3.wizardType = WizardType.Chefe3;
             chefe3.displayName = "Feiticeiro Espectral";
-            chefe3.maxHealth = 42;
+            chefe3.maxHealth = 32;
             chefe3.pointsOnDefeat = 120;
             chefe3.moveSpeed = 2.3f;
             chefe3.escapeTimeSeconds = 38.0f;
@@ -347,11 +347,11 @@ namespace WizardGame.EditorTools
             EditorUtility.SetDirty(chefe3);
             list.Add(chefe3);
 
-            // 8. Goblin Chefe Fase 4: Lorde Carmesim (HP 56, Pontos 180)
+            // 8. Goblin Chefe Fase 4: Lorde Carmesim (HP 42, Pontos 180)
             var chefe4 = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_Chefe4.asset");
             chefe4.wizardType = WizardType.Chefe4;
             chefe4.displayName = "Lorde Carmesim";
-            chefe4.maxHealth = 56;
+            chefe4.maxHealth = 42;
             chefe4.pointsOnDefeat = 180;
             chefe4.moveSpeed = 2.4f;
             chefe4.escapeTimeSeconds = 42.0f;
@@ -374,11 +374,11 @@ namespace WizardGame.EditorTools
             EditorUtility.SetDirty(chefe4);
             list.Add(chefe4);
 
-            // 9. Goblin Chefe Final (Fase 5): GOBLIN REI SUPREMO (HP 85, Pontos 500)
+            // 9. Goblin Chefe Final (Fase 5): GOBLIN REI SUPREMO (HP 60, Pontos 500)
             var chefeFinal = GetOrCreateSO<WizardDataSO>(folder + "/Goblin_ChefeFinal.asset");
             chefeFinal.wizardType = WizardType.ChefeFinal;
             chefeFinal.displayName = "Goblin Rei Supremo";
-            chefeFinal.maxHealth = 85;
+            chefeFinal.maxHealth = 60;
             chefeFinal.pointsOnDefeat = 500;
             chefeFinal.moveSpeed = 2.5f;
             chefeFinal.escapeTimeSeconds = 50.0f;
@@ -481,6 +481,14 @@ namespace WizardGame.EditorTools
 
             var stageBgSprites = new List<Sprite> { bgStage1, bgStage2, bgStage3, bgStage4, bgStage5 };
 
+            // Obstáculos 2.5D recortados por bioma (goblins passam por trás e pela frente pelo eixo Y)
+            var propStage1 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Environment/Prop_Stage1_Crates.png");
+            var propStage2 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Environment/Prop_Stage2_Ruins.png");
+            var propStage3 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Environment/Prop_Stage3_Volcanic.png");
+            var propStage4 = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Sprites/Environment/Prop_Stage4_ThronePillar.png");
+            var propStage5 = propStage4;
+            var stagePropSprites = new List<Sprite> { propStage1, propStage2, propStage3, propStage4, propStage5 };
+
             GameObject bgGo = new GameObject("Background_Stage");
             var bgSr = bgGo.AddComponent<SpriteRenderer>();
             bgSr.sprite = bgStage1;
@@ -494,6 +502,7 @@ namespace WizardGame.EditorTools
             SetPrivateField(stageEnv, "primaryScaler", bgScaler);
             SetPrivateField(stageEnv, "targetCamera", cam);
             SetPrivateField(stageEnv, "stageBackgrounds", stageBgSprites);
+            SetPrivateField(stageEnv, "stageCoverProps", stagePropSprites);
 
             // 2. SoundManager
             GameObject soundGo = new GameObject("SoundManager");
@@ -813,17 +822,17 @@ namespace WizardGame.EditorTools
             lvImg.color = Color.white;
             lvImg.raycastTarget = false;
 
-            // Coluna lateral esquerda alinhada exatamente como menu_modelo/menu.png
+            // Coluna lateral esquerda com o novo título oficial: Arcano: Caçada aos Goblins
             float menuCenterX = 335f;
-            var titleTop = CreateUIText(startMenu.transform, "TitleTop", "MINIGAME DO", 30, new Color(0.98f, 0.92f, 0.78f), new Vector2(menuCenterX, 275f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
-            titleTop.fontStyle = FontStyle.Bold;
-            titleTop.rectTransform.pivot = new Vector2(0.5f, 0.5f);
-
-            var titleMain = CreateUIText(startMenu.transform, "Title", "MAGO", 88, new Color(1f, 0.68f, 0.14f), new Vector2(menuCenterX, 195f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
+            var titleMain = CreateUIText(startMenu.transform, "Title", "ARCANO", 82, new Color(1f, 0.68f, 0.14f), new Vector2(menuCenterX, 244f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
             titleMain.fontStyle = FontStyle.Bold;
             titleMain.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
-            var subtitleTxt = CreateUIText(startMenu.transform, "Subtitle", "CAÇADA AOS GOBLINS  •  5 FASES ÉPICAS", 15, new Color(0.82f, 0.75f, 0.62f), new Vector2(menuCenterX, 128f), new Vector2(0f, 0.5f), uiFont, TextAnchor.MiddleCenter);
+            var titleSub = CreateUIText(startMenu.transform, "TitleSub", "CAÇADA AOS GOBLINS", 25, new Color(0.98f, 0.92f, 0.78f), new Vector2(menuCenterX, 174f), new Vector2(0f, 0.5f), titleFont, TextAnchor.MiddleCenter);
+            titleSub.fontStyle = FontStyle.Bold;
+            titleSub.rectTransform.pivot = new Vector2(0.5f, 0.5f);
+
+            var subtitleTxt = CreateUIText(startMenu.transform, "Subtitle", "5 FASES ÉPICAS  •  DEFESA DO CASTELO", 14, new Color(0.82f, 0.75f, 0.62f), new Vector2(menuCenterX, 130f), new Vector2(0f, 0.5f), uiFont, TextAnchor.MiddleCenter);
             subtitleTxt.rectTransform.pivot = new Vector2(0.5f, 0.5f);
 
             var playBtnObj = CreateThemedButton(startMenu.transform, "PlayButton", "►   JOGAR", new Vector2(menuCenterX, 46f), new Vector2(0f, 0.5f), new Vector2(340f, 64f), titleFont, sprBtnGold, new Color(1f, 0.96f, 0.88f), 24);
@@ -860,14 +869,14 @@ namespace WizardGame.EditorTools
                                "  • <b>GOBLIN COMUM</b> (1 HP | 1 Pt): Perambula pela arena; não ataca ao escapar.\n" +
                                "  • <b>GOBLIN FUGITIVO</b> (2 HP | 2 Pts): Fica mais veloz a cada fase e dispara ao ser ferido; causa <b>1 de Dano</b> ao fugir.\n" +
                                "  • <b>GOBLIN DOURADO</b> (3 HP | 5 Pts): Escudo reforçado; causa <b>2 de Dano</b> à sua Vida ao fugir.\n" +
-                               "  • <b>GOBLIN FANTASMA</b> (4 HP | 3 Pts): Teleporta através de portais ao receber dano.\n\n" +
+                               "  • <b>GOBLIN FANTASMA</b> (3 HP | 3 Pts): Teleporta através de portais ao receber dano.\n\n" +
                                "<color=#FFD269><b>AS 5 FASES & GRANDES CHEFES:</b></color>\n" +
-                               "  • <b>FASE 1</b> (Muralhas): Grande Goblin (20 HP)   •   <b>FASE 2</b> (Ruínas): Xamã do Caos (30 HP)\n" +
-                               "  • <b>FASE 3</b> (Fortaleza Vulcânica): Feiticeiro Espectral (42 HP)\n" +
-                               "  • <b>FASE 4</b> (Salão do Trono): Lorde Carmesim (56 HP)   •   <b>FASE 5</b> (Altar): Goblin Rei Supremo (85 HP)\n" +
+                               "  • <b>FASE 1</b> (Muralhas): Grande Goblin (18 HP)   •   <b>FASE 2</b> (Ruínas): Xamã do Caos (24 HP)\n" +
+                               "  • <b>FASE 3</b> (Fortaleza Vulcânica): Feiticeiro Espectral (32 HP)\n" +
+                               "  • <b>FASE 4</b> (Salão do Trono): Lorde Carmesim (42 HP)   •   <b>FASE 5</b> (Altar): Goblin Rei Supremo (60 HP)\n" +
                                "  • <b>DEFESA ATIVA:</b> Clique nos Orbes em voo (+5 pts) e acerte Feitiços em golpes carregados (+8 pts CONTRA-ATAQUE)!\n\n" +
                                "<color=#7CE0FF><b>VIDA, MANA & POWER-UPS:</b></color>\n" +
-                               "  • Você possui <b>5 Pontos de Vida</b> e <b>10 Cargas de Mana</b>. Cada Chefe derrotado cura <b>+1 Vida</b> e restaura Mana!\n" +
+                               "  • Você possui <b>5 Pontos de Vida</b> e <b>10 Cargas de Mana</b>. Cada Chefe derrotado cura <b>+2 Vida</b> e restaura Mana!\n" +
                                "  • Deixar <b>15 Goblins</b> escaparem ou zerar sua Vida encerra a partida.\n" +
                                "  • <b>ORBES RAROS:</b> Mana (+4 tiros)  •  Fúria (+1 Dano 5s)  •  Tempo (50% Lento 3s)  •  Tempestade  •  Mira Sniper (5s).\n\n" +
                                "<color=#FFB469><b>ARSENAL MÁGICO & COMBOS:</b></color>\n" +

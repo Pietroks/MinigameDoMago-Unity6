@@ -73,7 +73,7 @@ namespace WizardGame.Entities
 
             orbRenderer.sprite = GetSharedCircleSprite();
             orbRenderer.color = new Color(primaryColor.r, primaryColor.g, primaryColor.b, 0.78f);
-            orbRenderer.sortingOrder = 25; // Renderiza acima dos goblins normais
+            orbRenderer.sortingOrder = 175; // Renderiza acima dos goblins e obstáculos 2.5D
 
             // 2. Halo Interno Brilhante
             Transform halo = transform.Find("InnerGlow");
@@ -91,7 +91,7 @@ namespace WizardGame.Entities
 
             innerGlowRenderer.sprite = GetSharedCircleSprite();
             innerGlowRenderer.color = Color.white;
-            innerGlowRenderer.sortingOrder = 26;
+            innerGlowRenderer.sortingOrder = 176;
 
             // 3. Rótulo de Ícone e Título
             Transform label = transform.Find("Label");
@@ -108,7 +108,7 @@ namespace WizardGame.Entities
                 labelTextMesh.fontStyle = FontStyle.Bold;
 
                 var meshRenderer = labelGo.GetComponent<MeshRenderer>();
-                if (meshRenderer != null) meshRenderer.sortingOrder = 27;
+                if (meshRenderer != null) meshRenderer.sortingOrder = 177;
             }
             else
             {

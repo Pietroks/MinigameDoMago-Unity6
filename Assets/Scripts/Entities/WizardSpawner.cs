@@ -52,6 +52,7 @@ namespace WizardGame.Entities
         public event Action<WizardController, int, string> OnPlayerDamaged;
         public event Action<WizardController, WizardDataSO> OnBossSpawned;
         public event Action<WizardController, WizardDataSO> OnBossEnraged;
+        public event Action<WizardController, int, int, bool> OnBossHealthChanged;
         public event Action<WizardController, string> OnBossAttackInterrupted;
         public event Action<int, int> OnWaveProgressChanged; // (restantes, total)
         public event Action<int> OnWaveCompleted; // (numeroDaOnda)
@@ -286,6 +287,7 @@ namespace WizardGame.Entities
             wizard.OnBossSummonRequested += HandleBossSummonRequested;
             wizard.OnBossAttackInterrupted += HandleBossAttackInterrupted;
             wizard.OnBossEnraged += HandleBossEnraged;
+            wizard.OnBossHealthChanged += HandleBossHealthChanged;
 
             if (isBossSummon)
             {
@@ -448,6 +450,11 @@ namespace WizardGame.Entities
             OnBossEnraged?.Invoke(boss, data);
         }
 
+        private void HandleBossHealthChanged(WizardController boss, int currentHp, int maxHp, bool enraged)
+        {
+            OnBossHealthChanged?.Invoke(boss, currentHp, maxHp, enraged);
+        }
+
         private void HandleAttackPlayer(WizardController wizard, int damage, string source)
         {
             OnPlayerDamaged?.Invoke(wizard, damage, source);
@@ -462,6 +469,7 @@ namespace WizardGame.Entities
             wizard.OnBossSummonRequested -= HandleBossSummonRequested;
             wizard.OnBossAttackInterrupted -= HandleBossAttackInterrupted;
             wizard.OnBossEnraged -= HandleBossEnraged;
+            wizard.OnBossHealthChanged -= HandleBossHealthChanged;
             pool.Release(wizard);
         }
 

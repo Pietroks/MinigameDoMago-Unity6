@@ -80,6 +80,13 @@ namespace WizardGame.UI
         [SerializeField] private Text stageTransitionSubtitleText;
         [SerializeField] private Text stageTransitionDetailText;
 
+        [Header("Barra de Vida do Chefe & Recorde")]
+        [SerializeField] private GameObject bossBarContainer;
+        [SerializeField] private Text bossBarLabelText;
+        [SerializeField] private RectTransform bossBarFillRect;
+        [SerializeField] private Image bossBarFillImage;
+        [SerializeField] private Text menuHighScoreText;
+
         [Header("Elementos de Fim de Jogo")]
         [SerializeField] private Text endTitleText;
         [SerializeField] private Text endRankGradeText;
@@ -127,6 +134,10 @@ namespace WizardGame.UI
         private SpellType currentlySelectedSpell = SpellType.Arcane;
         private readonly Dictionary<SpellType, bool> spellReadyMap = new Dictionary<SpellType, bool>();
         private readonly Dictionary<SpellType, float> spellCooldownMap = new Dictionary<SpellType, float>();
+        private bool isLowHealthWarningActive = false;
+        private float targetBossHealthFill = 1f;
+        private float currentBossHealthFill = 1f;
+        private bool isBossBarEnraged = false;
 
         private void Awake()
         {
@@ -152,10 +163,12 @@ namespace WizardGame.UI
             if (settingsPanel != null) settingsPanel.SetActive(false);
             if (damageFlashOverlay != null) damageFlashOverlay.gameObject.SetActive(false);
             if (activeBuffsContainer != null) activeBuffsContainer.SetActive(false);
+            if (bossBarContainer != null) bossBarContainer.SetActive(false);
         }
 
         public void ShowStartMenu()
         {
+            isLowHealthWarningActive = false;
             if (startMenuPanel != null) startMenuPanel.SetActive(true);
             if (inGameHUD != null) inGameHUD.SetActive(false);
             if (pauseMenuPanel != null) pauseMenuPanel.SetActive(false);
@@ -164,6 +177,8 @@ namespace WizardGame.UI
             if (settingsPanel != null) settingsPanel.SetActive(false);
             if (waveBannerContainer != null) waveBannerContainer.SetActive(false);
             if (stageTransitionPanel != null) stageTransitionPanel.SetActive(false);
+            if (bossBarContainer != null) bossBarContainer.SetActive(false);
+            if (damageFlashOverlay != null) damageFlashOverlay.gameObject.SetActive(false);
             Cursor.visible = true;
         }
 
@@ -198,6 +213,8 @@ namespace WizardGame.UI
 
         public void ShowGameOver(GamePerformanceStats stats)
         {
+            isLowHealthWarningActive = false;
+            if (bossBarContainer != null) bossBarContainer.SetActive(false);
             if (gameOverPanel != null) gameOverPanel.SetActive(true);
             if (inGameHUD != null) inGameHUD.SetActive(false);
             Cursor.visible = true;
@@ -246,9 +263,13 @@ namespace WizardGame.UI
                 int seconds = Mathf.FloorToInt(stats.matchDuration % 60f);
                 string timeFormatted = $"{minutes:00}:{seconds:00}";
 
+                string recordBadge = stats.isNewRecord
+                    ? "   <size=18><color=#FFE047><b>• NOVO RECORDE! •</b></color></size>"
+                    : (stats.bestScore > 0 ? $"   <size=15><color=#A8B6C8>(Recorde: {stats.bestScore:D5} • Rank {stats.bestRankGrade})</color></size>" : "");
+
                 endStatsText.text =
                     $"<size=23><b>{stats.wizardsDefeated} INIMIGOS ABATIDOS   •   {stats.accuracy:F0}% PRECISÃO   •   COMBO ×{stats.maxStreak}</b></size>\n\n" +
-                    $"<size=32><color=#{colorHex}><b>{stats.finalScore:D5} PONTOS</b></color></size>\n\n" +
+                    $"<size=32><color=#{colorHex}><b>{stats.finalScore:D5} PONTOS</b></color></size>{recordBadge}\n\n" +
                     $"<size=15><color=#B8C4D4>Tempo: {timeFormatted}   •   Magias Especiais: {stats.strongShotsCount}   •   Bônus: {stats.skillBonusesCount} (+{stats.skillBonusTotalPoints} pts)\n" +
                     $"Disparos: {stats.totalShotsFired}   •   Acertos: {stats.totalHits}   •   Dano Total: {stats.totalDamageDealt}   •   Fugas: {stats.escapedCount}/{(stats.maxEscapes > 0 ? stats.maxEscapes : 15)}</color></size>";
             }
@@ -320,6 +341,12 @@ namespace WizardGame.UI
                         healthHeartImages[i].color = filled ? Color.white : new Color(0.75f, 0.75f, 0.85f, 0.85f);
                     }
                 }
+            }
+
+            isLowHealthWarningActive = (current == 1 && max > 1);
+            if (!isLowHealthWarningActive && damageFlashCoroutine == null && damageFlashOverlay != null)
+            {
+                damageFlashOverlay.gameObject.SetActive(false);
             }
 
             if (playerHealthText == null) return;
@@ -685,6 +712,184 @@ namespace WizardGame.UI
                     ShowInstructions(false);
                 }
             }
+
+            // Pulso suave de alerta quando o jogador está com apenas 1 ponto de vida
+            if (isLowHealthWarningActive && damageFlashCoroutine == null && damageFlashOverlay != null && inGameHUD != null && inGameHUD.activeSelf)
+            {
+                if (!damageFlashOverlay.gameObject.activeSelf) damageFlashOverlay.gameObject.SetActive(true);
+                float pulse = 0.045f + (Mathf.Sin(Time.unscaledTime * 5.2f) * 0.5f + 0.5f) * 0.11f;
+                damageFlashOverlay.color = new Color(0.85f, 0.05f, 0.05f, pulse);
+            }
+
+            // Animação suave da Barra de Vida do Chefe
+            if (bossBarContainer != null && bossBarContainer.activeSelf && bossBarFillRect != null)
+            {
+                currentBossHealthFill = Mathf.Lerp(currentBossHealthFill, targetBossHealthFill, Time.unscaledDeltaTime * 11f);
+                bossBarFillRect.anchorMax = new Vector2(Mathf.Clamp01(currentBossHealthFill), 1f);
+
+                if (bossBarFillImage != null)
+                {
+                    if (isBossBarEnraged)
+                    {
+                        float p = Mathf.Sin(Time.unscaledTime * 9f) * 0.5f + 0.5f;
+                        bossBarFillImage.color = Color.Lerp(new Color(0.95f, 0.14f, 0.08f, 1f), new Color(1f, 0.62f, 0.12f, 1f), p);
+                    }
+                    else
+                    {
+                        bossBarFillImage.color = Color.Lerp(new Color(0.88f, 0.16f, 0.12f, 1f), new Color(0.96f, 0.36f, 0.16f, 1f), currentBossHealthFill);
+                    }
+                }
+            }
+        }
+
+        public void UpdateMenuHighScore(int bestScore, string bestRank)
+        {
+            if (menuHighScoreText == null && startMenuPanel != null && bestScore > 0)
+            {
+                Font f = waveText != null ? waveText.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                var go = new GameObject("MenuHighScoreText");
+                go.transform.SetParent(startMenuPanel.transform, false);
+                var r = go.AddComponent<RectTransform>();
+                r.anchorMin = new Vector2(0f, 0.5f);
+                r.anchorMax = new Vector2(0f, 0.5f);
+                r.pivot = new Vector2(0.5f, 0.5f);
+                r.anchoredPosition = new Vector2(335f, -305f);
+                r.sizeDelta = new Vector2(400f, 34f);
+                menuHighScoreText = go.AddComponent<Text>();
+                menuHighScoreText.font = f;
+                menuHighScoreText.fontSize = 15;
+                menuHighScoreText.fontStyle = FontStyle.Bold;
+                menuHighScoreText.color = new Color(1f, 0.86f, 0.36f, 0.95f);
+                menuHighScoreText.alignment = TextAnchor.MiddleCenter;
+                menuHighScoreText.raycastTarget = false;
+                var ol = go.AddComponent<Outline>();
+                ol.effectColor = new Color(0f, 0f, 0f, 0.92f);
+                ol.effectDistance = new Vector2(1.4f, -1.4f);
+            }
+
+            if (menuHighScoreText != null)
+            {
+                bool hasRecord = bestScore > 0;
+                menuHighScoreText.gameObject.SetActive(hasRecord);
+                if (hasRecord)
+                {
+                    menuHighScoreText.text = $"RECORDE: {bestScore:D5} PTS  •  RANK {bestRank}";
+                }
+            }
+        }
+
+        public void ShowBossHealthBar(string bossName, int currentHp, int maxHp, bool enraged = false)
+        {
+            EnsureBossHealthBar();
+            if (bossBarContainer == null) return;
+
+            bossBarContainer.SetActive(true);
+            float pct = maxHp > 0 ? Mathf.Clamp01((float)currentHp / maxHp) : 0f;
+            currentBossHealthFill = pct;
+            targetBossHealthFill = pct;
+            isBossBarEnraged = enraged;
+
+            if (bossBarFillRect != null)
+            {
+                bossBarFillRect.anchorMax = new Vector2(pct, 1f);
+            }
+            UpdateBossHealthLabel(bossName, currentHp, maxHp, enraged);
+        }
+
+        public void UpdateBossHealthBar(string bossName, int currentHp, int maxHp, bool enraged)
+        {
+            if (bossBarContainer == null || !bossBarContainer.activeSelf)
+            {
+                ShowBossHealthBar(bossName, currentHp, maxHp, enraged);
+                return;
+            }
+            targetBossHealthFill = maxHp > 0 ? Mathf.Clamp01((float)currentHp / maxHp) : 0f;
+            isBossBarEnraged = enraged;
+            UpdateBossHealthLabel(bossName, currentHp, maxHp, enraged);
+        }
+
+        public void HideBossHealthBar()
+        {
+            if (bossBarContainer != null) bossBarContainer.SetActive(false);
+            isBossBarEnraged = false;
+        }
+
+        private void UpdateBossHealthLabel(string bossName, int currentHp, int maxHp, bool enraged)
+        {
+            if (bossBarLabelText == null) return;
+            string rageTag = enraged ? "  •  FÚRIA!" : "";
+            bossBarLabelText.text = $"CHEFE: {bossName.ToUpper()}   •   {Mathf.Max(0, currentHp)}/{maxHp} HP{rageTag}";
+            bossBarLabelText.color = enraged ? new Color(1f, 0.52f, 0.22f) : new Color(1f, 0.90f, 0.58f);
+        }
+
+        private void EnsureBossHealthBar()
+        {
+            if (bossBarContainer != null || inGameHUD == null) return;
+
+            Font titleF = waveText != null ? waveText.font : Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+            bossBarContainer = new GameObject("BossHealthBar_HUD");
+            bossBarContainer.transform.SetParent(inGameHUD.transform, false);
+            var rect = bossBarContainer.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 1f);
+            rect.anchorMax = new Vector2(0.5f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, -76f);
+            rect.sizeDelta = new Vector2(540f, 52f);
+
+            var bgImg = bossBarContainer.AddComponent<Image>();
+            bgImg.color = new Color(0.08f, 0.04f, 0.06f, 0.92f);
+            bgImg.raycastTarget = false;
+            var border = bossBarContainer.AddComponent<Outline>();
+            border.effectColor = new Color(0.88f, 0.62f, 0.20f, 0.95f);
+            border.effectDistance = new Vector2(2f, -2f);
+
+            // Trilha interna da barra
+            var trackGo = new GameObject("Track");
+            trackGo.transform.SetParent(bossBarContainer.transform, false);
+            var tr = trackGo.AddComponent<RectTransform>();
+            tr.anchorMin = new Vector2(0f, 0f);
+            tr.anchorMax = new Vector2(1f, 0f);
+            tr.pivot = new Vector2(0.5f, 0f);
+            tr.offsetMin = new Vector2(14f, 8f);
+            tr.offsetMax = new Vector2(-14f, 22f);
+            var trImg = trackGo.AddComponent<Image>();
+            trImg.color = new Color(0.18f, 0.05f, 0.06f, 0.96f);
+            trImg.raycastTarget = false;
+
+            // Preenchimento dinâmico
+            var fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(trackGo.transform, false);
+            bossBarFillRect = fillGo.AddComponent<RectTransform>();
+            bossBarFillRect.anchorMin = Vector2.zero;
+            bossBarFillRect.anchorMax = Vector2.one;
+            bossBarFillRect.offsetMin = Vector2.zero;
+            bossBarFillRect.offsetMax = Vector2.zero;
+            bossBarFillImage = fillGo.AddComponent<Image>();
+            bossBarFillImage.color = new Color(0.92f, 0.22f, 0.14f, 1f);
+            bossBarFillImage.raycastTarget = false;
+
+            // Nome + HP do Chefe
+            var lblGo = new GameObject("BossLabel");
+            lblGo.transform.SetParent(bossBarContainer.transform, false);
+            var lr = lblGo.AddComponent<RectTransform>();
+            lr.anchorMin = new Vector2(0f, 1f);
+            lr.anchorMax = new Vector2(1f, 1f);
+            lr.pivot = new Vector2(0.5f, 1f);
+            lr.offsetMin = new Vector2(12f, -26f);
+            lr.offsetMax = new Vector2(-12f, -2f);
+            bossBarLabelText = lblGo.AddComponent<Text>();
+            bossBarLabelText.font = titleF;
+            bossBarLabelText.fontSize = 15;
+            bossBarLabelText.fontStyle = FontStyle.Bold;
+            bossBarLabelText.alignment = TextAnchor.MiddleCenter;
+            bossBarLabelText.color = new Color(1f, 0.90f, 0.58f);
+            bossBarLabelText.raycastTarget = false;
+            var lol = lblGo.AddComponent<Outline>();
+            lol.effectColor = new Color(0f, 0f, 0f, 0.95f);
+            lol.effectDistance = new Vector2(1.4f, -1.4f);
+
+            bossBarContainer.SetActive(false);
         }
 
         private void HandleMuteChanged(bool _)
@@ -776,6 +981,15 @@ namespace WizardGame.UI
             if (activeBuffsContainer != null)
             {
                 activeBuffsContainer.SetActive(active);
+                if (active)
+                {
+                    var rt = activeBuffsContainer.GetComponent<RectTransform>();
+                    if (rt != null)
+                    {
+                        bool bossVisible = bossBarContainer != null && bossBarContainer.activeSelf;
+                        rt.anchoredPosition = new Vector2(0f, bossVisible ? -134f : -74f);
+                    }
+                }
             }
             if (activeBuffsText != null)
             {

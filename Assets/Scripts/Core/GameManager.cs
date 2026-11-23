@@ -40,6 +40,9 @@ namespace WizardGame.Core
         public string rankBadge;         // "👑", "🔮", "⚡", "📜", "🔰"
         public Color rankColor;
         public string defeatReason;      // Motivo detalhado da derrota
+        public int bestScore;            // Recorde histórico salvo
+        public string bestRankGrade;     // Melhor rank histórico salvo
+        public bool isNewRecord;         // Se bateu o recorde nesta partida
     }
 
     /// <summary>
@@ -68,10 +71,10 @@ namespace WizardGame.Core
         [SerializeField] private float delayBetweenWaves = 1.6f;
 
         [Header("Tempos de Recarga dos Feitiços Especiais")]
-        [SerializeField] private float arcaneCooldownDuration = 2.6f;
-        [SerializeField] private float iceCooldownDuration = 3.8f;
-        [SerializeField] private float lightningCooldownDuration = 4.2f;
-        [SerializeField] private float areaCooldownDuration = 5.0f;
+        [SerializeField] private float arcaneCooldownDuration = 2.1f;
+        [SerializeField] private float iceCooldownDuration = 3.1f;
+        [SerializeField] private float lightningCooldownDuration = 3.5f;
+        [SerializeField] private float areaCooldownDuration = 4.2f;
 
         private GameState currentState;
         private int currentScore;
@@ -81,6 +84,9 @@ namespace WizardGame.Core
         private Coroutine waveTransitionCoroutine;
         private bool isStageEndingOrTransitioning;
         private static bool autoStartNextLoad = false;
+
+        private const string PREF_BEST_SCORE = "Arcano_BestScore";
+        private const string PREF_BEST_RANK = "Arcano_BestRank";
 
         // Timers e Estados dos Feitiços
         private float arcaneTimer;
@@ -164,6 +170,7 @@ namespace WizardGame.Core
                 spawner.OnWizardDefeated += HandleWizardDefeated;
                 spawner.OnWizardEscaped += HandleWizardEscaped;
                 spawner.OnBossSpawned += HandleBossSpawned;
+                spawner.OnBossHealthChanged += HandleBossHealthChanged;
                 spawner.OnBossEnraged += HandleBossEnraged;
                 spawner.OnBossAttackInterrupted += HandleBossAttackInterrupted;
                 spawner.OnWaveProgressChanged += HandleWaveProgressChanged;
@@ -177,6 +184,9 @@ namespace WizardGame.Core
                 uiManager.OnResumeClicked += ResumeGame;
                 uiManager.OnRestartClicked += RestartGame;
                 uiManager.OnMainMenuClicked += ReturnToMainMenu;
+                uiManager.UpdateMenuHighScore(
+                    PlayerPrefs.GetInt(PREF_BEST_SCORE, 0),
+                    PlayerPrefs.GetString(PREF_BEST_RANK, "D"));
             }
 
             if (autoStartNextLoad)
@@ -192,6 +202,15 @@ namespace WizardGame.Core
 
         private void Update()
         {
+            if (currentState == GameState.Paused)
+            {
+                if (UnityEngine.Input.GetKeyDown(KeyCode.Escape) || UnityEngine.Input.GetKeyDown(KeyCode.P))
+                {
+                    ResumeGame();
+                }
+                return;
+            }
+
             if (currentState == GameState.Playing)
             {
                 if (!isStageEndingOrTransitioning)
@@ -237,6 +256,7 @@ namespace WizardGame.Core
                     powerUpManager?.SetSpawningEnabled(false);
                     spawner?.ClearActiveGoblins();
                     inputHandler?.SetInputBlocked(true);
+                    uiManager?.HideBossHealthBar();
                     uiManager?.ShowStartMenu();
                     SoundManager.Instance?.PlayMenuMusic();
                     break;
@@ -258,7 +278,6 @@ namespace WizardGame.Core
 
                 case GameState.Paused:
                     Time.timeScale = 0f;
-                    powerUpManager?.SetSpawningEnabled(false);
                     inputHandler?.SetInputBlocked(true);
                     uiManager?.ShowPauseMenu(true);
                     break;
@@ -271,6 +290,7 @@ namespace WizardGame.Core
                     powerUpManager?.SetSpawningEnabled(false);
                     spawner?.ClearActiveGoblins();
                     inputHandler?.SetInputBlocked(true);
+                    uiManager?.HideBossHealthBar();
                     break;
             }
         }
@@ -346,6 +366,7 @@ namespace WizardGame.Core
             }
 
             uiManager?.HideStageTransitionImmediate();
+            uiManager?.HideBossHealthBar();
             SetState(GameState.Playing);
             if (waves != null && waves.Count > 0)
             {
@@ -401,6 +422,11 @@ namespace WizardGame.Core
 
             totalShotsFired++;
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.normalShotSound);
+
+            Vector3 normalBeamTarget = hitInfo.powerUpTarget != null
+                ? hitInfo.powerUpTarget.transform.position
+                : (hitInfo.bossProjectileTarget != null ? hitInfo.bossProjectileTarget.transform.position : hitInfo.hitPoint);
+            SpellEffectsManager.Instance?.SpawnWandBeam(normalBeamTarget, SpellType.Normal, hitInfo.isHeadshot);
 
             // Coleta de Power-up flutuante atingido pelo disparo
             if (hitInfo.powerUpTarget != null)
@@ -507,6 +533,11 @@ namespace WizardGame.Core
                 return;
             }
 
+            Vector3 specialBeamTarget = hitInfo.powerUpTarget != null
+                ? hitInfo.powerUpTarget.transform.position
+                : (hitInfo.bossProjectileTarget != null ? hitInfo.bossProjectileTarget.transform.position : hitInfo.hitPoint);
+            SpellEffectsManager.Instance?.SpawnWandBeam(specialBeamTarget, spell, hitInfo.isHeadshot);
+
             // Bônus 1: Primeiro Tiro (+5)
             if (isFirstShotAttempt)
             {
@@ -610,8 +641,14 @@ namespace WizardGame.Core
                         }
                         SpellEffectsManager.Instance?.SpawnFloatingText(hitInfo.target.transform.position, $"CONGELADO! -{dmg}", new Color(0.58f, 0.96f, 1f), 1.08f);
                         hitInfo.target.TakeDamage(dmg, isNormalShot: false, isSpecialSpell: true);
-                        hitInfo.target.Freeze(2.8f);
-                        SpellEffectsManager.Instance?.SpawnIceEffect(hitInfo.target, 2.8f);
+                        if (!hitInfo.target.IsDeadOrEscaping)
+                        {
+                            hitInfo.target.Freeze(2.8f);
+                            if (hitInfo.target.IsFrozen)
+                            {
+                                SpellEffectsManager.Instance?.SpawnIceEffect(hitInfo.target, 2.8f);
+                            }
+                        }
                     }
                     else
                     {
@@ -771,14 +808,34 @@ namespace WizardGame.Core
 
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
             SpellEffectsManager.Instance?.TriggerCameraShake(0.24f, 0.22f);
-            uiManager?.ShowBossSpawnBanner(data.displayName, "INTERROMPA GOLPES E INTERCEPTE OS ORBES PARA NÃO SOFRER DANO!");
+            string bossName = data != null ? data.displayName : "Chefe";
+            uiManager?.ShowBossSpawnBanner(bossName, "INTERROMPA GOLPES E INTERCEPTE OS ORBES PARA NÃO SOFRER DANO!");
+            if (wizard != null && data != null)
+            {
+                uiManager?.ShowBossHealthBar(data.displayName, wizard.CurrentHealth, data.maxHealth, wizard.IsBossEnraged);
+            }
+        }
+
+        private void HandleBossHealthChanged(WizardController boss, int currentHp, int maxHp, bool enraged)
+        {
+            if (currentState != GameState.Playing || boss == null) return;
+            WizardDataSO data = boss.GetData();
+            if (data != null)
+            {
+                uiManager?.UpdateBossHealthBar(data.displayName, currentHp, maxHp, enraged);
+            }
         }
 
         private void HandleBossEnraged(WizardController wizard, WizardDataSO data)
         {
             if (currentState != GameState.Playing) return;
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.strongShotSound);
-            uiManager?.ShowBossEnragedBanner(data != null ? data.displayName : "Chefe");
+            string bossName = data != null ? data.displayName : "Chefe";
+            uiManager?.ShowBossEnragedBanner(bossName);
+            if (wizard != null && data != null)
+            {
+                uiManager?.UpdateBossHealthBar(data.displayName, wizard.CurrentHealth, data.maxHealth, true);
+            }
         }
 
         private void HandleBossAttackInterrupted(WizardController wizard, string bossName)
@@ -805,6 +862,22 @@ namespace WizardGame.Core
             {
                 weaponSystem.AddAmmo(2);
                 uiManager?.ShowSkillBonusPopup($"COMBO ×{currentMultiplier}! +2 MANA", new Color(0.35f, 0.92f, 1f));
+            }
+
+            // Recompensa de sobrevivência: a cada 12 abates em sequência sem errar, recupera +1 Vida (ou +25 pts se cheio)
+            if (currentStreak > 0 && currentStreak % 12 == 0)
+            {
+                if (currentPlayerHealth < maxPlayerHealth)
+                {
+                    currentPlayerHealth++;
+                    uiManager?.UpdatePlayerHealth(currentPlayerHealth, maxPlayerHealth);
+                    uiManager?.ShowSkillBonusPopup($"+1 VIDA! (COMBO {currentStreak})", new Color(0.32f, 1f, 0.52f));
+                    SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound, 0.72f);
+                }
+                else
+                {
+                    AwardBonus(25, $"IMPARÁVEL! COMBO {currentStreak} (+25)", new Color(1f, 0.85f, 0.2f), SoundManager.Instance?.headshotSound);
+                }
             }
 
             // Aplica multiplicador na pontuação
@@ -858,7 +931,8 @@ namespace WizardGame.Core
 
             if (isBoss)
             {
-                // Ao derrotar o Chefe da fase: para a música ambiente e toca APENAS a fanfarra de vitória!
+                // Ao derrotar o Chefe da fase: oculta barra do chefe, para a música ambiente e toca APENAS a fanfarra de vitória!
+                uiManager?.HideBossHealthBar();
                 SpellEffectsManager.Instance?.TriggerCameraShake(0.35f, 0.32f);
                 SoundManager.Instance?.StopMusic(0.20f);
                 SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound, 1.0f);
@@ -1109,6 +1183,20 @@ namespace WizardGame.Core
             float accuracy = totalShotsFired > 0 ? ((float)totalHits / totalShotsFired) * 100f : 0f;
             var rank = CalculateMatchRank(wizardsDefeated, accuracy, matchDuration, currentEscaped, maxStreak, strongShotsCount);
 
+            int prevBestScore = PlayerPrefs.GetInt(PREF_BEST_SCORE, 0);
+            string prevBestRank = PlayerPrefs.GetString(PREF_BEST_RANK, "D");
+            bool isNewRecord = currentScore > prevBestScore && currentScore > 0;
+            int bestScore = isNewRecord ? currentScore : prevBestScore;
+            string bestRankGrade = isNewRecord ? rank.grade : prevBestRank;
+
+            if (isNewRecord)
+            {
+                PlayerPrefs.SetInt(PREF_BEST_SCORE, bestScore);
+                PlayerPrefs.SetString(PREF_BEST_RANK, bestRankGrade);
+                PlayerPrefs.Save();
+                uiManager?.UpdateMenuHighScore(bestScore, bestRankGrade);
+            }
+
             var stats = new GamePerformanceStats
             {
                 won = won,
@@ -1131,7 +1219,10 @@ namespace WizardGame.Core
                 rankTitle = rank.title,
                 rankBadge = rank.badge,
                 rankColor = rank.color,
-                defeatReason = defeatReason
+                defeatReason = defeatReason,
+                bestScore = bestScore,
+                bestRankGrade = bestRankGrade,
+                isNewRecord = isNewRecord
             };
 
             uiManager?.ShowGameOver(stats);
@@ -1206,24 +1297,25 @@ namespace WizardGame.Core
 
             if (currentState != GameState.Playing) yield break;
 
-            // 2. Recompensa de Fase: Pontos bônus, Mana restaurada e +1 HP recuperado!
+            // 2. Recompensa de Fase: Pontos bônus, Mana restaurada e +2 HP recuperados!
             int bonus = waveClearBonusBase * completedWaveNumber;
             currentScore += bonus;
             uiManager?.UpdateScore(currentScore);
             weaponSystem?.RefillAmmo();
 
-            bool healed = false;
+            int healedAmount = 0;
             if (currentPlayerHealth < maxPlayerHealth)
             {
-                currentPlayerHealth++;
-                healed = true;
+                int prevHp = currentPlayerHealth;
+                currentPlayerHealth = Mathf.Min(maxPlayerHealth, currentPlayerHealth + 2);
+                healedAmount = currentPlayerHealth - prevHp;
                 uiManager?.UpdatePlayerHealth(currentPlayerHealth, maxPlayerHealth);
             }
 
             currentWaveIndex++;
             WaveConfig nextStage = waves[currentWaveIndex];
 
-            string healNote = healed ? "+1 Vida Recuperada  •  " : "";
+            string healNote = healedAmount > 0 ? $"+{healedAmount} Vida Recuperada  •  " : "";
             string diffNote = $"+{bonus} Pontos  •  {healNote}Mana Cheia!  •  Velocidade {nextStage.speedMultiplier:F2}x";
 
             // 3. Cortina cinematográfica de mudança de fase com troca de cenário no ponto médio
@@ -1287,7 +1379,7 @@ namespace WizardGame.Core
 
             waves = new List<WaveConfig>
             {
-                // FASE 1: Muralhas da Fortaleza — Chefe: Grande Goblin (Fugitivo 0.62x)
+                // FASE 1: Muralhas da Fortaleza — Chefe: Grande Goblin (Introdução fluida)
                 new WaveConfig(
                     stageNumber: 1,
                     name: "Muralhas da Fortaleza",
@@ -1298,104 +1390,105 @@ namespace WizardGame.Core
                     backgroundZoom: 1.0f,
                     ambientParticleColor: new Color(0.6f, 0.85f, 1f, 0.55f),
                     defaultMusicClip: m1,
-                    interval: 1.30f,
-                    speedMult: 1.00f,
-                    fugitiveSpeedMult: 0.62f,
-                    escapeTimerMult: 1.00f,
+                    interval: 1.35f,
+                    speedMult: 0.98f,
+                    fugitiveSpeedMult: 0.58f,
+                    escapeTimerMult: 1.10f,
                     maxConcurrent: 4,
                     doubleSpawnChance: 0f,
                     (WizardType.Comum, 7),
                     (WizardType.Fugitivo, 3),
                     (WizardType.Chefe, 1)),
 
-                // FASE 2: Ruínas Iluminadas pela Lua — Chefe: Xamã do Caos (Fugitivo 0.78x)
+                // FASE 2: Ruínas Iluminadas pela Lua — Chefe: Xamã do Caos (Progressão suave, introduz 2 Dourados)
                 new WaveConfig(
                     stageNumber: 2,
                     name: "Ruínas Iluminadas pela Lua",
-                    desc: "4 Comuns + 5 Fugitivos + 3 Dourados   •   CHEFE: XAMÃ DO CAOS!",
+                    desc: "6 Comuns + 3 Fugitivos + 2 Dourados   •   CHEFE: XAMÃ DO CAOS!",
                     bossDisplayName: "Xamã do Caos",
                     backgroundSprite: bg2,
                     backgroundTint: Color.white,
                     backgroundZoom: 1.0f,
                     ambientParticleColor: new Color(0.4f, 1f, 0.8f, 0.6f),
                     defaultMusicClip: m2,
-                    interval: 1.08f,
-                    speedMult: 1.14f,
-                    fugitiveSpeedMult: 0.78f,
-                    escapeTimerMult: 0.94f,
-                    maxConcurrent: 5,
-                    doubleSpawnChance: 0.18f,
-                    (WizardType.Comum, 4),
-                    (WizardType.Fugitivo, 5),
-                    (WizardType.Dourado, 3),
+                    interval: 1.24f,
+                    speedMult: 1.05f,
+                    fugitiveSpeedMult: 0.68f,
+                    escapeTimerMult: 1.05f,
+                    maxConcurrent: 4,
+                    doubleSpawnChance: 0.06f,
+                    (WizardType.Comum, 6),
+                    (WizardType.Fugitivo, 3),
+                    (WizardType.Dourado, 2),
                     (WizardType.Chefe2, 1)),
 
-                // FASE 3: Fortaleza Vulcânica — Chefe: Feiticeiro Espectral (Fugitivo 0.96x)
+                // FASE 3: Fortaleza Vulcânica — Chefe: Feiticeiro Espectral (Introduz Fantasmas em ritmo equilibrado)
                 new WaveConfig(
                     stageNumber: 3,
                     name: "Fortaleza Vulcânica",
-                    desc: "3 Comuns + 4 Fugitivos + 3 Dourados + 4 Fantasmas   •   CHEFE: FEITICEIRO ESPECTRAL!",
+                    desc: "5 Comuns + 3 Fugitivos + 2 Dourados + 3 Fantasmas   •   CHEFE: FEITICEIRO ESPECTRAL!",
                     bossDisplayName: "Feiticeiro Espectral",
                     backgroundSprite: bg3,
                     backgroundTint: Color.white,
                     backgroundZoom: 1.0f,
                     ambientParticleColor: new Color(1f, 0.45f, 0.12f, 0.72f),
                     defaultMusicClip: m3,
-                    interval: 0.94f,
-                    speedMult: 1.26f,
-                    fugitiveSpeedMult: 0.96f,
-                    escapeTimerMult: 0.88f,
-                    maxConcurrent: 6,
-                    doubleSpawnChance: 0.28f,
-                    (WizardType.Comum, 3),
-                    (WizardType.Fugitivo, 4),
-                    (WizardType.Dourado, 3),
-                    (WizardType.Fantasma, 4),
+                    interval: 1.14f,
+                    speedMult: 1.12f,
+                    fugitiveSpeedMult: 0.80f,
+                    escapeTimerMult: 1.00f,
+                    maxConcurrent: 5,
+                    doubleSpawnChance: 0.12f,
+                    (WizardType.Comum, 5),
+                    (WizardType.Fugitivo, 3),
+                    (WizardType.Dourado, 2),
+                    (WizardType.Fantasma, 3),
                     (WizardType.Chefe3, 1)),
 
-                // FASE 4: Salão do Trono em Ruínas — Chefe: Lorde Carmesim (Fugitivo 1.15x)
+                // FASE 4: Salão do Trono em Ruínas — Chefe: Lorde Carmesim (Desafio intenso e justo)
                 new WaveConfig(
                     stageNumber: 4,
                     name: "Salão do Trono em Ruínas",
-                    desc: "2 Comuns + 5 Fugitivos + 4 Dourados + 5 Fantasmas   •   CHEFE: LORDE CARMESIM!",
+                    desc: "4 Comuns + 4 Fugitivos + 3 Dourados + 3 Fantasmas   •   CHEFE: LORDE CARMESIM!",
                     bossDisplayName: "Lorde Carmesim",
                     backgroundSprite: bg4,
                     backgroundTint: new Color(0.84f, 0.82f, 1.0f, 1f),
                     backgroundZoom: 1.0f,
                     ambientParticleColor: new Color(0.82f, 0.35f, 1f, 0.68f),
                     defaultMusicClip: m4,
-                    interval: 0.82f,
-                    speedMult: 1.38f,
-                    fugitiveSpeedMult: 1.15f,
-                    escapeTimerMult: 0.84f,
-                    maxConcurrent: 7,
-                    doubleSpawnChance: 0.38f,
-                    (WizardType.Comum, 2),
-                    (WizardType.Fugitivo, 5),
-                    (WizardType.Dourado, 4),
-                    (WizardType.Fantasma, 5),
+                    interval: 1.02f,
+                    speedMult: 1.20f,
+                    fugitiveSpeedMult: 0.94f,
+                    escapeTimerMult: 0.95f,
+                    maxConcurrent: 5,
+                    doubleSpawnChance: 0.20f,
+                    (WizardType.Comum, 4),
+                    (WizardType.Fugitivo, 4),
+                    (WizardType.Dourado, 3),
+                    (WizardType.Fantasma, 3),
                     (WizardType.Chefe4, 1)),
 
-                // FASE 5: Altar do Rei Supremo — Chefe Final: Goblin Rei Supremo (Fugitivo 1.35x)
+                // FASE 5: Altar do Rei Supremo — Chefe Final: Goblin Rei Supremo (Clímax épico e vencível)
                 new WaveConfig(
                     stageNumber: 5,
                     name: "Altar do Rei Supremo",
-                    desc: "5 Fugitivos + 6 Dourados + 7 Fantasmas   •   CHEFE FINAL: GOBLIN REI SUPREMO!",
+                    desc: "3 Comuns + 4 Fugitivos + 4 Dourados + 4 Fantasmas   •   CHEFE FINAL: GOBLIN REI SUPREMO!",
                     bossDisplayName: "Goblin Rei Supremo",
                     backgroundSprite: bg5,
                     backgroundTint: new Color(1.0f, 0.72f, 0.65f, 1f),
                     backgroundZoom: 1.12f,
                     ambientParticleColor: new Color(1f, 0.22f, 0.15f, 0.8f),
                     defaultMusicClip: m5,
-                    interval: 0.72f,
-                    speedMult: 1.50f,
-                    fugitiveSpeedMult: 1.35f,
-                    escapeTimerMult: 0.80f,
-                    maxConcurrent: 8,
-                    doubleSpawnChance: 0.48f,
-                    (WizardType.Fugitivo, 5),
-                    (WizardType.Dourado, 6),
-                    (WizardType.Fantasma, 7),
+                    interval: 0.92f,
+                    speedMult: 1.28f,
+                    fugitiveSpeedMult: 1.10f,
+                    escapeTimerMult: 0.90f,
+                    maxConcurrent: 6,
+                    doubleSpawnChance: 0.28f,
+                    (WizardType.Comum, 3),
+                    (WizardType.Fugitivo, 4),
+                    (WizardType.Dourado, 4),
+                    (WizardType.Fantasma, 4),
                     (WizardType.ChefeFinal, 1))
             };
         }

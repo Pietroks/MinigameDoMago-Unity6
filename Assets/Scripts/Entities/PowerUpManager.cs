@@ -20,8 +20,8 @@ namespace WizardGame.Entities
         [SerializeField] private UIManager uiManager;
 
         [Header("Cadência Rara de Spawn (Eventos Especiais)")]
-        [SerializeField] private float minSpawnInterval = 18.0f;
-        [SerializeField] private float maxSpawnInterval = 28.0f;
+        [SerializeField] private float minSpawnInterval = 14.0f;
+        [SerializeField] private float maxSpawnInterval = 22.0f;
 
         [Header("Duração dos Buffs")]
         [SerializeField] private float arcaneFuryDuration = 5.0f;
@@ -200,6 +200,19 @@ namespace WizardGame.Entities
             // Efeitos sonoros e visuais de coleta
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.victorySound);
             SpellEffectsManager.Instance?.TriggerCameraShake(0.18f, 0.15f);
+            if (item != null)
+            {
+                string shortLabel = type switch
+                {
+                    PowerUpType.Mana => "+4 MANA!",
+                    PowerUpType.ArcaneFury => "+1 DANO (5s)!",
+                    PowerUpType.ArcaneTime => "TEMPO 50%!",
+                    PowerUpType.Storm => "TEMPESTADE!",
+                    PowerUpType.Precision => "PRECISÃO!",
+                    _ => "POWER-UP!"
+                };
+                SpellEffectsManager.Instance?.SpawnFloatingText(item.transform.position, shortLabel, PowerUpItem.GetColorForType(type), 1.15f);
+            }
 
             ApplyPowerUpEffect(type);
             OnPowerUpActivated?.Invoke(type);
@@ -248,31 +261,42 @@ namespace WizardGame.Entities
 
             int killedCount = 0;
             var activeGoblins = new List<WizardController>(WizardController.ActiveGoblins);
+            var stormTargets = new List<Vector3>();
 
             foreach (var goblin in activeGoblins)
             {
                 if (goblin != null && goblin.gameObject.activeSelf && !goblin.IsDeadOrEscaping && goblin.GetData() != null)
                 {
+                    Vector3 gPos = goblin.transform.position;
+                    stormTargets.Add(gPos);
                     var wType = goblin.GetData().wizardType;
                     if (wType == WizardType.Comum)
                     {
                         killedCount++;
+                        SpellEffectsManager.Instance?.SpawnFloatingText(gPos, "TEMPESTADE!", new Color(0.78f, 0.52f, 1f), 1.05f);
                         goblin.TakeDamage(goblin.CurrentHealth);
                     }
                     else if (!WaveConfig.IsBossType(wType))
                     {
                         // Fases avançadas: causa 2 de dano em goblins de elite em vez de ficar inútil
                         if (goblin.CurrentHealth <= 2) killedCount++;
+                        SpellEffectsManager.Instance?.SpawnFloatingText(gPos, "-2 RAIO!", new Color(0.78f, 0.52f, 1f), 1.05f);
                         goblin.TakeDamage(2);
                     }
                     else
                     {
+                        SpellEffectsManager.Instance?.SpawnFloatingText(gPos, "-3 RAIO!", new Color(0.78f, 0.52f, 1f), 1.15f);
                         goblin.TakeDamage(3);
                     }
                 }
             }
 
-            // Feedback épico de relâmpago divino
+            // Feedback épico de relâmpago divino conectando todos os alvos atingidos
+            if (stormTargets.Count > 0)
+            {
+                Vector3 skyOrigin = new Vector3(0f, 5.2f, 0f);
+                SpellEffectsManager.Instance?.SpawnLightningChain(skyOrigin, stormTargets);
+            }
             SpellEffectsManager.Instance?.TriggerCameraShake(0.35f, 0.28f);
             SoundManager.Instance?.PlaySFX(SoundManager.Instance.lightningCastSound);
 

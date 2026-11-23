@@ -132,6 +132,13 @@ namespace WizardGame.Entities
         private Coroutine flashCoroutine;
         private GameObject activeTelegraphRing;
         private TextMesh escapeWarningText;
+        private SpriteRenderer groundShadowRenderer;
+        private Vector3 baseShadowLocalPos;
+        private Vector3 baseShadowLocalScale = Vector3.one;
+        private float baseShadowAlpha = 0.50f;
+        private float currentDepthNormalized = 0.5f;
+        private float baseEffectiveTargetHeight = 1.85f;
+        private float currentEffectiveHeight = 1.85f;
 
         private static readonly List<WizardController> activeGoblins = new List<WizardController>();
         public static IReadOnlyList<WizardController> ActiveGoblins => activeGoblins;
@@ -169,7 +176,9 @@ namespace WizardGame.Entities
 
         public bool IsDeadOrEscaping => isDeadOrEscaping;
         public bool IsFrozen => isFrozen;
+        public bool IsBossEnraged => isBossEnraged;
         public int CurrentHealth => currentHealth;
+        public int MaxHealth => currentData != null ? currentData.maxHealth : 1;
         public bool IsTeleporting { get; private set; }
         public bool DiedWhileTeleporting { get; private set; }
         public bool WasLastDamageNormalShot { get; private set; }
@@ -180,6 +189,7 @@ namespace WizardGame.Entities
         public event Action<WizardController, WizardType> OnBossSummonRequested;
         public event Action<WizardController, string> OnBossAttackInterrupted;
         public event Action<WizardController, WizardDataSO> OnBossEnraged;
+        public event Action<WizardController, int, int, bool> OnBossHealthChanged;
 
         private void Awake()
         {
@@ -190,6 +200,44 @@ namespace WizardGame.Entities
 
             CreateHealthBarIfMissing();
             CreateEscapeWarningIfMissing();
+            CreateShadowIfMissing();
+        }
+
+        private static Sprite cachedGroundShadowSprite;
+        private static Sprite CreateGroundShadowSprite()
+        {
+            if (cachedGroundShadowSprite != null) return cachedGroundShadowSprite;
+            int w = 64, h = 32;
+            Texture2D tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            float cx = w * 0.5f;
+            float cy = h * 0.5f;
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    float dx = (x - cx) / (cx - 1f);
+                    float dy = (y - cy) / (cy - 1f);
+                    float norm = Mathf.Clamp01(Mathf.Sqrt(dx * dx + dy * dy));
+                    float alpha = Mathf.Pow(1f - norm, 2.0f);
+                    tex.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+            tex.Apply();
+            cachedGroundShadowSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), 100f);
+            return cachedGroundShadowSprite;
+        }
+
+        private void CreateShadowIfMissing()
+        {
+            if (groundShadowRenderer != null) return;
+            GameObject shadowGo = new GameObject("GroundShadow");
+            shadowGo.transform.SetParent(transform, false);
+            groundShadowRenderer = shadowGo.AddComponent<SpriteRenderer>();
+            groundShadowRenderer.sprite = CreateGroundShadowSprite();
+            groundShadowRenderer.color = new Color(0.02f, 0.02f, 0.06f, 0.50f);
+            groundShadowRenderer.sortingOrder = 4;
         }
 
         private void CreateEscapeWarningIfMissing()
@@ -253,11 +301,11 @@ namespace WizardGame.Entities
         {
             return stageNumber switch
             {
-                <= 1 => 0.62f,
-                2 => 0.78f,
-                3 => 0.96f,
-                4 => 1.15f,
-                _ => 1.35f + (stageNumber - 5) * 0.12f
+                <= 1 => 0.58f,
+                2 => 0.68f,
+                3 => 0.80f,
+                4 => 0.94f,
+                _ => 1.10f + (stageNumber - 5) * 0.10f
             };
         }
 
@@ -324,6 +372,9 @@ namespace WizardGame.Entities
             else if (data.wizardType == WizardType.Chefe4) effectiveTargetHeight = targetHeight * 1.45f;
             else if (data.wizardType == WizardType.ChefeFinal) effectiveTargetHeight = targetHeight * 1.55f;
 
+            baseEffectiveTargetHeight = effectiveTargetHeight;
+            currentEffectiveHeight = effectiveTargetHeight;
+
             float scaleFactor = effectiveTargetHeight / Mathf.Max(0.1f, spriteHeight);
             normalizedScale = new Vector3(scaleFactor, scaleFactor, 1f);
             transform.localScale = Vector3.zero;
@@ -343,6 +394,25 @@ namespace WizardGame.Entities
                     escapeWarningText.transform.localPosition = new Vector3(0f, barYOffset + (isBoss ? 0.35f : 0.28f), 0f);
                     escapeWarningText.gameObject.SetActive(false);
                 }
+            }
+
+            if (groundShadowRenderer != null)
+            {
+                bool isGhost = data.wizardType == WizardType.Fantasma || data.movementPattern == AIMovementPattern.SpectralHover;
+                bool isBoss = WaveConfig.IsBossType(data.wizardType);
+                float spW = (defaultSprite != null && defaultSprite.bounds.size.x > 0.05f) ? defaultSprite.bounds.size.x : spriteHeight * 0.75f;
+                Vector2 shSize = groundShadowRenderer.sprite != null ? (Vector2)groundShadowRenderer.sprite.bounds.size : Vector2.one;
+                baseShadowAlpha = isGhost ? 0.26f : (isBoss ? 0.56f : 0.48f);
+                baseShadowLocalPos = new Vector3(0f, -spriteHeight * (isGhost ? 0.48f : 0.41f), 0f);
+                baseShadowLocalScale = new Vector3(
+                    (spW * 0.78f) / Mathf.Max(0.01f, shSize.x),
+                    (spriteHeight * 0.20f) / Mathf.Max(0.01f, shSize.y),
+                    1f
+                );
+                groundShadowRenderer.transform.localPosition = baseShadowLocalPos;
+                groundShadowRenderer.transform.localScale = baseShadowLocalScale;
+                groundShadowRenderer.color = new Color(0.02f, 0.02f, 0.06f, baseShadowAlpha);
+                groundShadowRenderer.gameObject.SetActive(true);
             }
 
             ApplyDepthSortingAndScale();
@@ -490,11 +560,12 @@ namespace WizardGame.Entities
             }
         }
 
-        public float GetCurrentHeight() => targetHeight;
+        public float GetCurrentHeight() => currentEffectiveHeight;
 
         public void SetSortingOrder(int order)
         {
             if (spriteRenderer != null) spriteRenderer.sortingOrder = order;
+            if (groundShadowRenderer != null) groundShadowRenderer.sortingOrder = order - 1;
             if (healthBarBg != null) healthBarBg.sortingOrder = order + 2;
             if (healthBarFill != null) healthBarFill.sortingOrder = order + 3;
             if (escapeWarningText != null)
@@ -504,18 +575,37 @@ namespace WizardGame.Entities
             }
         }
 
+        private Color GetDepthAdjustedTint(Color baseColor)
+        {
+            if (StageEnvironmentManager.Instance == null) return baseColor;
+            float fogAmount = Mathf.Clamp01(currentDepthNormalized) * StageEnvironmentManager.Instance.CurrentDepthFogStrength;
+            Color fogCol = StageEnvironmentManager.Instance.CurrentDepthFogColor;
+            Color blended = Color.Lerp(baseColor, new Color(fogCol.r, fogCol.g, fogCol.b, baseColor.a), fogAmount);
+            blended.a = baseColor.a;
+            return blended;
+        }
+
         private void ApplyDepthSortingAndScale()
         {
-            SetSortingOrder(Mathf.RoundToInt((10f - transform.position.y) * 10f));
+            float feetY = transform.position.y - (currentEffectiveHeight * 0.34f);
+            SetSortingOrder(Mathf.RoundToInt((10f - feetY) * 10f));
+
+            float minY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.min.y : -4.5f;
+            float maxY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.max.y : 4.5f;
+            currentDepthNormalized = Mathf.InverseLerp(minY, maxY, transform.position.y);
 
             if (isScaleInFinished && !IsTeleporting && !isDeadOrEscaping)
             {
-                float minY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.min.y : -4.5f;
-                float maxY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.max.y : 4.5f;
-                float yNorm = Mathf.InverseLerp(minY, maxY, transform.position.y);
-                // Efeito sutil de profundidade 2.5D: maior próximo à câmera (baixo), menor ao fundo (alto)
-                float depthScale = Mathf.Lerp(1.07f, 0.89f, yNorm);
+                // Perspectiva 2.5D marcante: maior próximo à câmera (baixo), menor ao fundo (alto)
+                float depthScale = Mathf.Lerp(1.14f, 0.78f, currentDepthNormalized);
+                currentEffectiveHeight = baseEffectiveTargetHeight * depthScale;
                 transform.localScale = normalizedScale * depthScale;
+
+                if (flashCoroutine == null && !isFrozen && !isChargingBossAttack && !isInvulnerable && currentData != null &&
+                    currentData.wizardType != WizardType.Dourado && currentData.wizardType != WizardType.Fantasma && spriteRenderer != null)
+                {
+                    spriteRenderer.color = GetDepthAdjustedTint(currentData.baseTint);
+                }
             }
         }
 
@@ -555,6 +645,10 @@ namespace WizardGame.Entities
             {
                 spriteRenderer.color = currentData.baseTint;
             }
+            if (groundShadowRenderer != null)
+            {
+                groundShadowRenderer.color = new Color(0.02f, 0.02f, 0.06f, baseShadowAlpha);
+            }
         }
 
         public void CancelAndDespawnImmediately()
@@ -564,6 +658,7 @@ namespace WizardGame.Entities
             if (hitCollider != null) hitCollider.enabled = false;
             if (healthBarRoot != null) healthBarRoot.SetActive(false);
             if (escapeWarningText != null) escapeWarningText.gameObject.SetActive(false);
+            if (groundShadowRenderer != null) groundShadowRenderer.gameObject.SetActive(false);
             gameObject.SetActive(false);
         }
 
@@ -575,7 +670,7 @@ namespace WizardGame.Entities
             float minY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.min.y : -4.5f;
             float maxY = screenWorldBounds.size.y > 0.1f ? screenWorldBounds.max.y : 4.5f;
             float yNorm = Mathf.InverseLerp(minY, maxY, transform.position.y);
-            Vector3 targetScale = normalizedScale * Mathf.Lerp(1.07f, 0.89f, yNorm);
+            Vector3 targetScale = normalizedScale * Mathf.Lerp(1.14f, 0.78f, yNorm);
 
             while (elapsed < duration)
             {
@@ -706,6 +801,11 @@ namespace WizardGame.Entities
                 {
                     TriggerBossEnrage(spawnReinforcements: true);
                 }
+            }
+
+            if (currentData != null && WaveConfig.IsBossType(currentData.wizardType))
+            {
+                OnBossHealthChanged?.Invoke(this, Mathf.Max(0, currentHealth), currentData.maxHealth, isBossEnraged);
             }
 
             if (currentHealth <= 0)
@@ -880,6 +980,10 @@ namespace WizardGame.Entities
                 float t = elapsed / duration;
                 transform.position = Vector3.Lerp(startPos, endPos, t);
                 spriteRenderer.color = new Color(startCol.r, startCol.g, startCol.b, Mathf.Lerp(startCol.a, 0f, t));
+                if (groundShadowRenderer != null)
+                {
+                    groundShadowRenderer.color = new Color(0.02f, 0.02f, 0.06f, Mathf.Lerp(baseShadowAlpha, 0f, t));
+                }
                 yield return null;
             }
 
@@ -943,7 +1047,7 @@ namespace WizardGame.Entities
 
         public void Freeze(float duration = 2.5f)
         {
-            if (isDeadOrEscaping) return;
+            if (isDeadOrEscaping || isInvulnerable) return;
 
             if (freezeCoroutine != null) StopCoroutine(freezeCoroutine);
             freezeCoroutine = StartCoroutine(FreezeRoutine(duration));
@@ -1008,6 +1112,10 @@ namespace WizardGame.Entities
                 {
                     float fadeT = (t - 0.75f) / 0.25f;
                     spriteRenderer.color = new Color(startCol.r, startCol.g, startCol.b, Mathf.Lerp(startCol.a, 0f, fadeT));
+                    if (groundShadowRenderer != null)
+                    {
+                        groundShadowRenderer.color = new Color(0.02f, 0.02f, 0.06f, Mathf.Lerp(baseShadowAlpha, 0f, fadeT));
+                    }
                 }
                 yield return null;
             }
@@ -1104,18 +1212,30 @@ namespace WizardGame.Entities
             {
                 jumpElapsed += Time.deltaTime;
                 float t = jumpElapsed / jumpDuration;
-                float yOffset = Mathf.Sin(t * Mathf.PI) * jumpHeight;
+                float jumpArc = Mathf.Sin(t * Mathf.PI);
+                float yOffset = jumpArc * jumpHeight;
                 transform.position = new Vector3(startPos.x, startPos.y + yOffset, startPos.z);
+                if (groundShadowRenderer != null)
+                {
+                    float invScaleY = 1f / Mathf.Max(0.1f, transform.localScale.y);
+                    groundShadowRenderer.transform.localPosition = baseShadowLocalPos - new Vector3(0f, yOffset * invScaleY, 0f);
+                    groundShadowRenderer.transform.localScale = baseShadowLocalScale * Mathf.Lerp(1f, 0.62f, jumpArc);
+                }
                 yield return null;
             }
             transform.position = startPos;
+            if (groundShadowRenderer != null)
+            {
+                groundShadowRenderer.transform.localPosition = baseShadowLocalPos;
+                groundShadowRenderer.transform.localScale = baseShadowLocalScale;
+            }
 
-            // Corrida frenética (Flee) com progressão de agilidade conforme a fase atual
+            // Corrida frenética (Flee) com progressão justa de agilidade conforme a fase atual
             float stageProgress = Mathf.Clamp01((currentStageNumber - 1) / 4f);
-            float fleeTimer = Mathf.Max(1.3f, currentData.fleeDuration * Mathf.Lerp(0.85f, 1.12f, stageProgress));
+            float fleeTimer = Mathf.Max(1.2f, currentData.fleeDuration * Mathf.Lerp(0.78f, 1.05f, stageProgress));
             float progressiveFleeMult = (currentData.wizardType == WizardType.Fugitivo)
-                ? Mathf.Lerp(1.45f, Mathf.Max(2.18f, currentData.fleeSpeedMultiplier), stageProgress)
-                : Mathf.Max(1.6f, currentData.fleeSpeedMultiplier);
+                ? Mathf.Lerp(1.38f, 1.92f, stageProgress)
+                : Mathf.Max(1.5f, currentData.fleeSpeedMultiplier);
             float fleeSpeed = currentData.moveSpeed * currentSpeedMultiplier * progressiveFleeMult;
 
             frameAnimator.Play(AnimationState.Run);
@@ -1175,7 +1295,7 @@ namespace WizardGame.Entities
         // 3. STRAIGHT MOVEMENT: Marcha retilínea contínua, disciplinada e militar
         private IEnumerator StraightMovementRoutine()
         {
-            float speed = currentData.moveSpeed * currentSpeedMultiplier * 1.35f;
+            float speed = currentData.moveSpeed * currentSpeedMultiplier * 1.05f;
             float margin = 1.0f;
 
             // Escolhe um rumo inicial reto
@@ -1545,7 +1665,7 @@ namespace WizardGame.Entities
 
             SpriteRenderer sr = portalGo.AddComponent<SpriteRenderer>();
             sr.sprite = currentData.specialActionSprite;
-            sr.sortingOrder = 8;
+            sr.sortingOrder = spriteRenderer != null ? spriteRenderer.sortingOrder + 1 : 168;
             sr.color = new Color(0.3f, 0.8f, 1f, 0.9f);
 
             MonoBehaviour host = SpellEffectsManager.Instance != null ? (MonoBehaviour)SpellEffectsManager.Instance : this;
@@ -1765,18 +1885,18 @@ namespace WizardGame.Entities
                 if (doFlameBurst && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
                 {
                     // Labareda em Área (Telegrafo interrompível!)
-                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.22f, AnimationState.Attack2, new Color(1f, 0.42f, 0.08f, 0.95f), 2.0f, 1, "Labareda do Xamã do Caos"));
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.42f, AnimationState.Attack2, new Color(1f, 0.42f, 0.08f, 0.95f), 2.0f, 1, "Labareda do Xamã do Caos"));
                 }
                 else if (currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
                     // Disparo de Projétil de Fogo vindo em direção à câmera
                     frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
                     yield return new WaitForSeconds(0.28f);
-                    SpawnApproachingBossProjectile(transform.position + Vector3.down * 0.1f, new Color(1f, 0.48f, 0.1f), isBossEnraged ? 1.45f : 1.75f, 1, "Bola de Fogo do Xamã");
+                    SpawnApproachingBossProjectile(transform.position + Vector3.down * 0.1f, new Color(1f, 0.48f, 0.1f), isBossEnraged ? 1.72f : 2.05f, 1, "Bola de Fogo do Xamã");
                     if (isBossEnraged)
                     {
-                        yield return new WaitForSeconds(0.2f);
-                        SpawnApproachingBossProjectile(transform.position + Vector3.right * 0.3f, new Color(1f, 0.65f, 0.15f), 1.55f, 1, "Centelha Extra do Xamã");
+                        yield return new WaitForSeconds(0.28f);
+                        SpawnApproachingBossProjectile(transform.position + Vector3.right * 0.3f, new Color(1f, 0.65f, 0.15f), 1.85f, 1, "Centelha Extra do Xamã");
                     }
                     yield return new WaitForSeconds(0.3f);
                 }
@@ -1818,6 +1938,7 @@ namespace WizardGame.Entities
                     isInvulnerable = true;
                     Color normalColor = currentData.baseTint;
                     spriteRenderer.color = new Color(normalColor.r, normalColor.g, normalColor.b, 0.22f);
+                    if (groundShadowRenderer != null) groundShadowRenderer.color = new Color(0.02f, 0.02f, 0.06f, 0.10f);
 
                     Vector3 stealthTarget = GetRandomPointInBounds();
                     Vector3 stealthStart = transform.position;
@@ -1840,6 +1961,7 @@ namespace WizardGame.Entities
                     yield return new WaitForSeconds(0.22f);
 
                     spriteRenderer.color = normalColor;
+                    if (groundShadowRenderer != null) groundShadowRenderer.color = new Color(0.02f, 0.02f, 0.06f, baseShadowAlpha);
                     isInvulnerable = false;
                     SpawnBossBurstFX(transform.position, new Color(0.55f, 0.15f, 0.95f, 0.85f), 1.4f);
                 }
@@ -1858,7 +1980,7 @@ namespace WizardGame.Entities
                     usedStealthLastTurn = false;
                     frameAnimator.PlayOneShot(AnimationState.Attack, AnimationState.Idle);
                     yield return new WaitForSeconds(0.28f);
-                    SpawnApproachingBossProjectile(transform.position, new Color(0.75f, 0.2f, 1f), isBossEnraged ? 1.40f : 1.65f, 1, "Orbe Espectral do Feiticeiro");
+                    SpawnApproachingBossProjectile(transform.position, new Color(0.75f, 0.2f, 1f), isBossEnraged ? 1.65f : 1.95f, 1, "Orbe Espectral do Feiticeiro");
                     yield return new WaitForSeconds(0.3f);
                 }
 
@@ -1901,17 +2023,17 @@ namespace WizardGame.Entities
 
                 if (actionRoll < 0.35f && currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
-                    // Golpe de Cetro Telegrafado (2 Dano se não interrompido!)
-                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.15f, AnimationState.Attack, new Color(0.95f, 0.12f, 0.18f, 0.95f), 1.9f, 2, "Golpe de Cetro do Lorde Carmesim"));
+                    // Golpe de Cetro Telegrafado (1 Dano se não interrompido!)
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.38f, AnimationState.Attack, new Color(0.95f, 0.12f, 0.18f, 0.95f), 1.9f, 1, "Golpe de Cetro do Lorde Carmesim"));
                 }
                 else if (actionRoll < 0.78f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
                 {
                     // Ataque 2: Rajada Dupla de Orbes Carmesins interceptáveis
                     frameAnimator.PlayOneShot(AnimationState.Attack2, AnimationState.Idle);
                     yield return new WaitForSeconds(0.28f);
-                    float flightDur = isBossEnraged ? 1.40f : 1.65f;
+                    float flightDur = isBossEnraged ? 1.68f : 1.98f;
                     SpawnApproachingBossProjectile(transform.position + Vector3.left * 0.35f, new Color(0.95f, 0.08f, 0.2f), flightDur, 1, "Orbe Carmesim do Lorde", -2.2f);
-                    yield return new WaitForSeconds(0.18f);
+                    yield return new WaitForSeconds(0.22f);
                     SpawnApproachingBossProjectile(transform.position + Vector3.right * 0.35f, new Color(0.95f, 0.08f, 0.2f), flightDur, 1, "Orbe Carmesim do Lorde", 2.2f);
                     yield return new WaitForSeconds(0.25f);
                 }
@@ -1965,12 +2087,12 @@ namespace WizardGame.Entities
                 if (roll < 0.25f && currentData.attackFrames != null && currentData.attackFrames.Length > 0)
                 {
                     // Maça Sísmica Telegrafada
-                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.10f, AnimationState.Attack, new Color(1f, 0.35f, 0.05f, 0.95f), 2.3f, 2, "Terremoto Colossal do Rei"));
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.32f, AnimationState.Attack, new Color(1f, 0.35f, 0.05f, 0.95f), 2.3f, 2, "Terremoto Colossal do Rei"));
                 }
                 else if (roll < 0.50f && currentData.attack2Frames != null && currentData.attack2Frames.Length > 0)
                 {
                     // Choque de Magma Telegrafado
-                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.05f, AnimationState.Attack2, new Color(1f, 0.58f, 0.1f, 0.95f), 2.8f, 2, "Choque de Magma do Rei"));
+                    yield return StartCoroutine(ExecuteTelegraphedSlamRoutine(1.28f, AnimationState.Attack2, new Color(1f, 0.58f, 0.1f, 0.95f), 2.8f, 2, "Choque de Magma do Rei"));
                 }
                 else if (roll < 0.82f && currentData.attack3Frames != null && currentData.attack3Frames.Length > 0)
                 {
@@ -1978,7 +2100,7 @@ namespace WizardGame.Entities
                     frameAnimator.PlayOneShot(AnimationState.Attack3, AnimationState.Idle);
                     yield return new WaitForSeconds(0.28f);
 
-                    float flightDur = isBossEnraged ? 1.40f : 1.70f;
+                    float flightDur = isBossEnraged ? 1.75f : 2.08f;
                     float[] xOffsets = new float[] { -3.2f, 0f, 3.2f };
                     foreach (float xo in xOffsets)
                     {
@@ -2014,7 +2136,7 @@ namespace WizardGame.Entities
             SpriteRenderer sr = proj.AddComponent<SpriteRenderer>();
             sr.sprite = CreateOrbSprite(64);
             sr.color = color;
-            sr.sortingOrder = 34;
+            sr.sortingOrder = 170;
 
             // Núcleo interno brilhante branco-dourado para máxima visibilidade
             GameObject core = new GameObject("Core");
@@ -2023,7 +2145,7 @@ namespace WizardGame.Entities
             var coreSr = core.AddComponent<SpriteRenderer>();
             coreSr.sprite = sr.sprite;
             coreSr.color = new Color(1f, 0.96f, 0.82f, 0.95f);
-            coreSr.sortingOrder = 35;
+            coreSr.sortingOrder = 171;
 
             CircleCollider2D col = proj.AddComponent<CircleCollider2D>();
             col.radius = 0.62f;
@@ -2069,7 +2191,7 @@ namespace WizardGame.Entities
             SpriteRenderer sr = burst.AddComponent<SpriteRenderer>();
             sr.sprite = CreateSolidWhiteSprite();
             sr.color = color;
-            sr.sortingOrder = 32;
+            sr.sortingOrder = 182;
 
             MonoBehaviour host = SpellEffectsManager.Instance != null ? (MonoBehaviour)SpellEffectsManager.Instance : this;
             host.StartCoroutine(BossBurstFadeRoutine(burst, color, radius));

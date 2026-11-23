@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using WizardGame.Data;
 using WizardGame.Entities;
 
 namespace WizardGame.Core
@@ -147,7 +148,7 @@ namespace WizardGame.Core
             sr.sprite = diamondSprite;
             sr.material = spriteMaterial;
             sr.color = new Color(0.7f, 0.95f, 1f, 0.95f);
-            sr.sortingOrder = 25;
+            sr.sortingOrder = 184;
             shard.transform.localScale = Vector3.one * UnityEngine.Random.Range(0.25f, 0.45f);
 
             float rotSpeed = UnityEngine.Random.Range(-360f, 360f);
@@ -184,7 +185,7 @@ namespace WizardGame.Core
             sr.sprite = circleSprite;
             sr.material = spriteMaterial;
             sr.color = new Color(0.6f, 0.95f, 1f, 0.8f);
-            sr.sortingOrder = 20;
+            sr.sortingOrder = 182;
             p.transform.localScale = Vector3.one * 0.12f;
 
             float elapsed = 0f;
@@ -231,7 +232,7 @@ namespace WizardGame.Core
             lr.endColor = new Color(0.2f, 0.6f, 1f, 0.9f);   // Azul elétrico
             lr.startWidth = 0.18f;
             lr.endWidth = 0.10f;
-            lr.sortingOrder = 40;
+            lr.sortingOrder = 188;
             lr.positionCount = 8;
             lr.useWorldSpace = true;
 
@@ -288,7 +289,7 @@ namespace WizardGame.Core
             sr.sprite = circleSprite;
             sr.material = spriteMaterial;
             sr.color = color;
-            sr.sortingOrder = 45;
+            sr.sortingOrder = 190;
             spark.transform.localScale = Vector3.one * UnityEngine.Random.Range(0.12f, 0.22f);
 
             float elapsed = 0f;
@@ -324,7 +325,7 @@ namespace WizardGame.Core
             flashSr.sprite = circleSprite;
             flashSr.material = spriteMaterial;
             flashSr.color = new Color(1f, 0.4f, 1f, 0.95f); // Magenta brilhante
-            flashSr.sortingOrder = 48;
+            flashSr.sortingOrder = 192;
             flashGo.transform.localScale = Vector3.one * 0.5f;
 
             // 2. Onda de Choque Circular (Shockwave Ring via LineRenderer)
@@ -332,7 +333,7 @@ namespace WizardGame.Core
             ringGo.transform.position = center;
             var lr = ringGo.AddComponent<LineRenderer>();
             lr.material = spriteMaterial;
-            lr.sortingOrder = 49;
+            lr.sortingOrder = 193;
             lr.useWorldSpace = true;
             lr.loop = true;
             int segments = 36;
@@ -452,7 +453,7 @@ namespace WizardGame.Core
             tm.anchor = TextAnchor.MiddleCenter;
             tm.color = color;
             var mr = go.GetComponent<MeshRenderer>();
-            if (mr != null) mr.sortingOrder = 60;
+            if (mr != null) mr.sortingOrder = 200;
 
             // Sombra escura atrás do texto para leitura impecável em qualquer cenário
             GameObject shadowGo = new GameObject("Shadow");
@@ -467,7 +468,7 @@ namespace WizardGame.Core
             shadowTm.anchor = TextAnchor.MiddleCenter;
             shadowTm.color = new Color(0f, 0f, 0f, 0.85f);
             var shadowMr = shadowGo.GetComponent<MeshRenderer>();
-            if (shadowMr != null) shadowMr.sortingOrder = 59;
+            if (shadowMr != null) shadowMr.sortingOrder = 199;
 
             float duration = 0.72f;
             float elapsed = 0f;
@@ -492,6 +493,100 @@ namespace WizardGame.Core
             }
 
             Destroy(go);
+        }
+
+        public void SpawnWandBeam(Vector3 targetWorldPos, SpellType spell, bool isHeadshot = false)
+        {
+            Camera cam = Camera.main;
+            if (cam == null) return;
+
+            // Origem aproximada da ponta do cristal da varinha POV no canto inferior direito da tela
+            Vector3 wandTipScreen = new Vector3(Screen.width * 0.80f, Screen.height * 0.36f, -cam.transform.position.z);
+            Vector3 origin = cam.ScreenToWorldPoint(wandTipScreen);
+            origin.z = 0f;
+            targetWorldPos.z = 0f;
+
+            Color startCol;
+            Color endCol;
+            float width;
+
+            switch (spell)
+            {
+                case SpellType.Arcane:
+                    startCol = new Color(0.75f, 0.98f, 1f, 1f);
+                    endCol = new Color(0.15f, 0.72f, 1f, 0.95f);
+                    width = 0.22f;
+                    break;
+                case SpellType.Ice:
+                    startCol = new Color(0.92f, 0.99f, 1f, 1f);
+                    endCol = new Color(0.45f, 0.90f, 1f, 0.95f);
+                    width = 0.16f;
+                    break;
+                case SpellType.Lightning:
+                    startCol = new Color(1f, 0.98f, 0.72f, 1f);
+                    endCol = new Color(1f, 0.82f, 0.15f, 0.95f);
+                    width = 0.18f;
+                    break;
+                case SpellType.Area:
+                    startCol = new Color(1f, 0.78f, 0.45f, 1f);
+                    endCol = new Color(1f, 0.28f, 0.68f, 0.95f);
+                    width = 0.24f;
+                    break;
+                default: // Tiro Normal
+                    startCol = isHeadshot ? new Color(1f, 0.95f, 0.45f, 1f) : new Color(0.88f, 0.98f, 1f, 0.95f);
+                    endCol = isHeadshot ? new Color(1f, 0.72f, 0.12f, 0.95f) : new Color(0.28f, 0.85f, 1f, 0.9f);
+                    width = isHeadshot ? 0.14f : 0.10f;
+                    break;
+            }
+
+            StartCoroutine(WandBeamRoutine(origin, targetWorldPos, startCol, endCol, width, spell == SpellType.Lightning));
+        }
+
+        private IEnumerator WandBeamRoutine(Vector3 origin, Vector3 target, Color startCol, Color endCol, float baseWidth, bool jagged)
+        {
+            GameObject beamGo = new GameObject("WandSpellBeam");
+            var lr = beamGo.AddComponent<LineRenderer>();
+            lr.material = spriteMaterial;
+            lr.useWorldSpace = true;
+            lr.sortingOrder = 189;
+            lr.numCapVertices = 4;
+
+            int segs = jagged ? 7 : 4;
+            lr.positionCount = segs;
+            Vector3 dir = target - origin;
+            Vector3 perp = Vector3.Cross(dir.normalized, Vector3.forward);
+
+            for (int i = 0; i < segs; i++)
+            {
+                float frac = i / (float)(segs - 1);
+                Vector3 pt = Vector3.Lerp(origin, target, frac);
+                if (i > 0 && i < segs - 1)
+                {
+                    float jitter = jagged ? UnityEngine.Random.Range(-0.22f, 0.22f) : Mathf.Sin(frac * Mathf.PI) * 0.08f;
+                    pt += perp * jitter;
+                }
+                lr.SetPosition(i, pt);
+            }
+
+            float duration = 0.12f;
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                if (Time.timeScale > 0.0001f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    float t = Mathf.Clamp01(elapsed / duration);
+                    float alpha = 1f - (t * t);
+                    float w = Mathf.Lerp(baseWidth, 0.015f, t);
+                    lr.startWidth = w * 0.65f;
+                    lr.endWidth = w;
+                    lr.startColor = new Color(startCol.r, startCol.g, startCol.b, startCol.a * alpha);
+                    lr.endColor = new Color(endCol.r, endCol.g, endCol.b, endCol.a * alpha);
+                }
+                yield return null;
+            }
+
+            Destroy(beamGo);
         }
 
         public void SpawnImpactEffect(Vector3 worldPos, bool isHit, bool isHeadshot, Color? customColor = null)
@@ -523,7 +618,7 @@ namespace WizardGame.Core
             sr.sprite = circleSprite;
             sr.material = spriteMaterial;
             sr.color = color;
-            sr.sortingOrder = 46;
+            sr.sortingOrder = 191;
 
             float dur = 0.16f;
             float elapsed = 0f;

@@ -95,7 +95,11 @@ namespace WizardGame.Core
 
         private void Start()
         {
-            PlayMenuMusic();
+            // Evita sobrescrever a música da Fase 1 caso GameManager.Start() tenha iniciado a partida antes (ex: Reiniciar Partida)
+            if (!isPlayingGameplayPlaylist && fadeCoroutine == null && (bgmSource == null || !bgmSource.isPlaying))
+            {
+                PlayMenuMusic();
+            }
         }
 
         private void Update()
